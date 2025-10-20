@@ -1,0 +1,4 @@
+moderngl>=5.8.0
+moderngl-window>=2.4.0
+pyrr>=0.10.3
+numpy>=1.21.0
