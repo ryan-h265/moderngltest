@@ -218,13 +218,89 @@ class Game(mglw.WindowConfig):
         self.cube3 = geometry.cube(size=(1.0, 1.0, 1.0))
         self.cube3_pos = Vector3([0.0, 0.5, 3.0])
         self.cube3_color = (0.8, 0.8, 0.3)  # Yellow
-        
+
+        # Additional 15 cubes
+        self.cube4 = geometry.cube(size=(1.2, 1.2, 1.2))
+        self.cube4_pos = Vector3([-5.0, 0.6, -4.0])
+        self.cube4_color = (0.9, 0.5, 0.2)  # Orange
+
+        self.cube5 = geometry.cube(size=(0.8, 2.5, 0.8))
+        self.cube5_pos = Vector3([6.0, 1.25, 3.0])
+        self.cube5_color = (0.5, 0.2, 0.8)  # Purple
+
+        self.cube6 = geometry.cube(size=(1.5, 1.0, 1.5))
+        self.cube6_pos = Vector3([-2.0, 0.5, -6.0])
+        self.cube6_color = (0.2, 0.8, 0.8)  # Cyan
+
+        self.cube7 = geometry.cube(size=(1.0, 1.8, 1.0))
+        self.cube7_pos = Vector3([4.5, 0.9, -5.0])
+        self.cube7_color = (0.9, 0.3, 0.6)  # Pink
+
+        self.cube8 = geometry.cube(size=(2.0, 0.8, 2.0))
+        self.cube8_pos = Vector3([1.5, 0.4, 6.0])
+        self.cube8_color = (0.6, 0.6, 0.2)  # Olive
+
+        self.cube9 = geometry.cube(size=(1.3, 1.3, 1.3))
+        self.cube9_pos = Vector3([-7.0, 0.65, 2.0])
+        self.cube9_color = (0.3, 0.7, 0.4)  # Sea Green
+
+        self.cube10 = geometry.cube(size=(0.9, 2.0, 0.9))
+        self.cube10_pos = Vector3([2.5, 1.0, -3.0])
+        self.cube10_color = (0.8, 0.6, 0.3)  # Gold
+
+        self.cube11 = geometry.cube(size=(1.6, 1.2, 1.6))
+        self.cube11_pos = Vector3([-4.0, 0.6, 5.0])
+        self.cube11_color = (0.7, 0.3, 0.3)  # Maroon
+
+        self.cube12 = geometry.cube(size=(1.1, 1.5, 1.1))
+        self.cube12_pos = Vector3([7.5, 0.75, -2.0])
+        self.cube12_color = (0.4, 0.5, 0.8)  # Steel Blue
+
+        self.cube13 = geometry.cube(size=(0.7, 0.7, 0.7))
+        self.cube13_pos = Vector3([-1.0, 0.35, 7.0])
+        self.cube13_color = (0.9, 0.7, 0.5)  # Peach
+
+        self.cube14 = geometry.cube(size=(1.4, 1.6, 1.4))
+        self.cube14_pos = Vector3([5.5, 0.8, 1.0])
+        self.cube14_color = (0.5, 0.3, 0.6)  # Plum
+
+        self.cube15 = geometry.cube(size=(1.8, 1.0, 1.8))
+        self.cube15_pos = Vector3([-6.0, 0.5, -1.5])
+        self.cube15_color = (0.3, 0.6, 0.6)  # Teal
+
+        self.cube16 = geometry.cube(size=(1.0, 2.2, 1.0))
+        self.cube16_pos = Vector3([3.5, 1.1, 4.5])
+        self.cube16_color = (0.8, 0.4, 0.2)  # Rust
+
+        self.cube17 = geometry.cube(size=(1.2, 0.9, 1.2))
+        self.cube17_pos = Vector3([-3.5, 0.45, -2.5])
+        self.cube17_color = (0.5, 0.8, 0.3)  # Lime
+
+        self.cube18 = geometry.cube(size=(0.8, 1.4, 0.8))
+        self.cube18_pos = Vector3([8.0, 0.7, 4.0])
+        self.cube18_color = (0.6, 0.4, 0.7)  # Lavender
+
         # Store all objects for easy iteration
         self.objects = [
             (self.ground, self.ground_pos, self.ground_color),
             (self.cube1, self.cube1_pos, self.cube1_color),
             (self.cube2, self.cube2_pos, self.cube2_color),
             (self.cube3, self.cube3_pos, self.cube3_color),
+            (self.cube4, self.cube4_pos, self.cube4_color),
+            (self.cube5, self.cube5_pos, self.cube5_color),
+            (self.cube6, self.cube6_pos, self.cube6_color),
+            (self.cube7, self.cube7_pos, self.cube7_color),
+            (self.cube8, self.cube8_pos, self.cube8_color),
+            (self.cube9, self.cube9_pos, self.cube9_color),
+            (self.cube10, self.cube10_pos, self.cube10_color),
+            (self.cube11, self.cube11_pos, self.cube11_color),
+            (self.cube12, self.cube12_pos, self.cube12_color),
+            (self.cube13, self.cube13_pos, self.cube13_color),
+            (self.cube14, self.cube14_pos, self.cube14_color),
+            (self.cube15, self.cube15_pos, self.cube15_color),
+            (self.cube16, self.cube16_pos, self.cube16_color),
+            (self.cube17, self.cube17_pos, self.cube17_color),
+            (self.cube18, self.cube18_pos, self.cube18_color),
         ]
         
     def get_light_matrix(self):
