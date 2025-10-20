@@ -307,13 +307,11 @@ class Game(mglw.WindowConfig):
         self.light_pos.z = radius * np.sin(angle)
         self.light_pos.y = height
 
-        # Update camera orientation based on mouse
-        self.update_camera_vectors()
-
         # Handle continuous camera movement based on keys pressed
         dt = frametime  # Delta time for frame-independent movement
         if dt > 0:
             keys = self.wnd.keys
+
             # Calculate forward/right vectors for camera
             forward = vector.normalise(self.camera_target - self.camera_pos)
             up = Vector3([0.0, 1.0, 0.0])
@@ -332,6 +330,9 @@ class Game(mglw.WindowConfig):
                 self.camera_pos.y -= movement
             if keys.E in self.keys_pressed:
                 self.camera_pos.y += movement
+
+            # Update camera target again after position changes
+            self.update_camera_vectors()
 
     def on_render(self, time, frametime):
         """Main render function called each frame"""
