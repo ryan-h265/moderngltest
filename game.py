@@ -353,50 +353,38 @@ class Game(mglw.WindowConfig):
         
     def on_key_event(self, key, action, modifiers):
         """Handle keyboard input"""
-        print(f"DEBUG: key_press_event called with key={key}, action={action}")
+        # print(f"DEBUG: key_press_event called with key={key}, action={action}")
         keys = self.wnd.keys
-
-        # Camera movement (WASD + QE for up/down)
         if action == keys.ACTION_PRESS:
-            direction = Vector3([0.0, 0.0, 0.0])
+            print(f"Key Pressed: {key}")
+            self.keys_pressed.add(key)
+        elif action == keys.ACTION_RELEASE:
+            print(f"Key Released: {key}")
+            self.keys_pressed.discard(key)
 
-            # Calculate forward/right vectors
-            forward = vector.normalise(self.camera_target - self.camera_pos)
-            up = Vector3([0.0, 1.0, 0.0])
-            right = vector.normalise(np.cross(forward, up))
-            
-            if key == keys.W:
-                self.camera_pos += forward * self.camera_speed * 0.1
-                self.camera_target += forward * self.camera_speed * 0.1
-            if key == keys.S:
-                self.camera_pos -= forward * self.camera_speed * 0.1
-                self.camera_target -= forward * self.camera_speed * 0.1
-            if key == keys.A:
-                self.camera_pos -= right * self.camera_speed * 0.1
-                self.camera_target -= right * self.camera_speed * 0.1
-            if key == keys.D:
-                self.camera_pos += right * self.camera_speed * 0.1
-                self.camera_target += right * self.camera_speed * 0.1
-            if key == keys.Q:
-                self.camera_pos.y -= self.camera_speed * 0.1
-                self.camera_target.y -= self.camera_speed * 0.1
-            if key == keys.E:
-                self.camera_pos.y += self.camera_speed * 0.1
-                self.camera_target.y += self.camera_speed * 0.1
-                
-            # Light movement (Arrow keys + ZX for up/down)
-            if key == keys.UP:
-                self.light_pos.z -= 1.0
-            if key == keys.DOWN:
-                self.light_pos.z += 1.0
-            if key == keys.LEFT:
-                self.light_pos.x -= 1.0
-            if key == keys.RIGHT:
-                self.light_pos.x += 1.0
-            if key == keys.Z:
-                self.light_pos.y -= 1.0
-            if key == keys.X:
-                self.light_pos.y += 1.0
+
+        # # Camera movement (WASD + QE for up/down)
+        # if action == keys.ACTION_PRESS:
+        #     direction = Vector3([0.0, 0.0, 0.0])
+
+        #     # Calculate forward/right vectors
+        #     forward = vector.normalise(self.camera_target - self.camera_pos)
+        #     up = Vector3([0.0, 1.0, 0.0])
+        #     right = vector.normalise(np.cross(forward, up))
+
+        #     # Light movement (Arrow keys + ZX for up/down)
+        #     if key == keys.UP:
+        #         self.light_pos.z -= 1.0
+        #     if key == keys.DOWN:
+        #         self.light_pos.z += 1.0
+        #     if key == keys.LEFT:
+        #         self.light_pos.x -= 1.0
+        #     if key == keys.RIGHT:
+        #         self.light_pos.x += 1.0
+        #     if key == keys.Z:
+        #         self.light_pos.y -= 1.0
+        #     if key == keys.X:
+        #         self.light_pos.y += 1.0
 
 if __name__ == '__main__':
     Game.run()
