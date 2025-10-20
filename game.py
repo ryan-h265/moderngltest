@@ -40,6 +40,14 @@ class Game(mglw.WindowConfig):
         # Keyboard state tracking
         self.keys_pressed = set()
 
+        # Mouse state tracking
+        self.mouse_captured = True
+        self.first_mouse = True
+
+        # Capture mouse cursor
+        self.wnd.mouse_exclusivity = True
+        self.wnd.cursor = False
+
         # Load shaders
         self.load_shaders()
 
@@ -235,6 +243,23 @@ class Game(mglw.WindowConfig):
         
         return light_projection * light_view
         
+    def update_camera_vectors(self):
+        """Update camera target based on yaw and pitch"""
+        # Convert yaw and pitch to radians
+        yaw_rad = np.radians(self.camera_yaw)
+        pitch_rad = np.radians(self.camera_pitch)
+
+        # Calculate the new front vector
+        front = Vector3([
+            np.cos(yaw_rad) * np.cos(pitch_rad),
+            np.sin(pitch_rad),
+            np.sin(yaw_rad) * np.cos(pitch_rad)
+        ])
+
+        # Normalize and set camera target
+        front = vector.normalise(front)
+        self.camera_target = self.camera_pos + front
+
     def get_view_matrix(self):
         """Calculate camera view matrix"""
         return Matrix44.look_at(
@@ -270,8 +295,8 @@ class Game(mglw.WindowConfig):
             # Render
             obj.render(program)
     
-    def on_render(self, time, frametime):
-        """Main render function called each frame"""
+    def on_update(self, time, frametime):
+        """Update game logic (called each frame before rendering)"""
         self.time = time
 
         # Animate light position - rotate around the scene
@@ -281,6 +306,9 @@ class Game(mglw.WindowConfig):
         self.light_pos.x = radius * np.cos(angle)
         self.light_pos.z = radius * np.sin(angle)
         self.light_pos.y = height
+
+        # Update camera orientation based on mouse
+        self.update_camera_vectors()
 
         # Handle continuous camera movement based on keys pressed
         dt = frametime  # Delta time for frame-independent movement
@@ -293,29 +321,22 @@ class Game(mglw.WindowConfig):
 
             movement = self.camera_speed * dt
             if keys.W in self.keys_pressed:
-                print("Moving Forward")
                 self.camera_pos += forward * movement
-                self.camera_target += forward * movement
             if keys.S in self.keys_pressed:
-                print("Moving Backward")
                 self.camera_pos -= forward * movement
-                self.camera_target -= forward * movement
             if keys.A in self.keys_pressed:
-                print("Moving Left")
                 self.camera_pos -= right * movement
-                self.camera_target -= right * movement
             if keys.D in self.keys_pressed:
-                print("Moving Right")
                 self.camera_pos += right * movement
-                self.camera_target += right * movement
             if keys.Q in self.keys_pressed:
-                print("Moving Up")
                 self.camera_pos.y -= movement
-                self.camera_target.y -= movement
             if keys.E in self.keys_pressed:
-                print("Moving Down")
                 self.camera_pos.y += movement
-                self.camera_target.y += movement
+
+    def on_render(self, time, frametime):
+        """Main render function called each frame"""
+        # Update game logic first
+        self.on_update(time, frametime)
 
         # Get matrices
         light_matrix = self.get_light_matrix()
@@ -351,15 +372,42 @@ class Game(mglw.WindowConfig):
         # Render scene from camera's perspective
         self.render_scene(self.main_program, light_matrix)
         
+    def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
+        """Handle mouse movement for FPS-style camera control"""
+        if not self.mouse_captured:
+            return
+
+        # Handle first mouse movement to avoid jump
+        if self.first_mouse:
+            self.first_mouse = False
+            return
+
+        # Calculate mouse offset using delta values (dx, dy are mouse movement deltas)
+        x_offset = dx * self.mouse_sensitivity
+        y_offset = -dy * self.mouse_sensitivity  # Reversed since y-coordinates go from bottom to top
+
+        # Update yaw and pitch
+        self.camera_yaw += x_offset
+        self.camera_pitch += y_offset
+
+        # Constrain pitch to prevent camera flipping
+        self.camera_pitch = max(-89.0, min(89.0, self.camera_pitch))
+
     def on_key_event(self, key, action, modifiers):
         """Handle keyboard input"""
-        # print(f"DEBUG: key_press_event called with key={key}, action={action}")
         keys = self.wnd.keys
+
+        # Toggle mouse capture with ESC
+        if key == keys.ESCAPE and action == keys.ACTION_PRESS:
+            self.mouse_captured = not self.mouse_captured
+            self.wnd.mouse_exclusivity = self.mouse_captured
+            self.wnd.cursor = not self.mouse_captured
+            self.first_mouse = True
+            return
+
         if action == keys.ACTION_PRESS:
-            print(f"Key Pressed: {key}")
             self.keys_pressed.add(key)
         elif action == keys.ACTION_RELEASE:
-            print(f"Key Released: {key}")
             self.keys_pressed.discard(key)
 
 
@@ -385,6 +433,10 @@ class Game(mglw.WindowConfig):
         #         self.light_pos.y -= 1.0
         #     if key == keys.X:
         #         self.light_pos.y += 1.0
+
+    # def on_mouse_position_event(self, x, y, dx, dy):
+    #     print("Mouse position:", x, y, dx, dy)
+
 
 if __name__ == '__main__':
     Game.run()
