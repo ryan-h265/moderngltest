@@ -173,7 +173,7 @@ MAX_PITCH = 89.0
 # ============================================================================
 
 # Ambient lighting
-AMBIENT_STRENGTH = 0.2         # 0.0 = pitch black, 1.0 = fully lit
+AMBIENT_STRENGTH = 0.1         # 0.0 = pitch black, 1.0 = fully lit
 
 # Directional light projection bounds
 LIGHT_ORTHO_LEFT = -15.0
@@ -191,16 +191,6 @@ DEFAULT_LIGHT_COLOR = (1.0, 1.0, 1.0)  # White
 # Input Settings
 # ============================================================================
 
-# Key bindings (using moderngl_window key constants)
-# These are checked in InputHandler
-KEY_FORWARD = 'W'
-KEY_BACKWARD = 'S'
-KEY_LEFT = 'A'
-KEY_RIGHT = 'D'
-KEY_UP = 'E'
-KEY_DOWN = 'Q'
-KEY_TOGGLE_MOUSE = 'ESCAPE'
-
 # ============================================================================
 # Debug Settings
 # ============================================================================
@@ -214,12 +204,12 @@ LOG_LEVEL = "INFO"  # "DEBUG", "INFO", "WARNING", "ERROR"
 # ============================================================================
 
 # Target frame rate (0 = unlimited)
-TARGET_FPS = 60
+# TARGET_FPS = 60
 
 # Enable/disable features for performance
-ENABLE_SHADOWS = True
-ENABLE_SPECULAR = True
-ENABLE_PCF = True
+# ENABLE_SHADOWS = True
+# ENABLE_SPECULAR = True
+# ENABLE_PCF = True
 
 # ============================================================================
 # Future Settings (for SSAO, CSM)
