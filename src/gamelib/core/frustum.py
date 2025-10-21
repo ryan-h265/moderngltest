@@ -39,27 +39,28 @@ class Frustum:
         Returns:
             List of 6 plane equations [A, B, C, D]
         """
-        # Convert to numpy for easier manipulation
-        m = np.array(vp, dtype='f4')
+        # Convert to numpy and transpose to get row-major format
+        # pyrr matrices are column-major, but plane extraction uses rows
+        m = np.array(vp, dtype='f4').T
 
         planes = []
 
-        # Left plane: m[3] + m[0]
+        # Left plane: row3 + row0
         planes.append(self._normalize_plane(m[3] + m[0]))
 
-        # Right plane: m[3] - m[0]
+        # Right plane: row3 - row0
         planes.append(self._normalize_plane(m[3] - m[0]))
 
-        # Bottom plane: m[3] + m[1]
+        # Bottom plane: row3 + row1
         planes.append(self._normalize_plane(m[3] + m[1]))
 
-        # Top plane: m[3] - m[1]
+        # Top plane: row3 - row1
         planes.append(self._normalize_plane(m[3] - m[1]))
 
-        # Near plane: m[3] + m[2]
+        # Near plane: row3 + row2
         planes.append(self._normalize_plane(m[3] + m[2]))
 
-        # Far plane: m[3] - m[2]
+        # Far plane: row3 - row2
         planes.append(self._normalize_plane(m[3] - m[2]))
 
         return planes
