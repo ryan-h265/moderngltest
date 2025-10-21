@@ -4,7 +4,10 @@
 
 The engine now supports **deferred rendering** with **unlimited shadow-casting lights**! This is a major architectural upgrade that enables scalable dynamic lighting without the hard limits of forward rendering.
 
-**Status**: ✅ Fully implemented and tested with 10 lights @ 60 FPS
+**Status**: ✅ **Fully implemented, tested, and working!**
+- 10 shadow-casting lights @ 60 FPS
+- All lights casting proper shadows with PCF soft shadows
+- Shadow accumulation working correctly
 
 ---
 
