@@ -35,9 +35,18 @@ GL_VERSION = (4, 1)
 RENDERING_MODE = "deferred"  # "forward" or "deferred"
 
 # Shadow mapping
-SHADOW_MAP_SIZE = 2048  # Resolution of shadow maps (2048x2048)
+SHADOW_MAP_SIZE = 2048  # Resolution of shadow maps (2048x2048) - default/high quality
 MAX_LIGHTS = 3          # Number of shadow-casting lights (only for forward rendering)
 SHADOW_BIAS = 0.005     # Bias to prevent shadow acne
+
+# Shadow map optimizations
+SHADOW_MAP_MIN_INTENSITY = 0.01  # Skip shadow rendering for lights dimmer than this
+ENABLE_ADAPTIVE_SHADOW_RES = True  # Use lower resolution for distant/dim lights
+SHADOW_MAP_SIZE_LOW = 512   # Resolution for low-importance lights (distant/dim)
+SHADOW_MAP_SIZE_MED = 1024  # Resolution for medium-importance lights
+SHADOW_MAP_SIZE_HIGH = 2048  # Resolution for high-importance lights (close/bright)
+SHADOW_UPDATE_THROTTLE_FRAMES = 0  # Update static light shadows every N frames (0=every frame)
+DEBUG_SHADOW_RENDERING = False  # Print shadow map rendering statistics
 
 # Deferred rendering optimizations
 MAX_LIGHTS_PER_FRAME = None  # Limit lights rendered per frame (None = unlimited)
