@@ -123,6 +123,20 @@ class Camera:
             FAR_PLANE
         )
 
+    def get_frustum(self, aspect_ratio: float):
+        """
+        Get view frustum for culling.
+
+        Args:
+            aspect_ratio: Width / height ratio
+
+        Returns:
+            Frustum object for visibility testing
+        """
+        from .frustum import Frustum
+        view_proj = self.get_projection_matrix(aspect_ratio) * self.get_view_matrix()
+        return Frustum(view_proj)
+
     def get_forward(self) -> Vector3:
         """Get camera forward vector"""
         return vector.normalise(self.target - self.position)

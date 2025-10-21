@@ -39,6 +39,10 @@ SHADOW_MAP_SIZE = 2048  # Resolution of shadow maps (2048x2048)
 MAX_LIGHTS = 3          # Number of shadow-casting lights (only for forward rendering)
 SHADOW_BIAS = 0.005     # Bias to prevent shadow acne
 
+# Deferred rendering optimizations
+MAX_LIGHTS_PER_FRAME = None  # Limit lights rendered per frame (None = unlimited)
+ENABLE_LIGHT_SORTING = True  # Sort lights by importance (brightness/distance)
+
 # PCF (Percentage Closer Filtering) for soft shadows
 PCF_SAMPLES = 3         # 3x3 grid = 9 samples (use 5 for 25 samples, 1 for no PCF)
 

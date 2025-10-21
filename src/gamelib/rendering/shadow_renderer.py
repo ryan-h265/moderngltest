@@ -57,27 +57,38 @@ class ShadowRenderer:
 
     def initialize_light_shadow_maps(self, lights: List[Light]):
         """
-        Create shadow maps for all lights that don't have them.
+        Create shadow maps for shadow-casting lights that don't have them.
+
+        Non-shadow-casting lights are skipped to save memory.
 
         Args:
             lights: List of lights to initialize
         """
         for light in lights:
-            if light.shadow_map is None or light.shadow_fbo is None:
+            # Only create shadow maps for shadow-casting lights
+            if light.cast_shadows and (light.shadow_map is None or light.shadow_fbo is None):
                 light.shadow_map, light.shadow_fbo = self.create_shadow_map()
 
     def render_shadow_maps(self, lights: List[Light], scene: Scene):
         """
         Render shadow maps for all lights.
 
-        This performs one shadow pass per light.
+        Uses shadow map caching - only re-renders shadows for lights that moved.
+        Non-shadow-casting lights are skipped entirely.
 
         Args:
             lights: List of lights to render shadows for
             scene: Scene to render
         """
         for light in lights:
-            self.render_single_shadow_map(light, scene)
+            # Skip non-shadow-casting lights
+            if not light.cast_shadows:
+                continue
+
+            # Only render if shadow is dirty (light moved)
+            if light.is_shadow_dirty():
+                self.render_single_shadow_map(light, scene)
+                light.mark_shadow_clean()
 
     def render_single_shadow_map(self, light: Light, scene: Scene):
         """

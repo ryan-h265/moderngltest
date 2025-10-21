@@ -39,10 +39,16 @@ class Light:
     color: Vector3 = field(default_factory=lambda: Vector3(DEFAULT_LIGHT_COLOR))
     intensity: float = DEFAULT_LIGHT_INTENSITY
     light_type: str = 'directional'
+    cast_shadows: bool = True  # If False, light contributes illumination without shadows
 
     # Shadow map resources (set by ShadowRenderer)
     shadow_map: moderngl.Texture = None
     shadow_fbo: moderngl.Framebuffer = None
+
+    # Shadow map caching (optimization)
+    _shadow_dirty: bool = field(default=True, init=False, repr=False)
+    _last_position: Vector3 = field(default=None, init=False, repr=False)
+    _last_target: Vector3 = field(default=None, init=False, repr=False)
 
     def get_light_matrix(
         self,
@@ -91,6 +97,43 @@ class Light:
 
         return light_projection * light_view
 
+    def is_shadow_dirty(self) -> bool:
+        """
+        Check if shadow map needs to be re-rendered.
+
+        Returns True if light position/target changed since last shadow render.
+        """
+        if not self.cast_shadows:
+            return False
+
+        if self._shadow_dirty:
+            return True
+
+        # Check if position or target changed
+        if self._last_position is None or self._last_target is None:
+            return True
+
+        # Convert Vector3 to numpy arrays for comparison
+        pos_array = np.array([self.position.x, self.position.y, self.position.z])
+        last_pos_array = np.array([self._last_position.x, self._last_position.y, self._last_position.z])
+        target_array = np.array([self.target.x, self.target.y, self.target.z])
+        last_target_array = np.array([self._last_target.x, self._last_target.y, self._last_target.z])
+
+        position_changed = not np.allclose(pos_array, last_pos_array, atol=1e-5)
+        target_changed = not np.allclose(target_array, last_target_array, atol=1e-5)
+
+        return position_changed or target_changed
+
+    def mark_shadow_clean(self):
+        """Mark shadow map as up-to-date (called after rendering shadow)."""
+        self._shadow_dirty = False
+        self._last_position = self.position.copy()
+        self._last_target = self.target.copy()
+
+    def mark_shadow_dirty(self):
+        """Force shadow map to be re-rendered on next frame."""
+        self._shadow_dirty = True
+
     def animate_rotation(
         self,
         time: float,
@@ -102,6 +145,7 @@ class Light:
         Animate light rotating around a center point.
 
         Useful for simulating sun movement or rotating lights.
+        Automatically marks shadow as dirty.
 
         Args:
             time: Current time in seconds
@@ -113,18 +157,21 @@ class Light:
         self.position.x = radius * np.cos(angle)
         self.position.z = radius * np.sin(angle)
         self.position.y = height
+        self.mark_shadow_dirty()
 
     def set_position(self, x: float, y: float, z: float):
-        """Set light position"""
+        """Set light position and mark shadow dirty."""
         self.position.x = x
         self.position.y = y
         self.position.z = z
+        self.mark_shadow_dirty()
 
     def set_target(self, x: float, y: float, z: float):
-        """Set light target (look-at point)"""
+        """Set light target (look-at point) and mark shadow dirty."""
         self.target.x = x
         self.target.y = y
         self.target.z = z
+        self.mark_shadow_dirty()
 
     def set_color(self, r: float, g: float, b: float):
         """

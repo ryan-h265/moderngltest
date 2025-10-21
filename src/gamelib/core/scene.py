@@ -7,6 +7,7 @@ Handles scene objects and rendering.
 from typing import List, Tuple
 from pyrr import Matrix44, Vector3
 from moderngl_window import geometry
+from . import geometry_utils
 
 
 class SceneObject:
@@ -49,9 +50,15 @@ class Scene:
     Provides methods to add objects and render them.
     """
 
-    def __init__(self):
-        """Initialize empty scene"""
+    def __init__(self, ctx=None):
+        """
+        Initialize empty scene.
+
+        Args:
+            ctx: ModernGL context (required for custom geometry like pyramids)
+        """
         self.objects: List[SceneObject] = []
+        self.ctx = ctx
 
     def add_object(self, obj: SceneObject):
         """
@@ -68,9 +75,9 @@ class Scene:
 
     def create_default_scene(self):
         """
-        Create the default scene with ground plane and 18 cubes.
+        Create the default scene with ground plane and mixed shapes (cubes, spheres, pyramids, cones).
 
-        This is the scene from the original game.py.
+        This is the scene from the original game.py, now with variety in shapes.
         """
         # Ground plane
         ground = SceneObject(
@@ -80,13 +87,13 @@ class Scene:
         )
         self.add_object(ground)
 
-        # Cube 1 - Red
-        cube1 = SceneObject(
-            geometry.cube(size=(2.0, 2.0, 2.0)),
+        # Sphere 1 - Red
+        sphere1 = SceneObject(
+            geometry.sphere(radius=1.0),
             Vector3([-3.0, 1.0, 0.0]),
             (0.8, 0.3, 0.3)
         )
-        self.add_object(cube1)
+        self.add_object(sphere1)
 
         # Cube 2 - Blue
         cube2 = SceneObject(
@@ -96,13 +103,13 @@ class Scene:
         )
         self.add_object(cube2)
 
-        # Cube 3 - Yellow
-        cube3 = SceneObject(
-            geometry.cube(size=(1.0, 1.0, 1.0)),
-            Vector3([0.0, 0.5, 3.0]),
+        # Pyramid 3 - Yellow
+        pyramid3 = SceneObject(
+            geometry_utils.pyramid(base_size=1.0, height=1.5),
+            Vector3([0.0, 0.0, 3.0]),
             (0.8, 0.8, 0.3)
         )
-        self.add_object(cube3)
+        self.add_object(pyramid3)
 
         # Cube 4 - Orange
         cube4 = SceneObject(
@@ -112,45 +119,45 @@ class Scene:
         )
         self.add_object(cube4)
 
-        # Cube 5 - Purple
-        cube5 = SceneObject(
-            geometry.cube(size=(0.8, 2.5, 0.8)),
+        # Sphere 5 - Purple
+        sphere5 = SceneObject(
+            geometry.sphere(radius=1.2),
             Vector3([6.0, 1.25, 3.0]),
             (0.5, 0.2, 0.8)
         )
-        self.add_object(cube5)
+        self.add_object(sphere5)
 
-        # Cube 6 - Cyan
-        cube6 = SceneObject(
-            geometry.cube(size=(1.5, 1.0, 1.5)),
-            Vector3([-2.0, 0.5, -6.0]),
+        # Pyramid 6 - Cyan
+        pyramid6 = SceneObject(
+            geometry_utils.pyramid( base_size=1.5, height=2.0),
+            Vector3([-2.0, 0.0, -6.0]),
             (0.2, 0.8, 0.8)
         )
-        self.add_object(cube6)
+        self.add_object(pyramid6)
 
-        # Cube 7 - Pink
-        cube7 = SceneObject(
-            geometry.cube(size=(1.0, 1.8, 1.0)),
+        # Sphere 7 - Pink
+        sphere7 = SceneObject(
+            geometry.sphere(radius=0.9),
             Vector3([4.5, 0.9, -5.0]),
             (0.9, 0.3, 0.6)
         )
-        self.add_object(cube7)
+        self.add_object(sphere7)
 
-        # Cube 8 - Olive
-        cube8 = SceneObject(
-            geometry.cube(size=(2.0, 0.8, 2.0)),
-            Vector3([1.5, 0.4, 6.0]),
+        # Cone 8 - Olive
+        cone8 = SceneObject(
+            geometry_utils.cone( radius=1.0, height=2.0),
+            Vector3([1.5, 0.0, 6.0]),
             (0.6, 0.6, 0.2)
         )
-        self.add_object(cube8)
+        self.add_object(cone8)
 
-        # Cube 9 - Sea Green
-        cube9 = SceneObject(
-            geometry.cube(size=(1.3, 1.3, 1.3)),
+        # Sphere 9 - Sea Green
+        sphere9 = SceneObject(
+            geometry.sphere(radius=0.65),
             Vector3([-7.0, 0.65, 2.0]),
             (0.3, 0.7, 0.4)
         )
-        self.add_object(cube9)
+        self.add_object(sphere9)
 
         # Cube 10 - Gold
         cube10 = SceneObject(
@@ -160,13 +167,13 @@ class Scene:
         )
         self.add_object(cube10)
 
-        # Cube 11 - Maroon
-        cube11 = SceneObject(
-            geometry.cube(size=(1.6, 1.2, 1.6)),
-            Vector3([-4.0, 0.6, 5.0]),
+        # Pyramid 11 - Maroon
+        pyramid11 = SceneObject(
+            geometry_utils.pyramid( base_size=1.6, height=1.5),
+            Vector3([-4.0, 0.0, 5.0]),
             (0.7, 0.3, 0.3)
         )
-        self.add_object(cube11)
+        self.add_object(pyramid11)
 
         # Cube 12 - Steel Blue
         cube12 = SceneObject(
@@ -176,53 +183,53 @@ class Scene:
         )
         self.add_object(cube12)
 
-        # Cube 13 - Peach
-        cube13 = SceneObject(
-            geometry.cube(size=(0.7, 0.7, 0.7)),
+        # Sphere 13 - Peach
+        sphere13 = SceneObject(
+            geometry.sphere(radius=0.35),
             Vector3([-1.0, 0.35, 7.0]),
             (0.9, 0.7, 0.5)
         )
-        self.add_object(cube13)
+        self.add_object(sphere13)
 
-        # Cube 14 - Plum
-        cube14 = SceneObject(
-            geometry.cube(size=(1.4, 1.6, 1.4)),
-            Vector3([5.5, 0.8, 1.0]),
+        # Cone 14 - Plum
+        cone14 = SceneObject(
+            geometry_utils.cone( radius=0.7, height=2.0),
+            Vector3([5.5, 0.0, 1.0]),
             (0.5, 0.3, 0.6)
         )
-        self.add_object(cube14)
+        self.add_object(cone14)
 
-        # Cube 15 - Teal
-        cube15 = SceneObject(
-            geometry.cube(size=(1.8, 1.0, 1.8)),
-            Vector3([-6.0, 0.5, -1.5]),
+        # Sphere 15 - Teal
+        sphere15 = SceneObject(
+            geometry.sphere(radius=0.9),
+            Vector3([-6.0, 0.9, -1.5]),
             (0.3, 0.6, 0.6)
         )
-        self.add_object(cube15)
+        self.add_object(sphere15)
 
-        # Cube 16 - Rust
-        cube16 = SceneObject(
-            geometry.cube(size=(1.0, 2.2, 1.0)),
-            Vector3([3.5, 1.1, 4.5]),
+        # Pyramid 16 - Rust
+        pyramid16 = SceneObject(
+            geometry_utils.pyramid( base_size=1.0, height=2.5),
+            Vector3([3.5, 0.0, 4.5]),
             (0.8, 0.4, 0.2)
         )
-        self.add_object(cube16)
+        self.add_object(pyramid16)
 
-        # Cube 17 - Lime
-        cube17 = SceneObject(
-            geometry.cube(size=(1.2, 0.9, 1.2)),
-            Vector3([-3.5, 0.45, -2.5]),
+        # Sphere 17 - Lime
+        sphere17 = SceneObject(
+            geometry.sphere(radius=0.6),
+            Vector3([-3.5, 0.6, -2.5]),
             (0.5, 0.8, 0.3)
         )
-        self.add_object(cube17)
+        self.add_object(sphere17)
 
-        # Cube 18 - Lavender
-        cube18 = SceneObject(
-            geometry.cube(size=(0.8, 1.4, 0.8)),
-            Vector3([8.0, 0.7, 4.0]),
+        # Cone 18 - Lavender
+        cone18 = SceneObject(
+            geometry_utils.cone( radius=0.4, height=1.8),
+            Vector3([8.0, 0.0, 4.0]),
             (0.6, 0.4, 0.7)
         )
-        self.add_object(cube18)
+        self.add_object(cone18)
 
     def render_all(self, program):
         """

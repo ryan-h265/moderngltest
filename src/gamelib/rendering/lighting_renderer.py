@@ -12,7 +12,12 @@ import moderngl
 from ..core.camera import Camera
 from ..core.light import Light
 from .gbuffer import GBuffer
-from ..config.settings import AMBIENT_STRENGTH, CLEAR_COLOR
+from ..config.settings import (
+    AMBIENT_STRENGTH,
+    CLEAR_COLOR,
+    MAX_LIGHTS_PER_FRAME,
+    ENABLE_LIGHT_SORTING
+)
 
 
 class LightingRenderer:
@@ -110,15 +115,58 @@ class LightingRenderer:
         self.ctx.disable(moderngl.BLEND)
         self._render_ambient(gbuffer)
 
-        # Step 2: Accumulate lighting from all lights (additive blending)
+        # Step 2: Sort and limit lights if enabled
+        lights_to_render = self._prepare_lights_for_rendering(lights, camera)
+
+        # Step 3: Accumulate lighting from all lights (additive blending)
         self.ctx.enable(moderngl.BLEND)
         self.ctx.blend_func = moderngl.ONE, moderngl.ONE  # Additive blending
 
-        for light_index, light in enumerate(lights):
+        for light_index, light in enumerate(lights_to_render):
             self._render_light(light, light_index, camera)
 
         # Restore blending state
         self.ctx.disable(moderngl.BLEND)
+
+    def _prepare_lights_for_rendering(self, lights: List[Light], camera: Camera) -> List[Light]:
+        """
+        Sort lights by importance and apply budget limit.
+
+        Importance = intensity / distance_to_camera²
+
+        Args:
+            lights: All lights in the scene
+            camera: Camera for distance calculation
+
+        Returns:
+            List of lights to render (sorted and limited)
+        """
+        if not ENABLE_LIGHT_SORTING and MAX_LIGHTS_PER_FRAME is None:
+            return lights  # No optimization needed
+
+        # Calculate importance for each light
+        lights_with_importance = []
+        for light in lights:
+            # Distance from camera to light
+            distance = np.linalg.norm(light.position - camera.position)
+            # Prevent division by zero
+            distance = max(distance, 0.1)
+
+            # Importance = intensity / distance²  (inverse square law)
+            importance = light.intensity / (distance * distance)
+
+            lights_with_importance.append((light, importance))
+
+        # Sort by importance (descending - most important first)
+        if ENABLE_LIGHT_SORTING:
+            lights_with_importance.sort(key=lambda x: x[1], reverse=True)
+
+        # Apply light budget limit
+        if MAX_LIGHTS_PER_FRAME is not None:
+            lights_with_importance = lights_with_importance[:MAX_LIGHTS_PER_FRAME]
+
+        # Return just the lights (drop importance scores)
+        return [light for light, _ in lights_with_importance]
 
     def _render_ambient(self, gbuffer: GBuffer):
         """
@@ -168,16 +216,28 @@ class LightingRenderer:
             self.lighting_program['light_intensity'].value = light.intensity
 
         # Set shadow map (use higher texture units to avoid G-Buffer conflict)
-        shadow_texture_unit = 10 + light_index
-        if light.shadow_map is not None:
+        # For non-shadow-casting lights, we still need to bind something to avoid shader errors
+        if light.cast_shadows and light.shadow_map is not None:
+            shadow_texture_unit = 10 + light_index
             light.shadow_map.use(location=shadow_texture_unit)
             if 'shadow_map' in self.lighting_program:
                 self.lighting_program['shadow_map'].value = shadow_texture_unit
 
-        # Set light matrix for shadow mapping
-        if 'light_matrix' in self.lighting_program:
-            light_matrix = light.get_light_matrix()
-            self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+            # Set light matrix for shadow mapping
+            if 'light_matrix' in self.lighting_program:
+                light_matrix = light.get_light_matrix()
+                self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+        else:
+            # Non-shadow-casting light: bind a dummy texture or use a zero matrix
+            # The shader will see shadow factor = 0 (no shadow)
+            if 'shadow_map' in self.lighting_program:
+                # Bind first shadow map or create dummy (shader won't use it effectively)
+                shadow_texture_unit = 10
+                if 'light_matrix' in self.lighting_program:
+                    import numpy as np
+                    # Identity matrix will cause all shadow tests to fail gracefully
+                    identity = np.eye(4, dtype='f4')
+                    self.lighting_program['light_matrix'].write(identity.tobytes())
 
         # Set camera position
         if 'camera_pos' in self.lighting_program:

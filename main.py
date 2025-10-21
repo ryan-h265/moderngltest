@@ -83,7 +83,7 @@ class Game(mglw.WindowConfig):
         lights = []
 
         # Number of lights to create
-        num_lights = 20
+        num_lights = 8
 
         for i in range(num_lights):
             # Arrange lights in a circle
