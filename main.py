@@ -69,8 +69,8 @@ class Game(mglw.WindowConfig):
         # Create lights
         self.lights = self._create_lights()
 
-        # Initialize shadow maps for lights
-        self.render_pipeline.initialize_lights(self.lights)
+        # Initialize shadow maps for lights (with camera for adaptive resolution)
+        self.render_pipeline.initialize_lights(self.lights, self.camera)
 
         # Time tracking
         self.time = 0
@@ -90,7 +90,7 @@ class Game(mglw.WindowConfig):
         lights = []
 
         # Number of lights to create
-        num_lights = 8
+        num_lights = 6
 
         for i in range(num_lights):
             # Arrange lights in a circle
@@ -120,7 +120,7 @@ class Game(mglw.WindowConfig):
                 position=Vector3([x, height, z]),
                 target=Vector3([0.0, 0.0, 0.0]),
                 color=color,
-                intensity=(i % 3) * 0.2,  # Vary intensity
+                intensity= 0.3 + (i % 3) * 0.2,  # Vary intensity
                 light_type='directional'
             )
 

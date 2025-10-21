@@ -135,16 +135,18 @@ class RenderPipeline:
             smaa_neighborhood
         )
 
-    def initialize_lights(self, lights: List[Light]):
+    def initialize_lights(self, lights: List[Light], camera: Camera = None):
         """
-        Initialize shadow maps for lights.
+        Initialize shadow maps for lights with adaptive resolution.
 
         Call this once after creating lights.
 
         Args:
             lights: List of lights to initialize
+            camera: Optional camera for adaptive shadow resolution calculation
         """
-        self.shadow_renderer.initialize_light_shadow_maps(lights)
+        camera_pos = camera.position if camera else None
+        self.shadow_renderer.initialize_light_shadow_maps(lights, camera_pos)
 
     def render_frame(self, scene: Scene, camera: Camera, lights: List[Light]):
         """

@@ -44,11 +44,15 @@ class Light:
     # Shadow map resources (set by ShadowRenderer)
     shadow_map: moderngl.Texture = None
     shadow_fbo: moderngl.Framebuffer = None
+    shadow_resolution: int = None  # Actual resolution of this light's shadow map
 
     # Shadow map caching (optimization)
     _shadow_dirty: bool = field(default=True, init=False, repr=False)
     _last_position: Vector3 = field(default=None, init=False, repr=False)
     _last_target: Vector3 = field(default=None, init=False, repr=False)
+
+    # Shadow map throttling (optimization)
+    _frames_since_shadow_update: int = field(default=0, init=False, repr=False)
 
     def get_light_matrix(
         self,
@@ -97,6 +101,40 @@ class Light:
 
         return light_projection * light_view
 
+    def should_render_shadow(self, intensity_threshold: float = 0.01, throttle_frames: int = 0) -> bool:
+        """
+        Determine if this light's shadow should be rendered this frame.
+
+        Checks:
+        1. Light casts shadows
+        2. Intensity is above threshold
+        3. Shadow is dirty (light moved) OR throttle interval reached
+
+        Args:
+            intensity_threshold: Skip shadows for lights dimmer than this
+            throttle_frames: Render shadow every N frames for static lights (0=every frame)
+
+        Returns:
+            True if shadow should be rendered this frame
+        """
+        # Must cast shadows
+        if not self.cast_shadows:
+            return False
+
+        # Must have sufficient intensity
+        if self.intensity < intensity_threshold:
+            return False
+
+        # Check if dirty (light moved)
+        if self.is_shadow_dirty():
+            return True
+
+        # Check throttle interval for static lights
+        if throttle_frames > 0:
+            return self._frames_since_shadow_update >= throttle_frames
+
+        return False
+
     def is_shadow_dirty(self) -> bool:
         """
         Check if shadow map needs to be re-rendered.
@@ -129,6 +167,11 @@ class Light:
         self._shadow_dirty = False
         self._last_position = self.position.copy()
         self._last_target = self.target.copy()
+        self._frames_since_shadow_update = 0  # Reset throttle counter
+
+    def increment_shadow_age(self):
+        """Increment frames since last shadow update (for throttling)."""
+        self._frames_since_shadow_update += 1
 
     def mark_shadow_dirty(self):
         """Force shadow map to be re-rendered on next frame."""
