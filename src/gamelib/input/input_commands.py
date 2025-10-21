@@ -107,6 +107,7 @@ class InputCommand(Enum):
     SYSTEM_SCREENSHOT = auto()
     SYSTEM_TOGGLE_DEBUG = auto()
     SYSTEM_TOGGLE_FULLSCREEN = auto()
+    SYSTEM_TOGGLE_SSAO = auto()      # Toggle SSAO on/off
     SYSTEM_QUICK_SAVE = auto()
     SYSTEM_QUICK_LOAD = auto()
     SYSTEM_PAUSE = auto()
@@ -157,6 +158,7 @@ COMMAND_TYPES = {
     InputCommand.SYSTEM_TOGGLE_MOUSE: InputType.INSTANT,
     InputCommand.SYSTEM_SCREENSHOT: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_DEBUG: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_SSAO: InputType.INSTANT,
 
     # Toggle (on/off state)
     InputCommand.GAME_CROUCH: InputType.TOGGLE,

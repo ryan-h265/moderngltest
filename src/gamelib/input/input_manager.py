@@ -91,11 +91,16 @@ class InputManager:
 
         # Get command for this key
         command = self.key_bindings.get_command(key, is_mouse=False)
+
+        print(f"Key pressed in InputManager: {key}, command: {command}")
+
+
         if command is None:
             return
 
         # Check if command is allowed in current context
         if not self.context_manager.is_command_allowed(command):
+            print(f"Command not allowed in current context: {command}")
             return
 
         # Handle based on command type

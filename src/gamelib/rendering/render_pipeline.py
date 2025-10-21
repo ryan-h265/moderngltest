@@ -22,10 +22,7 @@ from ..config.settings import (
     RENDERING_MODE,
     WINDOW_SIZE,
     SSAO_ENABLED,
-    SSAO_KERNEL_SIZE,
-    SSAO_RADIUS,
-    SSAO_BIAS,
-    SSAO_INTENSITY
+    SSAO_KERNEL_SIZE
 )
 
 
@@ -168,15 +165,17 @@ class RenderPipeline:
 
         # Pass 2.5: SSAO pass (optional, if enabled)
         ssao_texture = None
-        if self.ssao_renderer is not None and SSAO_ENABLED:
+        # Import settings dynamically to get current runtime value
+        from ..config import settings
+        if self.ssao_renderer is not None and settings.SSAO_ENABLED:
             aspect_ratio = self.window.size[0] / self.window.size[1]
             self.ssao_renderer.render(
                 self.gbuffer.position_texture,
                 self.gbuffer.normal_texture,
                 camera.get_projection_matrix(aspect_ratio),
-                radius=SSAO_RADIUS,
-                bias=SSAO_BIAS,
-                intensity=SSAO_INTENSITY
+                radius=settings.SSAO_RADIUS,
+                bias=settings.SSAO_BIAS,
+                intensity=settings.SSAO_INTENSITY
             )
             ssao_texture = self.ssao_renderer.get_ssao_texture()
 

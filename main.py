@@ -20,7 +20,7 @@ from src.gamelib import (
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
-from src.gamelib.input.controllers import CameraController
+from src.gamelib.input.controllers import CameraController, RenderingController
 
 
 class Game(mglw.WindowConfig):
@@ -54,6 +54,9 @@ class Game(mglw.WindowConfig):
 
         # Setup rendering pipeline
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
+
+        # Setup rendering controller for SSAO toggle, etc.
+        self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
         # Create scene
         self.scene = Scene()
@@ -180,6 +183,7 @@ class Game(mglw.WindowConfig):
 
         # Handle key press/release
         if action == keys.ACTION_PRESS:
+            # print(f"Key pressed: {key}")
             self.input_manager.on_key_press(key)
 
             # Check if ESC was pressed (for mouse capture toggle)
