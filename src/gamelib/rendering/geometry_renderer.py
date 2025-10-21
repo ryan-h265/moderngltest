@@ -1,0 +1,80 @@
+"""
+Geometry Renderer
+
+Renders scene geometry to the G-Buffer (deferred rendering geometry pass).
+"""
+
+from typing import Tuple
+import moderngl
+
+from ..core.camera import Camera
+from ..core.scene import Scene
+from .gbuffer import GBuffer
+
+
+class GeometryRenderer:
+    """
+    Renders scene geometry to G-Buffer.
+
+    This is the first pass of deferred rendering, where geometric
+    properties (position, normal, albedo) are written to textures
+    for later use in the lighting pass.
+    """
+
+    def __init__(self, ctx: moderngl.Context, geometry_program: moderngl.Program):
+        """
+        Initialize geometry renderer.
+
+        Args:
+            ctx: ModernGL context
+            geometry_program: Shader program for geometry pass
+        """
+        self.ctx = ctx
+        self.geometry_program = geometry_program
+
+    def render(self, scene: Scene, camera: Camera, gbuffer: GBuffer):
+        """
+        Render scene geometry to G-Buffer.
+
+        Args:
+            scene: Scene to render
+            camera: Camera for view
+            gbuffer: G-Buffer to render into
+        """
+        # Use G-Buffer framebuffer
+        gbuffer.use()
+
+        # Clear G-Buffer
+        gbuffer.clear()
+
+        # Set viewport
+        self.ctx.viewport = gbuffer.viewport
+
+        # Enable depth testing
+        self.ctx.enable(moderngl.DEPTH_TEST)
+
+        # Set camera uniforms
+        self._set_camera_uniforms(camera, gbuffer.size)
+
+        # Render all scene objects
+        scene.render_all(self.geometry_program)
+
+    def _set_camera_uniforms(self, camera: Camera, viewport_size: Tuple[int, int]):
+        """
+        Set camera-related shader uniforms.
+
+        Args:
+            camera: Camera to get matrices from
+            viewport_size: Viewport size for aspect ratio
+        """
+        # Calculate aspect ratio
+        width, height = viewport_size
+        aspect_ratio = width / height if height > 0 else 1.0
+
+        # Get camera matrices
+        view = camera.get_view_matrix()
+        projection = camera.get_projection_matrix(aspect_ratio)
+
+        # Set uniforms
+        self.geometry_program['projection'].write(projection.astype('f4').tobytes())
+        self.geometry_program['view'].write(view.astype('f4').tobytes())

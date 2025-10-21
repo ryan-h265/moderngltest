@@ -3,7 +3,7 @@
 // Main Lighting Vertex Shader
 // Multi-light shadow mapping with PCF
 
-#define MAX_LIGHTS 2
+#define MAX_LIGHTS 3
 
 // Camera matrices
 uniform mat4 projection;

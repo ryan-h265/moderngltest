@@ -3,7 +3,7 @@
 // Main Lighting Fragment Shader
 // Multi-light with shadow mapping and PCF soft shadows
 
-#define MAX_LIGHTS 2
+#define MAX_LIGHTS 3
 
 // Light properties
 uniform vec3 light_positions[MAX_LIGHTS];

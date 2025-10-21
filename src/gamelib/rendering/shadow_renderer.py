@@ -94,6 +94,9 @@ class ShadowRenderer:
         # Set viewport to shadow map size
         self.ctx.viewport = (0, 0, self.shadow_size, self.shadow_size)
 
+        # IMPORTANT: Enable depth testing for shadow map generation
+        self.ctx.enable(moderngl.DEPTH_TEST)
+
         # Get light matrix
         light_matrix = light.get_light_matrix()
 

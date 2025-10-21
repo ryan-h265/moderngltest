@@ -31,9 +31,12 @@ GL_VERSION = (4, 1)
 # Rendering Settings
 # ============================================================================
 
+# Rendering mode
+RENDERING_MODE = "deferred"  # "forward" or "deferred"
+
 # Shadow mapping
 SHADOW_MAP_SIZE = 2048  # Resolution of shadow maps (2048x2048)
-MAX_LIGHTS = 2          # Number of shadow-casting lights
+MAX_LIGHTS = 3          # Number of shadow-casting lights (only for forward rendering)
 SHADOW_BIAS = 0.005     # Bias to prevent shadow acne
 
 # PCF (Percentage Closer Filtering) for soft shadows
