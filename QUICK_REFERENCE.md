@@ -31,14 +31,17 @@ from src.gamelib import Camera, Light, Scene, SceneObject
 # Rendering
 from src.gamelib import RenderPipeline
 
-# Input
-from src.gamelib import InputHandler
+# Input (new Command Pattern system)
+from src.gamelib import InputManager, CameraController
+from src.gamelib.input import InputCommand, InputContext, KeyBindings
 
 # Direct imports
 from src.gamelib.core.camera import Camera
 from src.gamelib.core.light import Light
 from src.gamelib.core.scene import Scene
 from src.gamelib.rendering.render_pipeline import RenderPipeline
+from src.gamelib.input.input_manager import InputManager
+from src.gamelib.input.controllers import CameraController
 ```
 
 ---
@@ -60,10 +63,7 @@ camera = Camera(
 view_matrix = camera.get_view_matrix()
 projection_matrix = camera.get_projection_matrix(aspect_ratio=16/9)
 
-# Update camera
-camera.process_mouse_movement(dx, dy)
-camera.process_keyboard(keys_pressed, frametime)
-camera.update_vectors()  # Call after changing yaw/pitch
+# Camera is now controlled via CameraController (see Input section)
 ```
 
 ---
@@ -137,31 +137,59 @@ pipeline.render_frame(scene, camera, lights)
 
 ---
 
-## Handling Input
+## Handling Input (New Command Pattern System)
 
 ```python
-from src.gamelib import InputHandler
+from src.gamelib import Camera, InputManager, CameraController
+from src.gamelib.input import InputCommand, InputContext
 
-input_handler = InputHandler(camera)
+# Setup
+camera = Camera(position)
+input_manager = InputManager()
+camera_controller = CameraController(camera, input_manager)
 
 # In event handlers
 def on_key_event(self, key, action, modifiers):
     if action == self.wnd.keys.ACTION_PRESS:
-        input_handler.on_key_press(key)
+        input_manager.on_key_press(key)
+
+        # Update window state if ESC was pressed
+        if key == self.wnd.keys.ESCAPE:
+            captured = input_manager.mouse_captured
+            self.wnd.mouse_exclusivity = captured
+            self.wnd.cursor = not captured
+
     elif action == self.wnd.keys.ACTION_RELEASE:
-        input_handler.on_key_release(key)
+        input_manager.on_key_release(key)
 
 def on_mouse_position_event(self, _x, _y, dx, dy):
-    input_handler.on_mouse_move(dx, dy)
+    input_manager.on_mouse_move(dx, dy)
 
 # In update loop
 def on_update(self, time, frametime):
-    input_handler.update(frametime)
-    camera.update_vectors()
+    input_manager.update(frametime)  # Handles camera movement automatically
 
-# Toggle mouse capture
-captured = input_handler.toggle_mouse_capture()
+# Register custom command handlers
+input_manager.register_handler(InputCommand.GAME_JUMP, player.jump)
+input_manager.register_handler(InputCommand.UI_CONFIRM, ui.confirm_selection)
+
+# Context management (for menus, dialogue, etc.)
+input_manager.push_context(InputContext.MENU)  # Open menu
+input_manager.pop_context()                     # Close menu
+
+# Rebind keys
+bindings = input_manager.key_bindings
+bindings.rebind_key(InputCommand.GAME_JUMP, 32)  # Rebind jump to SPACE
+bindings.save_bindings()  # Save to keybindings.json
 ```
+
+### Key Features
+- **Rebindable keys**: Users can customize controls
+- **Context management**: Different controls for menus, gameplay, etc.
+- **Save/Load**: Custom bindings persist to `keybindings.json`
+- **Extensible**: Easy to add UI, game actions, object picking
+
+See **[docs/INPUT_SYSTEM.md](docs/INPUT_SYSTEM.md)** for comprehensive documentation.
 
 ---
 
@@ -254,7 +282,7 @@ pytest -v
 | Scene | `src/gamelib/core/scene.py` |
 | Shaders | `assets/shaders/*.{vert,frag}` |
 | Rendering | `src/gamelib/rendering/` |
-| Input | `src/gamelib/input/input_handler.py` |
+| Input System | `src/gamelib/input/` (Command Pattern architecture) |
 | Tests | `tests/` |
 | Examples | `examples/` |
 | Docs | `docs/` |
@@ -362,6 +390,7 @@ Check:
 ## Documentation
 
 - **Architecture**: `docs/ARCHITECTURE.md`
+- **Input System**: `docs/INPUT_SYSTEM.md` ⭐ NEW
 - **Roadmap**: `docs/ROADMAP.md`
 - **Shaders**: `docs/SHADER_GUIDE.md`
 - **Multi-Light**: `docs/MULTI_LIGHT_IMPLEMENTATION.md`

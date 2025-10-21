@@ -86,7 +86,9 @@ class Camera:
         self._front = vector.normalise(front)
 
         # Calculate right and up vectors
-        self._right = vector.normalise(np.cross(self._front, Vector3([0.0, 1.0, 0.0])))
+        self._right = vector.normalise(np.cross(self.get_forward(), Vector3([0.0, 1.0, 0.0])))
+
+        # self._right = vector.normalise(np.cross(self._front, Vector3([0.0, 1.0, 0.0])))
         self._up = vector.normalise(np.cross(self._right, self._front))
 
         # Update target
@@ -123,53 +125,9 @@ class Camera:
             FAR_PLANE
         )
 
-    def process_mouse_movement(self, dx: float, dy: float):
-        """
-        Process mouse movement for camera look.
-
-        Args:
-            dx: Mouse delta X (pixels)
-            dy: Mouse delta Y (pixels)
-        """
-        x_offset = dx * self.sensitivity
-        y_offset = -dy * self.sensitivity if not INVERT_MOUSE_Y else dy * self.sensitivity
-
-        self.yaw += x_offset
-        self.pitch += y_offset
-
-        # Constrain pitch to prevent camera flipping
-        self.pitch = max(MIN_PITCH, min(MAX_PITCH, self.pitch))
-
-    def process_keyboard(self, keys_pressed: set, frametime: float):
-        """
-        Process keyboard input for camera movement.
-
-        Args:
-            keys_pressed: Set of currently pressed key codes
-            frametime: Time since last frame in seconds
-        """
-        # Calculate movement vectors
-        forward = self._front
-        right = self._right
-
-        # Movement amount (frame-independent)
-        movement = self.speed * frametime
-
-        # Process movement keys
-        # Note: Key codes will be provided from the input handler
-        # which uses moderngl_window key constants
-        if 87 in keys_pressed:  # W - forward
-            self.position += forward * movement
-        if 83 in keys_pressed:  # S - backward
-            self.position -= forward * movement
-        if 65 in keys_pressed:  # A - left
-            self.position -= right * movement
-        if 68 in keys_pressed:  # D - right
-            self.position += right * movement
-        if 81 in keys_pressed:  # Q - down
-            self.position.y -= movement
-        if 69 in keys_pressed:  # E - up
-            self.position.y += movement
+    def get_forward(self) -> Vector3:
+        """Get camera forward vector"""
+        return vector.normalise(self.target - self.position)
 
     def get_position(self) -> Vector3:
         """Get camera position"""

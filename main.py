@@ -16,9 +16,11 @@ from src.gamelib import (
     Camera, Light, Scene,
     # Rendering
     RenderPipeline,
-    # Input
-    InputHandler,
 )
+
+# New input system
+from src.gamelib.input.input_manager import InputManager
+from src.gamelib.input.controllers import CameraController
 
 
 class Game(mglw.WindowConfig):
@@ -42,12 +44,16 @@ class Game(mglw.WindowConfig):
             target=Vector3([0.0, 0.0, 0.0])
         )
 
-        # Setup input
-        self.input_handler = InputHandler(self.camera, self.wnd.keys)
+        # Setup input system (new Command Pattern architecture)
+        self.input_manager = InputManager(self.wnd.keys)
+        self.camera_controller = CameraController(self.camera, self.input_manager)
 
         # Capture mouse
         self.wnd.mouse_exclusivity = True
         self.wnd.cursor = False
+
+        print("Key Constants:")
+        print(self.wnd.keys.W)
 
         # Setup rendering pipeline
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
@@ -106,11 +112,8 @@ class Game(mglw.WindowConfig):
         self.lights[0].animate_rotation(time)
         # Light 2 stays static
 
-        # Update input (camera movement)
-        self.input_handler.update(frametime)
-
-        # Update camera vectors
-        self.camera.update_vectors()
+        # Update input system (processes continuous commands + mouse movement)
+        self.input_manager.update(frametime)
 
     def on_render(self, time, frametime):
         """
@@ -134,7 +137,7 @@ class Game(mglw.WindowConfig):
             _x, _y: Absolute mouse position (unused)
             dx, dy: Mouse delta
         """
-        self.input_handler.on_mouse_move(dx, dy)
+        self.input_manager.on_mouse_move(dx, dy)
 
     def on_key_event(self, key, action, modifiers):
         """
@@ -147,18 +150,19 @@ class Game(mglw.WindowConfig):
         """
         keys = self.wnd.keys
 
-        # ESC to toggle mouse capture
-        if key == keys.ESCAPE and action == keys.ACTION_PRESS:
-            captured = self.input_handler.toggle_mouse_capture()
-            self.wnd.mouse_exclusivity = captured
-            self.wnd.cursor = not captured
-            return
-
-        # Regular key handling
+        # Handle key press/release
         if action == keys.ACTION_PRESS:
-            self.input_handler.on_key_press(key)
+            self.input_manager.on_key_press(key)
+
+            # Check if ESC was pressed (for mouse capture toggle)
+            # Update window state if mouse capture changed
+            if key == keys.ESCAPE:
+                captured = self.input_manager.mouse_captured
+                self.wnd.mouse_exclusivity = captured
+                self.wnd.cursor = not captured
+
         elif action == keys.ACTION_RELEASE:
-            self.input_handler.on_key_release(key)
+            self.input_manager.on_key_release(key)
 
 
 if __name__ == '__main__':

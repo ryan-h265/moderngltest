@@ -17,8 +17,10 @@ from moderngl_window import geometry
 from src.gamelib import (
     WINDOW_SIZE, ASPECT_RATIO, GL_VERSION,
     Camera, Light, Scene, SceneObject,
-    RenderPipeline, InputHandler
+    RenderPipeline
 )
+
+from src.gamelib.input import InputManager, CameraController
 
 
 class SimpleSceneDemo(mglw.WindowConfig):
@@ -35,7 +37,10 @@ class SimpleSceneDemo(mglw.WindowConfig):
 
         # Camera
         self.camera = Camera(Vector3([0.0, 3.0, 8.0]))
-        self.input_handler = InputHandler(self.camera)
+
+        # Input system (new Command Pattern architecture)
+        self.input_manager = InputManager()
+        self.camera_controller = CameraController(self.camera, self.input_manager)
 
         # Mouse capture
         self.wnd.mouse_exclusivity = True
@@ -91,27 +96,29 @@ class SimpleSceneDemo(mglw.WindowConfig):
 
     def on_update(self, time, frametime):
         self.lights[0].animate_rotation(time, radius=8.0, height=6.0)
-        self.input_handler.update(frametime)
-        self.camera.update_vectors()
+        self.input_manager.update(frametime)
 
     def on_render(self, time, frametime):
         self.on_update(time, frametime)
         self.render_pipeline.render_frame(self.scene, self.camera, self.lights)
 
     def on_mouse_position_event(self, _x, _y, dx, dy):
-        self.input_handler.on_mouse_move(dx, dy)
+        self.input_manager.on_mouse_move(dx, dy)
 
     def on_key_event(self, key, action, modifiers):
-        if key == self.wnd.keys.ESCAPE and action == self.wnd.keys.ACTION_PRESS:
-            captured = self.input_handler.toggle_mouse_capture()
-            self.wnd.mouse_exclusivity = captured
-            self.wnd.cursor = not captured
-            return
+        keys = self.wnd.keys
 
-        if action == self.wnd.keys.ACTION_PRESS:
-            self.input_handler.on_key_press(key)
-        elif action == self.wnd.keys.ACTION_RELEASE:
-            self.input_handler.on_key_release(key)
+        if action == keys.ACTION_PRESS:
+            self.input_manager.on_key_press(key)
+
+            # Check if ESC was pressed (for mouse capture toggle)
+            if key == keys.ESCAPE:
+                captured = self.input_manager.mouse_captured
+                self.wnd.mouse_exclusivity = captured
+                self.wnd.cursor = not captured
+
+        elif action == keys.ACTION_RELEASE:
+            self.input_manager.on_key_release(key)
 
 
 if __name__ == '__main__':

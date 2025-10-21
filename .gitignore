@@ -214,3 +214,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Game-specific
+keybindings.json  # User's custom key bindings
