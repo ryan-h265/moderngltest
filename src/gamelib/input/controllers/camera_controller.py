@@ -4,9 +4,6 @@ Camera Controller
 Translates input commands to camera actions.
 """
 
-import numpy as np
-from pyrr import Vector3, vector
-
 from ...core.camera import Camera
 from ..input_commands import InputCommand
 from ..input_manager import InputManager
@@ -78,32 +75,25 @@ class CameraController:
             self.toggle_mouse_capture
         )
 
-    
-
     def move_forward(self, delta_time: float):
-        """Move camera forward (on horizontal XZ plane only)"""
+        """Move camera forward"""
         movement = self.camera.speed * delta_time
-
-        self.camera.position += vector.normalise(self.camera.get_forward()) * movement
+        self.camera.position += self.camera._front * movement
 
     def move_backward(self, delta_time: float):
-        """Move camera backward (on horizontal XZ plane only)"""
+        """Move camera backward"""
         movement = self.camera.speed * delta_time
-
-        self.camera.position -= vector.normalise(self.camera.get_forward()) * movement
+        self.camera.position -= self.camera._front * movement
 
     def move_left(self, delta_time: float):
-        """Move camera left (on horizontal XZ plane only)"""
+        """Move camera left (strafe)"""
         movement = self.camera.speed * delta_time
-        self.camera.position -= vector.normalise(self.camera.get_right()) * movement
-
+        self.camera.position -= self.camera._right * movement
 
     def move_right(self, delta_time: float):
-        """Move camera right (on horizontal XZ plane only)"""
+        """Move camera right (strafe)"""
         movement = self.camera.speed * delta_time
-        # right = vector.normalise(np.cross(forward, up))
-
-        self.camera.position += vector.normalise(self.camera.get_right()) * movement
+        self.camera.position += self.camera._right * movement
 
     def move_up(self, delta_time: float):
         """Move camera up"""

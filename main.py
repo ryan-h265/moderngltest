@@ -52,9 +52,6 @@ class Game(mglw.WindowConfig):
         self.wnd.mouse_exclusivity = True
         self.wnd.cursor = False
 
-        print("Key Constants:")
-        print(self.wnd.keys.W)
-
         # Setup rendering pipeline
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
 
@@ -114,6 +111,9 @@ class Game(mglw.WindowConfig):
 
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
+
+        # Update camera target after position changes
+        self.camera.update_vectors()
 
     def on_render(self, time, frametime):
         """

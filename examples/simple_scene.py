@@ -39,7 +39,7 @@ class SimpleSceneDemo(mglw.WindowConfig):
         self.camera = Camera(Vector3([0.0, 3.0, 8.0]))
 
         # Input system (new Command Pattern architecture)
-        self.input_manager = InputManager()
+        self.input_manager = InputManager(self.wnd.keys)
         self.camera_controller = CameraController(self.camera, self.input_manager)
 
         # Mouse capture
@@ -97,6 +97,7 @@ class SimpleSceneDemo(mglw.WindowConfig):
     def on_update(self, time, frametime):
         self.lights[0].animate_rotation(time, radius=8.0, height=6.0)
         self.input_manager.update(frametime)
+        self.camera.update_vectors()  # Update target after position changes
 
     def on_render(self, time, frametime):
         self.on_update(time, frametime)

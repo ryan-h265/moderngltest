@@ -89,9 +89,6 @@ class InputManager:
         # Add to pressed keys
         self.pressed_keys.add(key)
 
-        print(f"Key pressed: {self.key_bindings.get_key_name(key)}, code: {key}")
-        print(self.key_bindings.keyboard_bindings)
-
         # Get command for this key
         command = self.key_bindings.get_command(key, is_mouse=False)
         if command is None:

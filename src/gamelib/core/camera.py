@@ -86,9 +86,7 @@ class Camera:
         self._front = vector.normalise(front)
 
         # Calculate right and up vectors
-        self._right = vector.normalise(np.cross(self.get_forward(), Vector3([0.0, 1.0, 0.0])))
-
-        # self._right = vector.normalise(np.cross(self._front, Vector3([0.0, 1.0, 0.0])))
+        self._right = vector.normalise(np.cross(self._front, Vector3([0.0, 1.0, 0.0])))
         self._up = vector.normalise(np.cross(self._right, self._front))
 
         # Update target
