@@ -43,34 +43,28 @@ def pyramid(base_size=1.0, height=1.0):
         norm = np.linalg.norm(normal)
         return normal / norm if norm > 0 else normal
 
-    # Base (two triangles)
-    base_normal = np.array([0.0, -1.0, 0.0], dtype='f4')
-
-    # Side face normals
-    front_normal = calc_normal(vertices[3], vertices[2], vertices[4])
-    right_normal = calc_normal(vertices[2], vertices[1], vertices[4])
-    back_normal = calc_normal(vertices[1], vertices[0], vertices[4])
-    left_normal = calc_normal(vertices[0], vertices[3], vertices[4])
-
     # Build vertex data with positions and normals
     # Each triangle: 3 vertices, each with position (3 floats) + normal (3 floats)
     vertex_data = []
 
-    # Base (bottom, two triangles - clockwise from below)
-    for indices, normal in [
-        ([0, 2, 1], base_normal),  # Triangle 1
-        ([0, 3, 2], base_normal),  # Triangle 2
+    # Base (bottom, two triangles - CCW from below = CW from above)
+    base_normal = np.array([0.0, -1.0, 0.0], dtype='f4')
+    for indices in [
+        [0, 1, 2],  # Triangle 1
+        [0, 2, 3],  # Triangle 2
     ]:
         for idx in indices:
             vertex_data.extend(vertices[idx])
-            vertex_data.extend(normal)
+            vertex_data.extend(base_normal)
 
     # Side faces (counter-clockwise from outside)
+    # Looking from outside: vertices should go CCW
+    # Front face (+Z): looking from front, goes 3 -> 2 -> 4
     side_faces = [
-        ([3, 4, 2], front_normal),  # Front
-        ([2, 4, 1], right_normal),  # Right
-        ([1, 4, 0], back_normal),   # Back
-        ([0, 4, 3], left_normal),   # Left
+        ([3, 2, 4], calc_normal(vertices[3], vertices[2], vertices[4])),  # Front
+        ([2, 1, 4], calc_normal(vertices[2], vertices[1], vertices[4])),  # Right
+        ([1, 0, 4], calc_normal(vertices[1], vertices[0], vertices[4])),  # Back
+        ([0, 3, 4], calc_normal(vertices[0], vertices[3], vertices[4])),  # Left
     ]
 
     for indices, normal in side_faces:

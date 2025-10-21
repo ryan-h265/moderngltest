@@ -38,6 +38,10 @@ class Game(mglw.WindowConfig):
         # Enable depth testing
         self.ctx.enable(moderngl.DEPTH_TEST)
 
+        # Enable backface culling for ~50% fragment shader performance improvement
+        self.ctx.enable(moderngl.CULL_FACE)
+        self.ctx.front_face = 'ccw'  # Counter-clockwise winding order
+
         # Setup camera
         self.camera = Camera(
             position=Vector3([0.0, 5.0, 10.0]),
