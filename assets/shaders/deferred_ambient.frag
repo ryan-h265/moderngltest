@@ -1,12 +1,17 @@
 #version 410
 
 // Deferred Rendering - Ambient Lighting Fragment Shader
-// Adds base ambient lighting (not affected by shadows)
+// Adds base ambient lighting with optional SSAO
 
 // G-Buffer textures
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
 uniform sampler2D gAlbedo;
+
+// SSAO texture (optional)
+uniform sampler2D ssaoTexture;
+uniform bool ssaoEnabled;
+uniform float ssaoIntensity;
 
 // Ambient strength
 uniform float ambient_strength;
@@ -29,8 +34,16 @@ void main() {
         return;
     }
 
-    // Ambient lighting (constant base illumination)
-    vec3 ambient = ambient_strength * base_color;
+    // Get SSAO occlusion factor
+    float occlusion = 1.0;
+    if (ssaoEnabled) {
+        float ao = texture(ssaoTexture, v_texcoord).r;
+        // Mix between full occlusion (0.0) and no occlusion (1.0)
+        occlusion = mix(1.0 - ssaoIntensity, 1.0, ao);
+    }
+
+    // Ambient lighting (modulated by SSAO)
+    vec3 ambient = ambient_strength * base_color * occlusion;
 
     f_color = vec4(ambient, 1.0);
 }

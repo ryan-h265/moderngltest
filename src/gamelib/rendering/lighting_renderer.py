@@ -88,7 +88,8 @@ class LightingRenderer:
         lights: List[Light],
         gbuffer: GBuffer,
         camera: Camera,
-        viewport: tuple
+        viewport: tuple,
+        ssao_texture: moderngl.Texture = None
     ):
         """
         Render all lighting to the screen.
@@ -98,6 +99,7 @@ class LightingRenderer:
             gbuffer: G-Buffer with geometric data
             camera: Camera for view position
             viewport: Viewport tuple (x, y, width, height)
+            ssao_texture: Optional SSAO texture
         """
         # Use screen framebuffer
         self.ctx.screen.use()
@@ -113,7 +115,7 @@ class LightingRenderer:
 
         # Step 1: Render ambient lighting (no blending)
         self.ctx.disable(moderngl.BLEND)
-        self._render_ambient(gbuffer)
+        self._render_ambient(gbuffer, ssao_texture)
 
         # Step 2: Sort and limit lights if enabled
         lights_to_render = self._prepare_lights_for_rendering(lights, camera)
@@ -122,8 +124,11 @@ class LightingRenderer:
         self.ctx.enable(moderngl.BLEND)
         self.ctx.blend_func = moderngl.ONE, moderngl.ONE  # Additive blending
 
+        # Get inverse view matrix for world-space reconstruction
+        inverse_view = np.linalg.inv(camera.get_view_matrix())
+
         for light_index, light in enumerate(lights_to_render):
-            self._render_light(light, light_index, camera)
+            self._render_light(light, light_index, camera, inverse_view)
 
         # Restore blending state
         self.ctx.disable(moderngl.BLEND)
@@ -168,12 +173,13 @@ class LightingRenderer:
         # Return just the lights (drop importance scores)
         return [light for light, _ in lights_with_importance]
 
-    def _render_ambient(self, gbuffer: GBuffer):
+    def _render_ambient(self, gbuffer: GBuffer, ssao_texture: moderngl.Texture = None):
         """
         Render ambient lighting pass.
 
         Args:
             gbuffer: G-Buffer (for texture binding reference)
+            ssao_texture: Optional SSAO texture
         """
         # Set G-Buffer samplers (check if uniforms exist first)
         if 'gPosition' in self.ambient_program:
@@ -187,10 +193,24 @@ class LightingRenderer:
         if 'ambient_strength' in self.ambient_program:
             self.ambient_program['ambient_strength'].value = AMBIENT_STRENGTH
 
+        # Set SSAO texture and parameters
+        if ssao_texture is not None:
+            ssao_texture.use(location=4)
+            if 'ssaoTexture' in self.ambient_program:
+                self.ambient_program['ssaoTexture'].value = 4
+            if 'ssaoEnabled' in self.ambient_program:
+                self.ambient_program['ssaoEnabled'].value = True
+            if 'ssaoIntensity' in self.ambient_program:
+                from ..config.settings import SSAO_INTENSITY
+                self.ambient_program['ssaoIntensity'].value = SSAO_INTENSITY
+        else:
+            if 'ssaoEnabled' in self.ambient_program:
+                self.ambient_program['ssaoEnabled'].value = False
+
         # Render full-screen quad
         self.quad_vao_ambient.render(moderngl.TRIANGLES)
 
-    def _render_light(self, light: Light, light_index: int, camera: Camera):
+    def _render_light(self, light: Light, light_index: int, camera: Camera, inverse_view: np.ndarray):
         """
         Render a single light's contribution.
 
@@ -198,6 +218,7 @@ class LightingRenderer:
             light: Light to render
             light_index: Index of light (for shadow map binding)
             camera: Camera for view position
+            inverse_view: Inverse view matrix for world-space reconstruction
         """
         # Set G-Buffer samplers (locations 0-3) - check if uniforms exist
         if 'gPosition' in self.lighting_program:
@@ -206,6 +227,10 @@ class LightingRenderer:
             self.lighting_program['gNormal'].value = 1
         if 'gAlbedo' in self.lighting_program:
             self.lighting_program['gAlbedo'].value = 2
+
+        # Set inverse view matrix for world-space reconstruction
+        if 'inverse_view' in self.lighting_program:
+            self.lighting_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
 
         # Set light properties
         if 'light_position' in self.lighting_program:

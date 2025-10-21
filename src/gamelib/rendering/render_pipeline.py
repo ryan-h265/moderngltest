@@ -14,10 +14,19 @@ from .main_renderer import MainRenderer
 from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
+from .ssao_renderer import SSAORenderer
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
-from ..config.settings import RENDERING_MODE, WINDOW_SIZE
+from ..config.settings import (
+    RENDERING_MODE,
+    WINDOW_SIZE,
+    SSAO_ENABLED,
+    SSAO_KERNEL_SIZE,
+    SSAO_RADIUS,
+    SSAO_BIAS,
+    SSAO_INTENSITY
+)
 
 
 class RenderPipeline:
@@ -60,6 +69,10 @@ class RenderPipeline:
         self.shader_manager.load_program("lighting", "deferred_lighting.vert", "deferred_lighting.frag")
         self.shader_manager.load_program("ambient", "deferred_lighting.vert", "deferred_ambient.frag")
 
+        # SSAO shaders
+        self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
+        self.shader_manager.load_program("ssao_blur", "ssao_blur.vert", "ssao_blur.frag")
+
         # Create shadow renderer (used by both modes)
         self.shadow_renderer = ShadowRenderer(
             ctx,
@@ -83,6 +96,14 @@ class RenderPipeline:
             self.shader_manager.get("lighting"),
             self.shader_manager.get("ambient")
         )
+
+        # Create SSAO renderer (only used in deferred mode)
+        self.ssao_renderer = SSAORenderer(
+            ctx,
+            WINDOW_SIZE,
+            self.shader_manager.get("ssao"),
+            self.shader_manager.get("ssao_blur")
+        ) if SSAO_ENABLED else None
 
     def initialize_lights(self, lights: List[Light]):
         """
@@ -145,8 +166,28 @@ class RenderPipeline:
         # Pass 2: Geometry pass (write to G-Buffer)
         self.geometry_renderer.render(scene, camera, self.gbuffer)
 
+        # Pass 2.5: SSAO pass (optional, if enabled)
+        ssao_texture = None
+        if self.ssao_renderer is not None and SSAO_ENABLED:
+            aspect_ratio = self.window.size[0] / self.window.size[1]
+            self.ssao_renderer.render(
+                self.gbuffer.position_texture,
+                self.gbuffer.normal_texture,
+                camera.get_projection_matrix(aspect_ratio),
+                radius=SSAO_RADIUS,
+                bias=SSAO_BIAS,
+                intensity=SSAO_INTENSITY
+            )
+            ssao_texture = self.ssao_renderer.get_ssao_texture()
+
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
-        self.lighting_renderer.render(lights, self.gbuffer, camera, self.window.viewport)
+        self.lighting_renderer.render(
+            lights,
+            self.gbuffer,
+            camera,
+            self.window.viewport,
+            ssao_texture=ssao_texture
+        )
 
     def get_shader(self, name: str) -> moderngl.Program:
         """

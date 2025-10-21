@@ -3,10 +3,13 @@
 // Deferred Rendering - Lighting Pass Fragment Shader
 // Calculates lighting for a single light using G-Buffer data
 
-// G-Buffer textures
-uniform sampler2D gPosition;// World position
-uniform sampler2D gNormal;// World normal
+// G-Buffer textures (NOTE: position and normal are in VIEW SPACE)
+uniform sampler2D gPosition;// View space position
+uniform sampler2D gNormal;// View space normal
 uniform sampler2D gAlbedo;// Base color + specular
+
+// Transform from view space to world space
+uniform mat4 inverse_view;
 
 // Light properties
 uniform vec3 light_position;
@@ -68,21 +71,25 @@ float calculate_shadow(vec3 position){
 }
 
 void main(){
-    // Sample G-Buffer
-    vec3 position=texture(gPosition,v_texcoord).rgb;
-    vec3 normal=texture(gNormal,v_texcoord).rgb;
+    // Sample G-Buffer (view space data)
+    vec3 view_position=texture(gPosition,v_texcoord).rgb;
+    vec3 view_normal=texture(gNormal,v_texcoord).rgb;
     vec4 albedo=texture(gAlbedo,v_texcoord);
-    
+
     // Extract material properties
     vec3 base_color=albedo.rgb;
     float specular_intensity=albedo.a;
-    
+
     // Early exit for background pixels (no geometry)
-    if(length(normal)<.1){
+    if(length(view_normal)<.1){
         f_color=vec4(0.,0.,0.,0.);
         return;
     }
-    
+
+    // Transform position and normal back to world space
+    vec3 position=(inverse_view*vec4(view_position,1.)).xyz;
+    vec3 normal=normalize(mat3(inverse_view)*view_normal);
+
     // Lighting calculations
     vec3 light_dir=normalize(light_position-position);
     vec3 view_dir=normalize(camera_pos-position);

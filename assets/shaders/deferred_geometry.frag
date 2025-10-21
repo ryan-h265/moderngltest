@@ -7,20 +7,24 @@
 uniform vec3 object_color;
 
 // Inputs from vertex shader
-in vec3 v_position;  // World space position
-in vec3 v_normal;    // World space normal
+in vec3 v_world_position;  // World space position
+in vec3 v_view_position;   // View space position
+in vec3 v_world_normal;    // World space normal
+in vec3 v_view_normal;     // View space normal
 
 // G-Buffer outputs (Multiple Render Targets)
-layout(location = 0) out vec3 gPosition;  // World position
-layout(location = 1) out vec3 gNormal;    // World normal
+// NOTE: Position and Normal are in VIEW SPACE for SSAO compatibility
+// World-space can be reconstructed if needed using inverse view matrix
+layout(location = 0) out vec3 gPosition;  // View space position (for SSAO)
+layout(location = 1) out vec3 gNormal;    // View space normal (for SSAO)
 layout(location = 2) out vec4 gAlbedo;    // Base color + specular
 
 void main() {
-    // Store world space position
-    gPosition = v_position;
+    // Store view space position (required for SSAO)
+    gPosition = v_view_position;
 
-    // Store normalized normal
-    gNormal = normalize(v_normal);
+    // Store view space normalized normal (required for SSAO)
+    gNormal = normalize(v_view_normal);
 
     // Store albedo (base color) and specular intensity
     // RGB = object color, A = specular intensity (currently hardcoded to 0.3)

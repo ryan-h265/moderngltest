@@ -19,7 +19,7 @@ SHADERS_DIR = ASSETS_DIR / "shaders"
 # Window Configuration
 # ============================================================================
 
-WINDOW_SIZE = (1280, 720)
+WINDOW_SIZE = (1920, 1080)
 ASPECT_RATIO = 16 / 9
 WINDOW_TITLE = "ModernGL 3D Engine"
 RESIZABLE = True
@@ -135,7 +135,7 @@ ENABLE_PCF = True
 # ============================================================================
 
 # SSAO (Screen Space Ambient Occlusion)
-SSAO_ENABLED = False
+SSAO_ENABLED = True
 SSAO_KERNEL_SIZE = 64
 SSAO_RADIUS = 0.5
 SSAO_BIAS = 0.025
