@@ -13,10 +13,11 @@ class Mesh:
     """
     Represents a single mesh within a model.
 
-    Each mesh has its own VAO and material.
+    Each mesh has its own VAO, material, and local transform.
     """
 
-    def __init__(self, vao, material: Material, name: str = "Mesh"):
+    def __init__(self, vao, material: Material, name: str = "Mesh",
+                 local_transform: Matrix44 = None):
         """
         Initialize mesh.
 
@@ -24,19 +25,35 @@ class Mesh:
             vao: ModernGL VAO object
             material: Material for this mesh
             name: Mesh name for debugging
+            local_transform: Local transformation matrix (from GLTF node)
         """
         self.vao = vao
         self.material = material
         self.name = name
         self.vertex_count = 0  # Set by loader
 
-    def render(self, program):
+        # Local transform (from GLTF node hierarchy)
+        self.local_transform = local_transform if local_transform is not None else Matrix44.identity()
+
+    def render(self, program, parent_transform: Matrix44 = None):
         """
-        Render this mesh.
+        Render this mesh with optional parent transform.
 
         Args:
             program: Shader program to use
+            parent_transform: Parent model matrix (applied before local transform)
         """
+        # Calculate final transform
+        if parent_transform is not None:
+            # Combine parent transform with local transform
+            final_transform = parent_transform @ self.local_transform
+            if 'model' in program:
+                program['model'].write(final_transform.astype('f4').tobytes())
+        elif self.local_transform is not None:
+            # Use local transform only
+            if 'model' in program:
+                program['model'].write(self.local_transform.astype('f4').tobytes())
+
         # Bind material textures
         self.material.bind_textures(program)
 
@@ -119,14 +136,12 @@ class Model:
         Args:
             program: Shader program to use
         """
-        # Set model matrix once for all meshes
-        model_matrix = self.get_model_matrix()
-        if 'model' in program:
-            program['model'].write(model_matrix.astype('f4').tobytes())
+        # Get parent model matrix (position, rotation, scale of the whole model)
+        parent_matrix = self.get_model_matrix()
 
-        # Render each mesh
+        # Render each mesh with its local transform
         for mesh in self.meshes:
-            mesh.render(program)
+            mesh.render(program, parent_transform=parent_matrix)
 
     def release(self):
         """Release GPU resources"""

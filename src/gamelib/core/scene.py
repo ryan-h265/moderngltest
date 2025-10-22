@@ -99,29 +99,55 @@ class Scene:
 
         Combines primitive shapes (cubes, spheres, pyramids, cones) with loaded GLTF models.
         """
-        # Load GLTF model if context is available
+        # Load GLTF models if context is available
         if self.ctx is not None:
             try:
                 from ..loaders import GltfLoader
                 from ..config.settings import PROJECT_ROOT
+                import math
 
                 loader = GltfLoader(self.ctx)
-                lantern_path = PROJECT_ROOT / "assets" / "models" / "props" / "japanese_stone_lantern" / "scene.gltf"
+                models_loaded = 0
 
-                if lantern_path.exists():
-                    print(f"Loading GLTF model: {lantern_path}")
-                    lantern_model = loader.load(str(lantern_path))
+                # # 1. Japanese Stone Lantern - Center piece
+                # lantern_path = PROJECT_ROOT / "assets/models/props/japanese_stone_lantern/scene.gltf"
+                # if lantern_path.exists():
+                #     print(f"Loading GLTF model: {lantern_path}")
+                #     lantern = loader.load(str(lantern_path))
+                #     lantern.position = Vector3([0.0, 0.0, 0.0])
+                #     lantern.scale = Vector3([2.0, 2.0, 2.0])
+                #     self.add_object(lantern)
+                #     models_loaded += 1
+                #     print(f"  ✓ Added japanese_stone_lantern ({len(lantern.meshes)} meshes)")
 
-                    # Position the lantern in the scene (center, on the ground)
-                    lantern_model.position = Vector3([0.0, 0.0, 0.0])
-                    lantern_model.scale = Vector3([2.0, 2.0, 2.0])  # Scale up for visibility
+                # 2. Tent - Place to the right
+                # tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
+                # if tent_path.exists():
+                #     print(f"Loading GLTF model: {tent_path}")
+                #     tent = loader.load(str(tent_path))
+                #     tent.position = Vector3([6.0, 0.0, 3.0])
+                #     tent.scale = Vector3([1.5, 1.5, 1.5])
+                #     tent.rotation = Vector3([0.0, math.radians(-30), 0.0])  # Rotate toward center
+                #     self.add_object(tent)
+                #     models_loaded += 1
+                #     print(f"  ✓ Added tent ({len(tent.meshes)} meshes)")
 
-                    self.add_object(lantern_model)
-                    print(f"  Added japanese_stone_lantern to scene at {lantern_model.position}")
-                else:
-                    print(f"  Warning: GLTF model not found at {lantern_path}")
+                # 3. Japanese Bar - Place to the left
+                bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
+                if bar_path.exists():
+                    print(f"Loading GLTF model: {bar_path}")
+                    bar = loader.load(str(bar_path))
+                    bar.position = Vector3([-7.0, 0.0, -2.0])
+                    bar.scale = Vector3([1.2, 1.2, 1.2])
+                    bar.rotation = Vector3([0.0, math.radians(20), 0.0])  # Rotate toward center
+                    self.add_object(bar)
+                    models_loaded += 1
+                    print(f"  ✓ Added japanese_bar ({len(bar.meshes)} meshes)")
+
+                print(f"\n=== Loaded {models_loaded} GLTF models successfully ===\n")
+
             except Exception as e:
-                print(f"  Warning: Failed to load GLTF model: {e}")
+                print(f"  Warning: Failed to load GLTF models: {e}")
                 import traceback
                 traceback.print_exc()
 
@@ -135,97 +161,97 @@ class Scene:
         )
         self.add_object(ground)
 
-        # Sphere 1 - Red
-        sphere1 = SceneObject(
-            geometry.sphere(radius=1.0),
-            Vector3([-3.0, 1.0, 0.0]),
-            (0.8, 0.3, 0.3),
-            bounding_radius=1.0,
-            name="Sphere1_Red"
-        )
-        self.add_object(sphere1)
+        # # Sphere 1 - Red
+        # sphere1 = SceneObject(
+        #     geometry.sphere(radius=1.0),
+        #     Vector3([-3.0, 1.0, 0.0]),
+        #     (0.8, 0.3, 0.3),
+        #     bounding_radius=1.0,
+        #     name="Sphere1_Red"
+        # )
+        # self.add_object(sphere1)
 
-        # Cube 2 - Blue
-        cube2 = SceneObject(
-            geometry.cube(size=(1.5, 3.0, 1.5)),
-            Vector3([3.0, 1.5, -2.0]),
-            (0.3, 0.3, 0.8),
-            bounding_radius=1.9,  # Half diagonal of cube
-            name="Cube2_Blue"
-        )
-        self.add_object(cube2)
+        # # Cube 2 - Blue
+        # cube2 = SceneObject(
+        #     geometry.cube(size=(1.5, 3.0, 1.5)),
+        #     Vector3([3.0, 1.5, -2.0]),
+        #     (0.3, 0.3, 0.8),
+        #     bounding_radius=1.9,  # Half diagonal of cube
+        #     name="Cube2_Blue"
+        # )
+        # self.add_object(cube2)
 
-        # Pyramid 3 - Yellow
-        pyramid3 = SceneObject(
-            geometry_utils.pyramid(base_size=1.0, height=1.5),
-            Vector3([0.0, 0.0, 3.0]),
-            (0.8, 0.8, 0.3),
-            bounding_radius=1.0
-        )
-        self.add_object(pyramid3)
+        # # Pyramid 3 - Yellow
+        # pyramid3 = SceneObject(
+        #     geometry_utils.pyramid(base_size=1.0, height=1.5),
+        #     Vector3([0.0, 0.0, 3.0]),
+        #     (0.8, 0.8, 0.3),
+        #     bounding_radius=1.0
+        # )
+        # self.add_object(pyramid3)
 
-        # Sphere 5 - Purple
-        sphere5 = SceneObject(
-            geometry.sphere(radius=1.2),
-            Vector3([6.0, 1.25, 3.0]),
-            (0.5, 0.2, 0.8),
-            bounding_radius=1.2
-        )
-        self.add_object(sphere5)
+        # # Sphere 5 - Purple
+        # sphere5 = SceneObject(
+        #     geometry.sphere(radius=1.2),
+        #     Vector3([6.0, 1.25, 3.0]),
+        #     (0.5, 0.2, 0.8),
+        #     bounding_radius=1.2
+        # )
+        # self.add_object(sphere5)
 
-        # Pyramid 6 - Cyan
-        pyramid6 = SceneObject(
-            geometry_utils.pyramid(base_size=1.5, height=2.0),
-            Vector3([-2.0, 0.0, -6.0]),
-            (0.2, 0.8, 0.8),
-            bounding_radius=1.5
-        )
-        self.add_object(pyramid6)
+        # # Pyramid 6 - Cyan
+        # pyramid6 = SceneObject(
+        #     geometry_utils.pyramid(base_size=1.5, height=2.0),
+        #     Vector3([-2.0, 0.0, -6.0]),
+        #     (0.2, 0.8, 0.8),
+        #     bounding_radius=1.5
+        # )
+        # self.add_object(pyramid6)
 
-        # Sphere 7 - Pink
-        sphere7 = SceneObject(
-            geometry.sphere(radius=0.9),
-            Vector3([4.5, 0.9, -5.0]),
-            (0.9, 0.3, 0.6),
-            bounding_radius=0.9
-        )
-        self.add_object(sphere7)
+        # # Sphere 7 - Pink
+        # sphere7 = SceneObject(
+        #     geometry.sphere(radius=0.9),
+        #     Vector3([4.5, 0.9, -5.0]),
+        #     (0.9, 0.3, 0.6),
+        #     bounding_radius=0.9
+        # )
+        # self.add_object(sphere7)
 
-        # Sphere 9 - Sea Green
-        sphere9 = SceneObject(
-            geometry.sphere(radius=0.65),
-            Vector3([-7.0, 0.65, 2.0]),
-            (0.3, 0.7, 0.4),
-            bounding_radius=0.65
-        )
-        self.add_object(sphere9)
+        # # Sphere 9 - Sea Green
+        # sphere9 = SceneObject(
+        #     geometry.sphere(radius=0.65),
+        #     Vector3([-7.0, 0.65, 2.0]),
+        #     (0.3, 0.7, 0.4),
+        #     bounding_radius=0.65
+        # )
+        # self.add_object(sphere9)
 
-        # Cube 12 - Steel Blue
-        cube12 = SceneObject(
-            geometry.cube(size=(1.1, 1.5, 1.1)),
-            Vector3([7.5, 0.75, -2.0]),
-            (0.4, 0.5, 0.8),
-            bounding_radius=1.1
-        )
-        self.add_object(cube12)
+        # # Cube 12 - Steel Blue
+        # cube12 = SceneObject(
+        #     geometry.cube(size=(1.1, 1.5, 1.1)),
+        #     Vector3([7.5, 0.75, -2.0]),
+        #     (0.4, 0.5, 0.8),
+        #     bounding_radius=1.1
+        # )
+        # self.add_object(cube12)
 
-        # Sphere 13 - Peach
-        sphere13 = SceneObject(
-            geometry.sphere(radius=0.35),
-            Vector3([-1.0, 0.35, 7.0]),
-            (0.9, 0.7, 0.5),
-            bounding_radius=0.35
-        )
-        self.add_object(sphere13)
+        # # Sphere 13 - Peach
+        # sphere13 = SceneObject(
+        #     geometry.sphere(radius=0.35),
+        #     Vector3([-1.0, 0.35, 7.0]),
+        #     (0.9, 0.7, 0.5),
+        #     bounding_radius=0.35
+        # )
+        # self.add_object(sphere13)
 
-        # Cone 14 - Plum
-        cone14 = SceneObject(
-            geometry_utils.cone(radius=0.7, height=2.0),
-            Vector3([5.5, 0.0, 1.0]),
-            (0.5, 0.3, 0.6),
-            bounding_radius=1.2
-        )
-        self.add_object(cone14)
+        # # Cone 14 - Plum
+        # cone14 = SceneObject(
+        #     geometry_utils.cone(radius=0.7, height=2.0),
+        #     Vector3([5.5, 0.0, 1.0]),
+        #     (0.5, 0.3, 0.6),
+        #     bounding_radius=1.2
+        # )
+        # self.add_object(cone14)
 
 
     def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = "",
@@ -280,13 +306,12 @@ class Scene:
                     # Render model using primitive shader (just geometry, no textures)
                     active_program = program
 
-                    # Set model matrix
-                    model_matrix = obj.get_model_matrix()
-                    active_program['model'].write(model_matrix.astype('f4').tobytes())
+                    # Get parent model matrix
+                    parent_matrix = obj.get_model_matrix()
 
-                    # Render each mesh in the model
+                    # Render each mesh with its local transform
                     for mesh in obj.meshes:
-                        mesh.vao.render(active_program)
+                        mesh.render(active_program, parent_transform=parent_matrix)
             else:
                 # Use primitive shader for regular SceneObjects
                 active_program = program

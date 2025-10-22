@@ -52,8 +52,8 @@ class GltfLoader:
         # Parse materials first (needed for meshes)
         materials = self._parse_materials(gltf, filepath.parent)
 
-        # Parse meshes
-        meshes = self._parse_meshes(gltf, materials)
+        # Parse node hierarchy and extract meshes with transforms
+        meshes = self._parse_scene_hierarchy(gltf, materials)
 
         # Calculate bounding sphere
         bounding_radius = self._calculate_bounding_radius(gltf)
@@ -68,6 +68,134 @@ class GltfLoader:
         print(f"  Loaded {len(meshes)} meshes, bounding radius: {bounding_radius:.2f}")
 
         return model
+
+    def _parse_scene_hierarchy(self, gltf: pygltflib.GLTF2, materials: List[Material]) -> List[Mesh]:
+        """
+        Parse the GLTF scene hierarchy and extract meshes with transforms.
+
+        Args:
+            gltf: GLTF data
+            materials: List of parsed materials
+
+        Returns:
+            List of Mesh objects with local transforms
+        """
+        from pyrr import Matrix44
+
+        meshes = []
+
+        # Get the default scene (or first scene if no default)
+        scene_idx = gltf.scene if gltf.scene is not None else 0
+        if scene_idx >= len(gltf.scenes):
+            print("  Warning: No valid scene found, falling back to direct mesh parsing")
+            return self._parse_meshes(gltf, materials)
+
+        scene = gltf.scenes[scene_idx]
+
+        # Process each root node in the scene
+        for node_idx in scene.nodes:
+            self._process_node(gltf, node_idx, Matrix44.identity(), materials, meshes)
+
+        return meshes
+
+    def _process_node(self, gltf: pygltflib.GLTF2, node_idx: int,
+                     parent_transform: 'Matrix44', materials: List[Material],
+                     meshes: List[Mesh]):
+        """
+        Recursively process a node and its children, accumulating transforms.
+
+        Args:
+            gltf: GLTF data
+            node_idx: Index of current node
+            parent_transform: Accumulated transform from parent nodes
+            materials: List of materials
+            meshes: Output list to append meshes to
+        """
+        from pyrr import Matrix44
+
+        node = gltf.nodes[node_idx]
+
+        # Get local transform for this node
+        local_transform = self._get_node_transform(node)
+
+        # Accumulate with parent transform
+        world_transform = parent_transform @ local_transform
+
+        # If this node has a mesh, create Mesh objects for each primitive
+        if node.mesh is not None:
+            gltf_mesh = gltf.meshes[node.mesh]
+
+            for prim_idx, primitive in enumerate(gltf_mesh.primitives):
+                mesh_name = f"{node.name or gltf_mesh.name or 'Mesh'}_{prim_idx}"
+
+                # Get material
+                mat_idx = primitive.material if primitive.material is not None else 0
+                material = materials[mat_idx] if mat_idx < len(materials) else Material()
+
+                # Extract vertex data
+                vertex_data = self._extract_vertex_data(gltf, primitive)
+
+                if vertex_data is None:
+                    print(f"  Warning: Skipping mesh {mesh_name} (failed to extract data)")
+                    continue
+
+                # Create VAO
+                vao = self._create_vao(vertex_data)
+
+                # Create mesh with world transform from node hierarchy
+                mesh = Mesh(vao=vao, material=material, name=mesh_name,
+                           local_transform=world_transform)
+                mesh.vertex_count = vertex_data['count']
+                meshes.append(mesh)
+
+                print(f"  Mesh: {mesh_name}, vertices: {mesh.vertex_count}")
+
+        # Process children recursively
+        if node.children:
+            for child_idx in node.children:
+                self._process_node(gltf, child_idx, world_transform, materials, meshes)
+
+    def _get_node_transform(self, node) -> 'Matrix44':
+        """
+        Extract transformation matrix from a GLTF node.
+
+        Args:
+            node: GLTF node
+
+        Returns:
+            4x4 transformation matrix
+        """
+        from pyrr import Matrix44, Quaternion
+        import numpy as np
+
+        # Check if node has a matrix property
+        if node.matrix is not None and len(node.matrix) == 16:
+            # Matrix is provided directly (column-major)
+            matrix = np.array(node.matrix, dtype='f4').reshape(4, 4)
+            # GLTF uses column-major, pyrr uses row-major, so transpose
+            return Matrix44(matrix.T)
+
+        # Otherwise, compose from TRS (Translation, Rotation, Scale)
+        matrix = Matrix44.identity()
+
+        # Apply scale
+        if node.scale is not None:
+            s = node.scale
+            matrix = matrix @ Matrix44.from_scale([s[0], s[1], s[2]])
+
+        # Apply rotation (quaternion)
+        if node.rotation is not None:
+            q = node.rotation  # [x, y, z, w]
+            # Create quaternion and convert to matrix
+            quat = Quaternion([q[3], q[0], q[1], q[2]])  # pyrr uses [w, x, y, z]
+            matrix = matrix @ Matrix44.from_quaternion(quat)
+
+        # Apply translation
+        if node.translation is not None:
+            t = node.translation
+            matrix = matrix @ Matrix44.from_translation([t[0], t[1], t[2]])
+
+        return matrix
 
     def _parse_meshes(self, gltf: pygltflib.GLTF2, materials: List[Material]) -> List[Mesh]:
         """
@@ -150,6 +278,11 @@ class GltfLoader:
         tangents = None
         if hasattr(primitive.attributes, 'TANGENT') and primitive.attributes.TANGENT is not None:
             tangents = self._get_accessor_data(gltf, primitive.attributes.TANGENT)
+
+        # Generate tangents if missing (and we have texcoords for normal mapping)
+        if tangents is None and texcoords is not None and normals is not None:
+            print("    Generating tangents for normal mapping...")
+            tangents = self._generate_tangents(positions, normals, texcoords)
 
         # Get indices (optional)
         indices = None
@@ -247,6 +380,91 @@ class GltfLoader:
 
         return array.flatten().astype('f4')
 
+    def _generate_tangents(self, positions: np.ndarray, normals: np.ndarray, texcoords: np.ndarray) -> np.ndarray:
+        """
+        Generate tangents using Lengyel's method.
+
+        Reference: http://www.terathon.com/code/tangent.html
+
+        Args:
+            positions: Vertex positions (flat array, 3 floats per vertex)
+            normals: Vertex normals (flat array, 3 floats per vertex)
+            texcoords: Texture coordinates (flat array, 2 floats per vertex)
+
+        Returns:
+            Tangent array (flat array, 4 floats per vertex: xyz + handedness)
+        """
+        vertex_count = len(positions) // 3
+        positions_3d = positions.reshape(-1, 3)
+        normals_3d = normals.reshape(-1, 3)
+        texcoords_2d = texcoords.reshape(-1, 2)
+
+        # Initialize tangent and bitangent accumulators
+        tan1 = np.zeros_like(positions_3d)
+        tan2 = np.zeros_like(positions_3d)
+
+        # Calculate tangents for each triangle
+        for i in range(0, vertex_count, 3):
+            if i + 2 >= vertex_count:
+                break
+
+            # Triangle vertices
+            v0 = positions_3d[i]
+            v1 = positions_3d[i + 1]
+            v2 = positions_3d[i + 2]
+
+            # UV coordinates
+            uv0 = texcoords_2d[i]
+            uv1 = texcoords_2d[i + 1]
+            uv2 = texcoords_2d[i + 2]
+
+            # Edge vectors
+            edge1 = v1 - v0
+            edge2 = v2 - v0
+
+            # UV deltas
+            duv1 = uv1 - uv0
+            duv2 = uv2 - uv0
+
+            # Calculate tangent and bitangent
+            r = 1.0 / (duv1[0] * duv2[1] - duv1[1] * duv2[0] + 1e-6)  # Avoid division by zero
+            sdir = (edge1 * duv2[1] - edge2 * duv1[1]) * r
+            tdir = (edge2 * duv1[0] - edge1 * duv2[0]) * r
+
+            # Accumulate for all vertices of this triangle
+            tan1[i] += sdir
+            tan1[i + 1] += sdir
+            tan1[i + 2] += sdir
+
+            tan2[i] += tdir
+            tan2[i + 1] += tdir
+            tan2[i + 2] += tdir
+
+        # Orthogonalize and calculate handedness for each vertex
+        tangents = []
+        for i in range(vertex_count):
+            n = normals_3d[i]
+            t = tan1[i]
+
+            # Gram-Schmidt orthogonalize
+            t_ortho = t - n * np.dot(n, t)
+            t_norm = np.linalg.norm(t_ortho)
+            if t_norm > 1e-6:
+                t_ortho = t_ortho / t_norm
+            else:
+                # Fallback: use perpendicular vector
+                t_ortho = np.array([1.0, 0.0, 0.0]) if abs(n[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+                t_ortho = t_ortho - n * np.dot(n, t_ortho)
+                t_ortho = t_ortho / (np.linalg.norm(t_ortho) + 1e-6)
+
+            # Calculate handedness (w component)
+            handedness = 1.0 if np.dot(np.cross(n, t), tan2[i]) > 0.0 else -1.0
+
+            # Store as vec4 (xyz + w)
+            tangents.extend([t_ortho[0], t_ortho[1], t_ortho[2], handedness])
+
+        return np.array(tangents, dtype='f4')
+
     def _generate_flat_normals(self, positions: np.ndarray) -> np.ndarray:
         """
         Generate flat normals for a mesh (face normals).
@@ -297,6 +515,7 @@ class GltfLoader:
         positions = vertex_data['positions']
         normals = vertex_data['normals']
         texcoords = vertex_data['texcoords']
+        tangents = vertex_data['tangents']
         indices = vertex_data['indices']
 
         # If we have indices, expand vertex data first
@@ -306,6 +525,7 @@ class GltfLoader:
             expanded_positions = []
             expanded_normals = []
             expanded_texcoords = [] if texcoords is not None else None
+            expanded_tangents = [] if tangents is not None else None
 
             # Expand vertices according to indices
             for idx in indices_int:
@@ -316,18 +536,34 @@ class GltfLoader:
                 # Texcoords
                 if texcoords is not None:
                     expanded_texcoords.extend(texcoords[idx * 2:(idx + 1) * 2])
+                # Tangents (vec4)
+                if tangents is not None:
+                    expanded_tangents.extend(tangents[idx * 4:(idx + 1) * 4])
 
             positions = np.array(expanded_positions, dtype='f4')
             normals = np.array(expanded_normals, dtype='f4')
             if texcoords is not None:
                 texcoords = np.array(expanded_texcoords, dtype='f4')
+            if tangents is not None:
+                tangents = np.array(expanded_tangents, dtype='f4')
 
         # Build interleaved vertex buffer
         vertex_count = len(positions) // 3
 
-        # Create interleaved array
-        if texcoords is not None:
-            # Interleave: pos, norm, uv
+        # Create interleaved array based on available attributes
+        if texcoords is not None and tangents is not None:
+            # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f) = 12 floats per vertex
+            interleaved = np.zeros(vertex_count * 12, dtype='f4')
+            for i in range(vertex_count):
+                base = i * 12
+                interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
+                interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
+                interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
+                interleaved[base + 8:base + 12] = tangents[i * 4:(i + 1) * 4]
+            format_str = '3f 3f 2f 4f'
+            attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent']
+        elif texcoords is not None:
+            # Interleave: pos, norm, uv (no tangents)
             interleaved = np.zeros(vertex_count * 8, dtype='f4')
             for i in range(vertex_count):
                 base = i * 8
@@ -337,7 +573,7 @@ class GltfLoader:
             format_str = '3f 3f 2f'
             attributes = ['in_position', 'in_normal', 'in_texcoord']
         else:
-            # Interleave: pos, norm
+            # Interleave: pos, norm (no UVs, no tangents)
             interleaved = np.zeros(vertex_count * 6, dtype='f4')
             for i in range(vertex_count):
                 base = i * 6
@@ -476,7 +712,91 @@ class GltfLoader:
 
     def _calculate_bounding_radius(self, gltf: pygltflib.GLTF2) -> float:
         """
-        Calculate bounding sphere radius for the model.
+        Calculate bounding sphere radius for the model with node transforms applied.
+
+        Args:
+            gltf: GLTF data
+
+        Returns:
+            Bounding radius
+        """
+        from pyrr import Matrix44
+
+        max_radius = 0.0
+
+        # Get the default scene (or first scene if no default)
+        scene_idx = gltf.scene if gltf.scene is not None else 0
+        if scene_idx >= len(gltf.scenes):
+            # Fallback to simple calculation
+            return self._calculate_bounding_radius_simple(gltf)
+
+        scene = gltf.scenes[scene_idx]
+
+        # Process each root node in the scene
+        for node_idx in scene.nodes:
+            max_radius = max(max_radius, self._calculate_node_bounding_radius(gltf, node_idx, Matrix44.identity()))
+
+        return float(max_radius) if max_radius > 0 else 1.0
+
+    def _calculate_node_bounding_radius(self, gltf: pygltflib.GLTF2, node_idx: int, parent_transform: 'Matrix44') -> float:
+        """
+        Recursively calculate bounding radius for a node and its children.
+
+        Args:
+            gltf: GLTF data
+            node_idx: Node index
+            parent_transform: Parent transformation matrix
+
+        Returns:
+            Maximum bounding radius for this node and children
+        """
+        from pyrr import Matrix44
+
+        node = gltf.nodes[node_idx]
+        max_radius = 0.0
+
+        # Get local transform for this node
+        local_transform = self._get_node_transform(node)
+
+        # Accumulate with parent transform
+        world_transform = parent_transform @ local_transform
+
+        # If this node has a mesh, calculate its bounding radius with transform
+        if node.mesh is not None:
+            gltf_mesh = gltf.meshes[node.mesh]
+
+            for primitive in gltf_mesh.primitives:
+                if 'POSITION' not in primitive.attributes.__dict__:
+                    continue
+
+                positions = self._get_accessor_data(gltf, primitive.attributes.POSITION)
+                if positions is None:
+                    continue
+
+                # Reshape to 3D points
+                points = positions.reshape(-1, 3)
+
+                # Apply world transform to each point and calculate distance from origin
+                for point in points:
+                    # Transform point to world space
+                    point_4d = np.array([point[0], point[1], point[2], 1.0], dtype='f4')
+                    transformed = world_transform @ point_4d
+
+                    # Calculate distance from origin
+                    radius = np.linalg.norm(transformed[:3])
+                    max_radius = max(max_radius, radius)
+
+        # Process children recursively
+        if node.children:
+            for child_idx in node.children:
+                child_radius = self._calculate_node_bounding_radius(gltf, child_idx, world_transform)
+                max_radius = max(max_radius, child_radius)
+
+        return max_radius
+
+    def _calculate_bounding_radius_simple(self, gltf: pygltflib.GLTF2) -> float:
+        """
+        Simple bounding radius calculation without transforms (fallback).
 
         Args:
             gltf: GLTF data

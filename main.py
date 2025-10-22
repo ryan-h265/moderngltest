@@ -98,7 +98,7 @@ class Game(mglw.WindowConfig):
         import math
 
         radius = 12.0
-        height = 20
+        height = 60
 
         # Position on circle
         x = radius * math.cos(0.0)
@@ -132,7 +132,7 @@ class Game(mglw.WindowConfig):
 
         lights = []
 
-        light = self._create_light(Vector3([1.0, 0.5, 1.0]))
+        light = self._create_light(Vector3([1.0, 1.0, 0.8]), 2.0)
 
         lights.append(light)
 
@@ -152,7 +152,7 @@ class Game(mglw.WindowConfig):
         for i, light in enumerate(self.lights):
             # Rotate every other light at different speeds
             if i % 2 == 0:
-                light.animate_rotation(time * (1.0 + i * 0.1), speed=0.001)
+                light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
 
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
