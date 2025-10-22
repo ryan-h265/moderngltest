@@ -4,7 +4,7 @@ Shadow Renderer
 Handles shadow map generation for all lights.
 """
 
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 import moderngl
 import numpy as np
 
@@ -43,8 +43,9 @@ class ShadowRenderer:
         self.ctx = ctx
         self.shadow_program = shadow_program
         self.shadow_size = shadow_size
+        self.last_stats: Optional[Dict[str, int]] = None
 
-    def create_shadow_map(self, resolution: int = None) -> Tuple[moderngl.Texture, moderngl.Framebuffer]:
+    def create_shadow_map(self, resolution: Optional[int] = None) -> Tuple[moderngl.Texture, moderngl.Framebuffer]:
         """
         Create a shadow map texture and framebuffer.
 
@@ -172,6 +173,15 @@ class ShadowRenderer:
                 # Increment age for throttling
                 light.increment_shadow_age()
 
+        # Persist stats for overlay/debug consumers
+        self.last_stats = {
+            'rendered': rendered,
+            'total': len(lights),
+            'skipped_intensity': skipped_intensity,
+            'skipped_throttle': skipped_throttle,
+            'skipped_non_casting': skipped_non_casting,
+        }
+
         # Debug output
         if DEBUG_SHADOW_RENDERING:
             total = len(lights)
@@ -212,4 +222,4 @@ class ShadowRenderer:
             frustum = Frustum(light_matrix)
 
         # Render scene from light's perspective with frustum culling
-        scene.render_all(self.shadow_program, frustum=frustum)
+        scene.render_all(self.shadow_program, frustum=frustum, debug_label="Shadow Pass")

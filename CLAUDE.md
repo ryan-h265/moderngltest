@@ -190,3 +190,7 @@ Comprehensive docs in `docs/`:
 - `MULTI_LIGHT_IMPLEMENTATION.md` - Shadow mapping implementation
 - `SHADER_GUIDE.md` - Shader programming guide
 - `ROADMAP.md` - Future features and milestones
+
+## Notes
+
+ModernGL/OpenGL expects column-major layout where the translation components are in the bottom row, not the right column

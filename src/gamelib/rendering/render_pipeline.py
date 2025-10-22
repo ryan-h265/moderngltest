@@ -15,6 +15,8 @@ from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
 from .ssao_renderer import SSAORenderer
+from .text_manager import TextManager
+from .ui_renderer import UIRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from ..core.camera import Camera
 from ..core.light import Light
@@ -23,7 +25,11 @@ from ..config.settings import (
     RENDERING_MODE,
     WINDOW_SIZE,
     SSAO_ENABLED,
-    SSAO_KERNEL_SIZE
+    SSAO_KERNEL_SIZE,
+    UI_FONT_PATH,
+    UI_FONT_SIZE,
+    DEBUG_OVERLAY_ENABLED,
+    PROJECT_ROOT
 )
 
 
@@ -135,6 +141,15 @@ class RenderPipeline:
             smaa_neighborhood
         )
 
+        # Create UI rendering system
+        self.shader_manager.load_program("ui_text", "ui_text.vert", "ui_text.frag")
+        font_path = str(PROJECT_ROOT / UI_FONT_PATH)
+        self.text_manager = TextManager(font_path, UI_FONT_SIZE)
+        self.ui_renderer = UIRenderer(
+            ctx,
+            self.shader_manager.get("ui_text"),
+        )
+
     def initialize_lights(self, lights: List[Light], camera: Camera = None):
         """
         Initialize shadow maps for lights with adaptive resolution.
@@ -155,11 +170,13 @@ class RenderPipeline:
         Pipeline (Forward):
         1. Shadow passes (one per light)
         2. Main scene pass (with lighting and shadows)
+        3. UI overlay pass
 
         Pipeline (Deferred):
         1. Shadow passes (one per light)
         2. Geometry pass (write to G-Buffer)
         3. Lighting pass (accumulate all lights)
+        4. UI overlay pass
 
         Args:
             scene: Scene to render
@@ -174,6 +191,10 @@ class RenderPipeline:
             self._render_deferred(scene, camera, lights)
         else:
             self._render_forward(scene, camera, lights)
+
+        # Final pass: Render UI overlay
+        if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
+            self.ui_renderer.render(self.text_manager, self.window.size)
 
     def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light]):
         """
