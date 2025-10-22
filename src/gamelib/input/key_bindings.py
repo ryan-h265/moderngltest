@@ -149,46 +149,6 @@ class KeyBindings:
         """
         return self.command_to_keys.get(command, [])
 
-    def get_key_name(self, key: int) -> str:
-        """
-        Get human-readable name for a key.
-
-        Args:
-            key: Key code (negative for mouse buttons)
-
-        Returns:
-            Key name string
-        """
-        if key < 0:
-            # Mouse button
-            mouse_names = {-1: "Left Click", -2: "Right Click", -3: "Middle Click"}
-            return mouse_names.get(key, f"Mouse{abs(key)}")
-
-        # Keyboard keys (moderngl_window codes)
-        key_names = {
-            32: "Space", 256: "ESC", 257: "Enter", 258: "Tab",
-            259: "Backspace", 260: "Insert", 261: "Delete",
-            262: "Right", 263: "Left", 264: "Down", 265: "Up",
-            290: "F1", 291: "F2", 292: "F3", 293: "F4", 294: "F5",
-            295: "F6", 296: "F7", 297: "F8", 298: "F9", 299: "F10",
-            300: "F11", 301: "F12",
-            340: "Left Shift", 341: "Left Ctrl", 342: "Left Alt",
-            344: "Right Shift", 345: "Right Ctrl", 346: "Right Alt",
-        }
-
-        if key in key_names:
-            return key_names[key]
-
-        # Letter keys (65-90 = A-Z)
-        if 65 <= key <= 90:
-            return chr(key)
-
-        # Number keys (48-57 = 0-9)
-        if 48 <= key <= 57:
-            return chr(key)
-
-        return f"Key{key}"
-
     def rebind_key(self, command: InputCommand, new_key: int, is_mouse: bool = False):
         """
         Rebind a command to a new key.

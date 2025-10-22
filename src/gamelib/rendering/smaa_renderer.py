@@ -3,11 +3,30 @@ SMAA Renderer
 
 Implements Enhanced Subpixel Morphological Antialiasing (SMAA).
 A 3-pass technique that provides better quality than FXAA.
+
+Uses official SMAA 1.0 precomputed lookup textures for professional-grade antialiasing.
 """
 
 from typing import Tuple
 import moderngl
 import numpy as np
+from pathlib import Path
+import sys
+
+# Add assets directory to path to import textures
+assets_path = Path(__file__).parent.parent.parent.parent / "assets"
+sys.path.insert(0, str(assets_path))
+
+from textures.smaa_textures import (
+    get_area_texture_data,
+    get_search_texture_data,
+    AREA_TEX_WIDTH,
+    AREA_TEX_HEIGHT,
+    AREA_TEX_COMPONENTS,
+    SEARCH_TEX_WIDTH,
+    SEARCH_TEX_HEIGHT,
+    SEARCH_TEX_COMPONENTS
+)
 
 
 class SMAARenderer:
@@ -111,28 +130,23 @@ class SMAARenderer:
         self.blend_fbo = self.ctx.framebuffer(color_attachments=[self.blend_texture])
     
     def _create_lookup_textures(self):
-        """Create precomputed lookup textures for SMAA"""
-        # Simplified area texture (normally loaded from precomputed data)
-        # For now, create a simple gradient texture
-        area_size = (160, 560)
-        area_data = np.zeros((area_size[1], area_size[0], 2), dtype=np.uint8)
-        
-        # Fill with simple pattern (in real SMAA, this would be precomputed patterns)
-        for y in range(area_size[1]):
-            for x in range(area_size[0]):
-                area_data[y, x, 0] = min(255, x * 255 // area_size[0])  # R
-                area_data[y, x, 1] = min(255, y * 255 // area_size[1])  # G
-        
-        self.area_texture = self.ctx.texture(area_size, 2, area_data.tobytes())
+        """Create precomputed lookup textures for SMAA using official SMAA 1.0 data"""
+        # Load official SMAA area texture (160x560, RG8 format)
+        # Used for coverage area lookup in blending weight calculation
+        area_data = get_area_texture_data()
+        area_size = (AREA_TEX_WIDTH, AREA_TEX_HEIGHT)
+
+        self.area_texture = self.ctx.texture(area_size, AREA_TEX_COMPONENTS, area_data)
         self.area_texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
         self.area_texture.repeat_x = False
         self.area_texture.repeat_y = False
-        
-        # Simplified search texture
-        search_size = (66, 33)
-        search_data = np.full((search_size[1], search_size[0]), 128, dtype=np.uint8)  # Gray
-        
-        self.search_texture = self.ctx.texture(search_size, 1, search_data.tobytes())
+
+        # Load official SMAA search texture (64x16, R8 format)
+        # Used for pattern searching in blending weight calculation
+        search_data = get_search_texture_data()
+        search_size = (SEARCH_TEX_WIDTH, SEARCH_TEX_HEIGHT)
+
+        self.search_texture = self.ctx.texture(search_size, SEARCH_TEX_COMPONENTS, search_data)
         self.search_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
         self.search_texture.repeat_x = False
         self.search_texture.repeat_y = False
@@ -176,19 +190,19 @@ class SMAARenderer:
         """Pass 2: Blending Weight Calculation"""
         self.blend_fbo.use()
         self.blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        
-        # Set uniforms
-        self.blend_program['SMAA_RT_METRICS'] = rt_metrics
-        
+
+        # Note: SMAA_RT_METRICS is only used in the vertex shader,
+        # passed to fragment shader via varyings (pixcoord, offset)
+
         # Bind textures
         self.edges_texture.use(0)
         self.area_texture.use(1)
         self.search_texture.use(2)
-        
+
         self.blend_program['edgesTex'] = 0
         self.blend_program['areaTex'] = 1
         self.blend_program['searchTex'] = 2
-        
+
         # Render
         self.blend_vao.render()
     
