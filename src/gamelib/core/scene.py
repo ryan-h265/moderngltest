@@ -74,9 +74,9 @@ class Scene:
         Initialize empty scene.
 
         Args:
-            ctx: ModernGL context (required for custom geometry like pyramids)
+            ctx: ModernGL context (required for custom geometry like pyramids and GLTF models)
         """
-        self.objects: List[SceneObject] = []
+        self.objects: List[SceneObject] = []  # Can contain both SceneObject and Model instances
         self.ctx = ctx
         self.last_render_stats: Dict[str, Dict[str, object]] = {}
 
@@ -95,10 +95,36 @@ class Scene:
 
     def create_default_scene(self):
         """
-        Create the default scene with ground plane and mixed shapes (cubes, spheres, pyramids, cones).
+        Create the default scene with ground plane, mixed shapes, and GLTF models.
 
-        This is the scene from the original game.py, now with variety in shapes.
+        Combines primitive shapes (cubes, spheres, pyramids, cones) with loaded GLTF models.
         """
+        # Load GLTF model if context is available
+        if self.ctx is not None:
+            try:
+                from ..loaders import GltfLoader
+                from ..config.settings import PROJECT_ROOT
+
+                loader = GltfLoader(self.ctx)
+                lantern_path = PROJECT_ROOT / "assets" / "models" / "props" / "japanese_stone_lantern" / "scene.gltf"
+
+                if lantern_path.exists():
+                    print(f"Loading GLTF model: {lantern_path}")
+                    lantern_model = loader.load(str(lantern_path))
+
+                    # Position the lantern in the scene (center, on the ground)
+                    lantern_model.position = Vector3([0.0, 0.0, 0.0])
+                    lantern_model.scale = Vector3([2.0, 2.0, 2.0])  # Scale up for visibility
+
+                    self.add_object(lantern_model)
+                    print(f"  Added japanese_stone_lantern to scene at {lantern_model.position}")
+                else:
+                    print(f"  Warning: GLTF model not found at {lantern_path}")
+            except Exception as e:
+                print(f"  Warning: Failed to load GLTF model: {e}")
+                import traceback
+                traceback.print_exc()
+
         # Ground plane
         ground = SceneObject(
             geometry.cube(size=(20.0, 0.5, 20.0)),
@@ -202,14 +228,16 @@ class Scene:
         self.add_object(cone14)
 
 
-    def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = ""):
+    def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = "",
+                   textured_program=None):
         """
         Render all objects in the scene.
 
         Args:
-            program: Shader program to use for rendering
+            program: Shader program to use for rendering primitives
             frustum: Optional frustum for culling (if None, all objects rendered)
             debug_label: Label for debug output (e.g., "Main", "Shadow Light 0")
+            textured_program: Optional shader program for textured models
         """
         from ..config.settings import DEBUG_FRUSTUM_CULLING, DEBUG_SHOW_CULLED_OBJECTS
 
@@ -225,16 +253,55 @@ class Scene:
                     culled_objects.append(f"{obj.name} (pos: {obj.position}, radius: {obj.bounding_radius})")
                 continue
 
-            # Set model matrix
-            model = obj.get_model_matrix()
-            program['model'].write(model.astype('f4').tobytes())
+            # Check if this is a Model (textured) or SceneObject (primitive)
+            is_model = hasattr(obj, 'is_model') and obj.is_model
 
-            # Set color (only if this uniform exists in the shader)
-            if 'object_color' in program:
-                program['object_color'].write(Vector3(obj.color).astype('f4').tobytes())
+            if is_model:
+                # Model objects need special handling
+                if textured_program is not None:
+                    # Use textured shader for models (geometry pass)
+                    # Note: Camera uniforms are already set by GeometryRenderer
+                    active_program = textured_program
 
-            # Render geometry
-            obj.geometry.render(program)
+                    # Set material defaults
+                    if 'baseColorFactor' in active_program:
+                        active_program['baseColorFactor'].value = (1.0, 1.0, 1.0, 1.0)
+                    if 'hasBaseColorTexture' in active_program:
+                        active_program['hasBaseColorTexture'].value = False
+                    if 'hasNormalTexture' in active_program:
+                        active_program['hasNormalTexture'].value = False
+                    if 'hasMetallicRoughnessTexture' in active_program:
+                        active_program['hasMetallicRoughnessTexture'].value = False
+
+                    # Model handles its own rendering (sets model matrix, binds materials)
+                    obj.render(active_program)
+                else:
+                    # Shadow pass or other passes without textured shader
+                    # Render model using primitive shader (just geometry, no textures)
+                    active_program = program
+
+                    # Set model matrix
+                    model_matrix = obj.get_model_matrix()
+                    active_program['model'].write(model_matrix.astype('f4').tobytes())
+
+                    # Render each mesh in the model
+                    for mesh in obj.meshes:
+                        mesh.vao.render(active_program)
+            else:
+                # Use primitive shader for regular SceneObjects
+                active_program = program
+
+                # Set model matrix
+                model = obj.get_model_matrix()
+                active_program['model'].write(model.astype('f4').tobytes())
+
+                # Set color (only if this uniform exists in the shader)
+                if 'object_color' in active_program:
+                    active_program['object_color'].write(Vector3(obj.color).astype('f4').tobytes())
+
+                # Render geometry
+                obj.geometry.render(active_program)
+
             rendered_count += 1
 
         # Debug output

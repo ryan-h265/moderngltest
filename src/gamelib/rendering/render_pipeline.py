@@ -70,6 +70,7 @@ class RenderPipeline:
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
+        self.shader_manager.load_program("geometry_textured", "deferred_geometry_textured.vert", "deferred_geometry_textured.frag")
         self.shader_manager.load_program("lighting", "deferred_lighting.vert", "deferred_lighting.frag")
         self.shader_manager.load_program("ambient", "deferred_lighting.vert", "deferred_ambient.frag")
 
@@ -104,7 +105,8 @@ class RenderPipeline:
         self.gbuffer = GBuffer(ctx, WINDOW_SIZE)
         self.geometry_renderer = GeometryRenderer(
             ctx,
-            self.shader_manager.get("geometry")
+            self.shader_manager.get("geometry"),
+            self.shader_manager.get("geometry_textured")
         )
         self.lighting_renderer = LightingRenderer(
             ctx,

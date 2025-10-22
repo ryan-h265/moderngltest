@@ -66,8 +66,8 @@ class Game(mglw.WindowConfig):
         # Setup rendering controller for SSAO toggle, etc.
         self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
-        # Create scene
-        self.scene = Scene()
+        # Create scene (pass context for GLTF model loading)
+        self.scene = Scene(ctx=self.ctx)
         self.scene.create_default_scene()
 
         # Create lights

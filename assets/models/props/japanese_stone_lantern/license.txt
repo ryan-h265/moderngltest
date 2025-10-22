@@ -1,0 +1,11 @@
+Model Information:
+* title:	Japanese Stone Lantern
+* source:	https://sketchfab.com/3d-models/japanese-stone-lantern-e0417d1e05984727a50f9ab1451d162d
+* author:	Sahir Virmani (https://sketchfab.com/sahirvirmani)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Japanese Stone Lantern" (https://sketchfab.com/3d-models/japanese-stone-lantern-e0417d1e05984727a50f9ab1451d162d) by Sahir Virmani (https://sketchfab.com/sahirvirmani) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
