@@ -15,7 +15,6 @@ from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
 from .ssao_renderer import SSAORenderer
-from .font_loader import FontLoader
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
 from ..core.camera import Camera
@@ -28,7 +27,6 @@ from ..config.settings import (
     SSAO_KERNEL_SIZE,
     UI_FONT_PATH,
     UI_FONT_SIZE,
-    UI_ATLAS_SIZE,
     DEBUG_OVERLAY_ENABLED,
     PROJECT_ROOT
 )
@@ -113,12 +111,10 @@ class RenderPipeline:
         # Create UI rendering system
         self.shader_manager.load_program("ui_text", "ui_text.vert", "ui_text.frag")
         font_path = str(PROJECT_ROOT / UI_FONT_PATH)
-        self.font_loader = FontLoader(ctx, font_path, UI_FONT_SIZE, UI_ATLAS_SIZE)
-        self.text_manager = TextManager(self.font_loader)
+        self.text_manager = TextManager(font_path, UI_FONT_SIZE)
         self.ui_renderer = UIRenderer(
             ctx,
             self.shader_manager.get("ui_text"),
-            self.font_loader.get_texture()
         )
 
     def initialize_lights(self, lights: List[Light], camera: Camera = None):

@@ -75,7 +75,7 @@ class MainRenderer:
             frustum = camera.get_frustum(aspect_ratio)
 
         # Render scene with frustum culling
-        scene.render_all(self.main_program, frustum=frustum)
+        scene.render_all(self.main_program, frustum=frustum, debug_label="Main Pass")
 
     def _bind_shadow_maps(self, lights: List[Light]):
         """

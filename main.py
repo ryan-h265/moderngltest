@@ -78,7 +78,7 @@ class Game(mglw.WindowConfig):
 
         # Setup debug overlay
         if DEBUG_OVERLAY_ENABLED:
-            self.debug_overlay = DebugOverlay(self.render_pipeline.text_manager)
+            self.debug_overlay = DebugOverlay(self.render_pipeline)
         else:
             self.debug_overlay = None
 

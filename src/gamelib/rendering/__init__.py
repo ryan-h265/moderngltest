@@ -6,9 +6,9 @@ from .main_renderer import MainRenderer
 from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
-from .font_loader import FontLoader
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
+from .text_sprite import TextSprite
 
 __all__ = [
     "RenderPipeline",
@@ -18,7 +18,7 @@ __all__ = [
     "GBuffer",
     "GeometryRenderer",
     "LightingRenderer",
-    "FontLoader",
     "TextManager",
-    "UIRenderer"
+    "UIRenderer",
+    "TextSprite",
 ]

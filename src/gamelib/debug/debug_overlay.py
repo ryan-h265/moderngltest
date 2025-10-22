@@ -5,11 +5,10 @@ Collects and displays engine statistics as on-screen text.
 Provides real-time information about FPS, camera, rendering, lights, etc.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
-from ..rendering.text_manager import TextManager
 from ..config.settings import (
     DEBUG_POSITION,
     DEBUG_LINE_SPACING,
@@ -18,8 +17,15 @@ from ..config.settings import (
     RENDERING_MODE,
     SSAO_ENABLED,
     ENABLE_FRUSTUM_CULLING,
-    SHADOW_MAP_SIZE
+    SHADOW_MAP_SIZE,
+    DEBUG_SHOW_CULLED_OBJECTS,
+    DEBUG_SHADOW_RENDERING,
+    DEBUG_OVERLAY_BACKGROUND_COLOR,
+    DEBUG_OVERLAY_BACKGROUND_PADDING,
 )
+
+if TYPE_CHECKING:
+    from ..rendering.render_pipeline import RenderPipeline
 
 
 class DebugOverlay:
@@ -29,14 +35,15 @@ class DebugOverlay:
     Collects engine statistics and updates TextManager with formatted output.
     """
 
-    def __init__(self, text_manager: TextManager):
+    def __init__(self, pipeline: "RenderPipeline"):
         """
         Initialize debug overlay.
 
         Args:
-            text_manager: TextManager for rendering text
+            pipeline: RenderPipeline for accessing text manager and render stats
         """
-        self.text_manager = text_manager
+        self.pipeline = pipeline
+        self.text_manager = pipeline.text_manager
         self.text_ids = []  # Track text IDs for updates
 
         # Frame time tracking for averaging
@@ -97,7 +104,7 @@ class DebugOverlay:
 
         # Camera info
         cam_pos = camera.position
-        lines.append(f"Cam: [{cam_pos[0]:.1f}, {cam_pos[1]:.1f}, {cam_pos[2]:.1f}]")
+        lines.append(f"Cam Pos.: [{cam_pos[0]:.1f}, {cam_pos[1]:.1f}, {cam_pos[2]:.1f}]")
         lines.append(f"Pitch: {camera.pitch:.1f}° | Yaw: {camera.yaw:.1f}°")
 
         # Light info
@@ -107,13 +114,69 @@ class DebugOverlay:
         # Scene info
         if scene:
             total_objects = len(scene.objects)
-            # Note: We don't have culling stats here, but we could add them
             culling_status = "ON" if ENABLE_FRUSTUM_CULLING else "OFF"
             lines.append(f"Objects: {total_objects} | Culling: {culling_status}")
+
+            culling_lines = self._format_culling_stats(scene.last_render_stats)
+            if culling_lines:
+                lines.append("")
+                lines.extend(culling_lines)
+
+        shadow_lines = self._format_shadow_stats()
+        if shadow_lines:
+            lines.append("")
+            lines.extend(shadow_lines)
 
         # Controls hint
         lines.append("")
         lines.append("ESC: Release mouse | T: Toggle SSAO")
+
+        return lines
+
+    def _format_culling_stats(self, stats: Dict[str, Dict[str, object]]) -> List[str]:
+        if not stats:
+            return []
+
+        lines: List[str] = []
+        for label, data in stats.items():
+            if not data.get('frustum_applied'):
+                continue
+
+            rendered = data.get('rendered', 0)
+            total = data.get('total', 0)
+            culled = data.get('culled', 0)
+            lines.append(f"Frustum[{label}]: {rendered}/{total} rendered (culled {culled})")
+
+            if DEBUG_SHOW_CULLED_OBJECTS:
+                culled_objects = data.get('culled_objects') or []
+                if culled_objects:
+                    sample = culled_objects[:3]
+                    remainder = len(culled_objects) - len(sample)
+                    summary = ', '.join(sample)
+                    if remainder > 0:
+                        summary = f"{summary}, +{remainder} more"
+                    lines.append(f"  Culled: {summary}")
+
+        return lines
+
+    def _format_shadow_stats(self) -> List[str]:
+        shadow_renderer = getattr(self.pipeline, 'shadow_renderer', None)
+        if shadow_renderer is None or shadow_renderer.last_stats is None:
+            return []
+
+        stats = shadow_renderer.last_stats
+        rendered = stats.get('rendered', 0)
+        total = stats.get('total', 0)
+        skipped_intensity = stats.get('skipped_intensity', 0)
+        skipped_throttle = stats.get('skipped_throttle', 0)
+        skipped_non_casting = stats.get('skipped_non_casting', 0)
+
+        lines = [
+            f"Shadows: {rendered}/{total} rendered | skipped I:{skipped_intensity} T:{skipped_throttle} NC:{skipped_non_casting}"
+        ]
+
+        if DEBUG_SHADOW_RENDERING:
+            lines.append("  (Shadow debug logging enabled)")
 
         return lines
 
@@ -131,13 +194,19 @@ class DebugOverlay:
 
         # Add new text objects
         x, y = DEBUG_POSITION
+        line_height = self.text_manager.get_line_height() * DEBUG_TEXT_SCALE
+        line_step = max(line_height, float(DEBUG_LINE_SPACING))
+
         for i, line in enumerate(lines):
+            line_y = y + i * line_step
             text_id = self.text_manager.add_text(
                 text=line,
-                position=(x, y + i * DEBUG_LINE_SPACING),
+                position=(x, line_y),
                 color=DEBUG_TEXT_COLOR,
                 scale=DEBUG_TEXT_SCALE,
-                layer="debug"
+                layer="debug",
+                background_color=DEBUG_OVERLAY_BACKGROUND_COLOR,
+                background_padding=DEBUG_OVERLAY_BACKGROUND_PADDING,
             )
             self.text_ids.append(text_id)
 

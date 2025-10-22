@@ -84,8 +84,8 @@ class FontLoader:
         Returns:
             OpenGL texture containing all glyphs
         """
-        # Create atlas image (RGBA)
-        atlas = Image.new('RGBA', (self.atlas_size, self.atlas_size), (0, 0, 0, 0))
+        # Create atlas image (single-channel alpha)
+        atlas = Image.new('L', (self.atlas_size, self.atlas_size), 0)
         draw = ImageDraw.Draw(atlas)
 
         # Calculate grid layout
@@ -119,12 +119,17 @@ class FontLoader:
 
             # Draw glyph
             # Offset by bearing to align properly
-            draw.text((x - bbox[0], y - bbox[1]), char, font=self.font, fill=(255, 255, 255, 255))
+            draw.text((x - bbox[0], y - bbox[1]), char, font=self.font, fill=255)
 
-            # Calculate UV coordinates (normalized 0-1)
-            # Don't flip here - will flip in shader instead
-            uv_min = (x / self.atlas_size, y / self.atlas_size)
-            uv_max = ((x + glyph_width) / self.atlas_size, (y + glyph_height) / self.atlas_size)
+            # Calculate UV coordinates (normalized 0-1) with origin at bottom-left (OpenGL standard)
+            u_min = x / self.atlas_size
+            u_max = (x + glyph_width) / self.atlas_size
+            # After we flip the atlas data vertically for OpenGL, the glyph's vertical position becomes:
+            y_flipped = self.atlas_size - y - glyph_height
+            v_min = y_flipped / self.atlas_size
+            v_max = (y_flipped + glyph_height) / self.atlas_size
+            uv_min = (u_min, v_min)
+            uv_max = (u_max, v_max)
 
             # Get advance width (for cursor positioning)
             # Use getlength for accurate advance width
@@ -146,12 +151,13 @@ class FontLoader:
             current_row_height = max(current_row_height, glyph_height)
 
         # Convert to numpy array and upload to GPU
-        atlas_data = np.array(atlas, dtype='uint8')
+        # Flip vertically so row 0 becomes bottom of the texture
+        atlas_data = np.array(atlas, dtype='uint8')[::-1].copy()
 
         # Create OpenGL texture
         texture = self.ctx.texture(
             (self.atlas_size, self.atlas_size),
-            components=4,
+            components=1,
             data=atlas_data.tobytes(),
             dtype='u1'
         )
@@ -161,6 +167,7 @@ class FontLoader:
         texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
         texture.repeat_x = False
         texture.repeat_y = False
+        texture.swizzle = 'RRRR'
 
         # Save atlas for debugging (disabled for performance)
         # atlas.save('/tmp/debug_atlas.png')

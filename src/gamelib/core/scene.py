@@ -4,7 +4,7 @@ Scene Management
 Handles scene objects and rendering.
 """
 
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 from pyrr import Matrix44, Vector3
 from moderngl_window import geometry
 from . import geometry_utils
@@ -78,6 +78,7 @@ class Scene:
         """
         self.objects: List[SceneObject] = []
         self.ctx = ctx
+        self.last_render_stats: Dict[str, Dict[str, object]] = {}
 
     def add_object(self, obj: SceneObject):
         """
@@ -285,7 +286,7 @@ class Scene:
 
         rendered_count = 0
         culled_count = 0
-        culled_objects = []
+        culled_objects: List[str] = []
 
         for obj in self.objects:
             # Frustum culling (skip if outside view)
@@ -308,8 +309,17 @@ class Scene:
             rendered_count += 1
 
         # Debug output
+        label_key = debug_label if debug_label else "Main"
+        self.last_render_stats[label_key] = {
+            'rendered': rendered_count,
+            'total': len(self.objects),
+            'culled': culled_count,
+            'culled_objects': culled_objects if DEBUG_SHOW_CULLED_OBJECTS else None,
+            'frustum_applied': frustum is not None,
+        }
+
         if DEBUG_FRUSTUM_CULLING and frustum is not None:
-            label = f" [{debug_label}]" if debug_label else ""
+            label = f" [{label_key}]"
             print(f"Frustum Culling{label}: Rendered {rendered_count}/{len(self.objects)}, Culled {culled_count}")
 
         if DEBUG_SHOW_CULLED_OBJECTS and culled_objects:

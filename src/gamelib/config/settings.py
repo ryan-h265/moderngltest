@@ -157,8 +157,9 @@ CSM_LAMBDA = 0.5  # Blend between uniform and logarithmic splits
 # ============================================================================
 
 # Font configuration
-UI_FONT_PATH = "assets/fonts/PixelOperatorMono.ttf"
-UI_FONT_SIZE = 16  # Font size in pixels
+# UI_FONT_PATH = "assets/fonts/PixelOperatorMono.ttf"
+UI_FONT_PATH = "assets/fonts/TX-02-Regular.otf"
+UI_FONT_SIZE = 24  # Font size in pixels
 UI_ATLAS_SIZE = 512  # Texture atlas resolution (512x512)
 
 # Debug overlay
@@ -166,4 +167,6 @@ DEBUG_OVERLAY_ENABLED = True
 DEBUG_TEXT_COLOR = (0.0, 1.0, 0.0, 1.0)  # RGBA (green - original)
 DEBUG_TEXT_SCALE = 1.0  # Normal scale
 DEBUG_POSITION = (10, 10)  # Top-left
-DEBUG_LINE_SPACING = 20  # Pixels between lines
+DEBUG_LINE_SPACING = 35  # Pixels between lines
+DEBUG_OVERLAY_BACKGROUND_COLOR = (0.1, 0.1, 0.1, 0.6)  # Semi-transparent gray
+DEBUG_OVERLAY_BACKGROUND_PADDING = 6.0  # Pixels of padding around text
