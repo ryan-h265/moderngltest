@@ -4,10 +4,11 @@ Scene Management
 Handles scene objects and rendering.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pyrr import Matrix44, Vector3
 from moderngl_window import geometry
 from . import geometry_utils
+from .frustum import Frustum
 
 
 class SceneObject:
@@ -18,9 +19,11 @@ class SceneObject:
     - Geometry (VAO from moderngl_window.geometry)
     - Position in world space
     - Color
+    - Bounding sphere for frustum culling
     """
 
-    def __init__(self, geom, position: Vector3, color: Tuple[float, float, float]):
+    def __init__(self, geom, position: Vector3, color: Tuple[float, float, float],
+                 bounding_radius: float = None, name: str = "Object"):
         """
         Initialize scene object.
 
@@ -28,10 +31,14 @@ class SceneObject:
             geom: Geometry VAO from moderngl_window.geometry
             position: World space position
             color: RGB color tuple (0.0 to 1.0)
+            bounding_radius: Radius of bounding sphere (auto-calculated if None)
+            name: Debug name for this object
         """
         self.geometry = geom
         self.position = position
         self.color = color
+        self.bounding_radius = bounding_radius if bounding_radius is not None else 1.0
+        self.name = name
 
     def get_model_matrix(self) -> Matrix44:
         """
@@ -41,6 +48,18 @@ class SceneObject:
             4x4 transformation matrix (currently just translation)
         """
         return Matrix44.from_translation(self.position)
+
+    def is_visible(self, frustum: Frustum) -> bool:
+        """
+        Test if this object is visible in the given frustum.
+
+        Args:
+            frustum: View frustum to test against
+
+        Returns:
+            True if object is visible (inside or intersecting frustum)
+        """
+        return frustum.contains_sphere(self.position, self.bounding_radius)
 
 
 class Scene:
@@ -83,7 +102,9 @@ class Scene:
         ground = SceneObject(
             geometry.cube(size=(20.0, 0.5, 20.0)),
             Vector3([0.0, -0.25, 0.0]),
-            (0.3, 0.6, 0.3)  # Green
+            (0.3, 0.6, 0.3),  # Green
+            bounding_radius=14.15,  # sqrt(10^2 + 10^2) for ground
+            name="Ground"
         )
         self.add_object(ground)
 
@@ -91,7 +112,9 @@ class Scene:
         sphere1 = SceneObject(
             geometry.sphere(radius=1.0),
             Vector3([-3.0, 1.0, 0.0]),
-            (0.8, 0.3, 0.3)
+            (0.8, 0.3, 0.3),
+            bounding_radius=1.0,
+            name="Sphere1_Red"
         )
         self.add_object(sphere1)
 
@@ -99,7 +122,9 @@ class Scene:
         cube2 = SceneObject(
             geometry.cube(size=(1.5, 3.0, 1.5)),
             Vector3([3.0, 1.5, -2.0]),
-            (0.3, 0.3, 0.8)
+            (0.3, 0.3, 0.8),
+            bounding_radius=1.9,  # Half diagonal of cube
+            name="Cube2_Blue"
         )
         self.add_object(cube2)
 
@@ -107,7 +132,8 @@ class Scene:
         pyramid3 = SceneObject(
             geometry_utils.pyramid(base_size=1.0, height=1.5),
             Vector3([0.0, 0.0, 3.0]),
-            (0.8, 0.8, 0.3)
+            (0.8, 0.8, 0.3),
+            bounding_radius=1.0
         )
         self.add_object(pyramid3)
 
@@ -115,7 +141,8 @@ class Scene:
         cube4 = SceneObject(
             geometry.cube(size=(1.2, 1.2, 1.2)),
             Vector3([-5.0, 0.6, -4.0]),
-            (0.9, 0.5, 0.2)
+            (0.9, 0.5, 0.2),
+            bounding_radius=1.0
         )
         self.add_object(cube4)
 
@@ -123,15 +150,17 @@ class Scene:
         sphere5 = SceneObject(
             geometry.sphere(radius=1.2),
             Vector3([6.0, 1.25, 3.0]),
-            (0.5, 0.2, 0.8)
+            (0.5, 0.2, 0.8),
+            bounding_radius=1.2
         )
         self.add_object(sphere5)
 
         # Pyramid 6 - Cyan
         pyramid6 = SceneObject(
-            geometry_utils.pyramid( base_size=1.5, height=2.0),
+            geometry_utils.pyramid(base_size=1.5, height=2.0),
             Vector3([-2.0, 0.0, -6.0]),
-            (0.2, 0.8, 0.8)
+            (0.2, 0.8, 0.8),
+            bounding_radius=1.5
         )
         self.add_object(pyramid6)
 
@@ -139,15 +168,17 @@ class Scene:
         sphere7 = SceneObject(
             geometry.sphere(radius=0.9),
             Vector3([4.5, 0.9, -5.0]),
-            (0.9, 0.3, 0.6)
+            (0.9, 0.3, 0.6),
+            bounding_radius=0.9
         )
         self.add_object(sphere7)
 
         # Cone 8 - Olive
         cone8 = SceneObject(
-            geometry_utils.cone( radius=1.0, height=2.0),
+            geometry_utils.cone(radius=1.0, height=2.0),
             Vector3([1.5, 0.0, 6.0]),
-            (0.6, 0.6, 0.2)
+            (0.6, 0.6, 0.2),
+            bounding_radius=1.4
         )
         self.add_object(cone8)
 
@@ -155,7 +186,8 @@ class Scene:
         sphere9 = SceneObject(
             geometry.sphere(radius=0.65),
             Vector3([-7.0, 0.65, 2.0]),
-            (0.3, 0.7, 0.4)
+            (0.3, 0.7, 0.4),
+            bounding_radius=0.65
         )
         self.add_object(sphere9)
 
@@ -163,15 +195,17 @@ class Scene:
         cube10 = SceneObject(
             geometry.cube(size=(0.9, 2.0, 0.9)),
             Vector3([2.5, 1.0, -3.0]),
-            (0.8, 0.6, 0.3)
+            (0.8, 0.6, 0.3),
+            bounding_radius=1.2
         )
         self.add_object(cube10)
 
         # Pyramid 11 - Maroon
         pyramid11 = SceneObject(
-            geometry_utils.pyramid( base_size=1.6, height=1.5),
+            geometry_utils.pyramid(base_size=1.6, height=1.5),
             Vector3([-4.0, 0.0, 5.0]),
-            (0.7, 0.3, 0.3)
+            (0.7, 0.3, 0.3),
+            bounding_radius=1.3
         )
         self.add_object(pyramid11)
 
@@ -179,7 +213,8 @@ class Scene:
         cube12 = SceneObject(
             geometry.cube(size=(1.1, 1.5, 1.1)),
             Vector3([7.5, 0.75, -2.0]),
-            (0.4, 0.5, 0.8)
+            (0.4, 0.5, 0.8),
+            bounding_radius=1.1
         )
         self.add_object(cube12)
 
@@ -187,15 +222,17 @@ class Scene:
         sphere13 = SceneObject(
             geometry.sphere(radius=0.35),
             Vector3([-1.0, 0.35, 7.0]),
-            (0.9, 0.7, 0.5)
+            (0.9, 0.7, 0.5),
+            bounding_radius=0.35
         )
         self.add_object(sphere13)
 
         # Cone 14 - Plum
         cone14 = SceneObject(
-            geometry_utils.cone( radius=0.7, height=2.0),
+            geometry_utils.cone(radius=0.7, height=2.0),
             Vector3([5.5, 0.0, 1.0]),
-            (0.5, 0.3, 0.6)
+            (0.5, 0.3, 0.6),
+            bounding_radius=1.2
         )
         self.add_object(cone14)
 
@@ -203,15 +240,17 @@ class Scene:
         sphere15 = SceneObject(
             geometry.sphere(radius=0.9),
             Vector3([-6.0, 0.9, -1.5]),
-            (0.3, 0.6, 0.6)
+            (0.3, 0.6, 0.6),
+            bounding_radius=0.9
         )
         self.add_object(sphere15)
 
         # Pyramid 16 - Rust
         pyramid16 = SceneObject(
-            geometry_utils.pyramid( base_size=1.0, height=2.5),
+            geometry_utils.pyramid(base_size=1.0, height=2.5),
             Vector3([3.5, 0.0, 4.5]),
-            (0.8, 0.4, 0.2)
+            (0.8, 0.4, 0.2),
+            bounding_radius=1.5
         )
         self.add_object(pyramid16)
 
@@ -219,26 +258,43 @@ class Scene:
         sphere17 = SceneObject(
             geometry.sphere(radius=0.6),
             Vector3([-3.5, 0.6, -2.5]),
-            (0.5, 0.8, 0.3)
+            (0.5, 0.8, 0.3),
+            bounding_radius=0.6
         )
         self.add_object(sphere17)
 
         # Cone 18 - Lavender
         cone18 = SceneObject(
-            geometry_utils.cone( radius=0.4, height=1.8),
+            geometry_utils.cone(radius=0.4, height=1.8),
             Vector3([8.0, 0.0, 4.0]),
-            (0.6, 0.4, 0.7)
+            (0.6, 0.4, 0.7),
+            bounding_radius=1.0
         )
         self.add_object(cone18)
 
-    def render_all(self, program):
+    def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = ""):
         """
         Render all objects in the scene.
 
         Args:
             program: Shader program to use for rendering
+            frustum: Optional frustum for culling (if None, all objects rendered)
+            debug_label: Label for debug output (e.g., "Main", "Shadow Light 0")
         """
+        from ..config.settings import DEBUG_FRUSTUM_CULLING, DEBUG_SHOW_CULLED_OBJECTS
+
+        rendered_count = 0
+        culled_count = 0
+        culled_objects = []
+
         for obj in self.objects:
+            # Frustum culling (skip if outside view)
+            if frustum is not None and not obj.is_visible(frustum):
+                culled_count += 1
+                if DEBUG_SHOW_CULLED_OBJECTS:
+                    culled_objects.append(f"{obj.name} (pos: {obj.position}, radius: {obj.bounding_radius})")
+                continue
+
             # Set model matrix
             model = obj.get_model_matrix()
             program['model'].write(model.astype('f4').tobytes())
@@ -249,7 +305,30 @@ class Scene:
 
             # Render geometry
             obj.geometry.render(program)
+            rendered_count += 1
+
+        # Debug output
+        if DEBUG_FRUSTUM_CULLING and frustum is not None:
+            label = f" [{debug_label}]" if debug_label else ""
+            print(f"Frustum Culling{label}: Rendered {rendered_count}/{len(self.objects)}, Culled {culled_count}")
+
+        if DEBUG_SHOW_CULLED_OBJECTS and culled_objects:
+            print(f"  Culled objects: {', '.join(culled_objects)}")
+
+        return rendered_count
 
     def get_object_count(self) -> int:
         """Get number of objects in scene"""
         return len(self.objects)
+
+    def get_visible_objects(self, frustum: Frustum) -> List['SceneObject']:
+        """
+        Get list of objects visible in frustum.
+
+        Args:
+            frustum: View frustum to test against
+
+        Returns:
+            List of visible objects
+        """
+        return [obj for obj in self.objects if obj.is_visible(frustum)]

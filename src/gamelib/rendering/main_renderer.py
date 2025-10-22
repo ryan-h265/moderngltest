@@ -40,7 +40,7 @@ class MainRenderer:
         viewport: Tuple[int, int, int, int]
     ):
         """
-        Render the main scene to screen.
+        Render the main scene with frustum culling.
 
         Args:
             scene: Scene to render
@@ -86,8 +86,16 @@ class MainRenderer:
         # Set light uniforms
         self._set_light_uniforms(lights)
 
-        # Render scene
-        scene.render_all(self.main_program)
+        # Get frustum for culling
+        from ..config.settings import ENABLE_FRUSTUM_CULLING
+        frustum = None
+        if ENABLE_FRUSTUM_CULLING:
+            _, _, width, height = viewport
+            aspect_ratio = width / height if height > 0 else 1.0
+            frustum = camera.get_frustum(aspect_ratio)
+
+        # Render scene with frustum culling
+        scene.render_all(self.main_program, frustum=frustum)
 
     def _bind_shadow_maps(self, lights: List[Light]):
         """

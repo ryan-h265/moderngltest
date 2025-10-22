@@ -34,7 +34,7 @@ class GeometryRenderer:
 
     def render(self, scene: Scene, camera: Camera, gbuffer: GBuffer):
         """
-        Render scene geometry to G-Buffer.
+        Render scene geometry to G-Buffer with frustum culling.
 
         Args:
             scene: Scene to render
@@ -56,8 +56,16 @@ class GeometryRenderer:
         # Set camera uniforms
         self._set_camera_uniforms(camera, gbuffer.size)
 
-        # Render all scene objects
-        scene.render_all(self.geometry_program)
+        # Get frustum for culling
+        from ..config.settings import ENABLE_FRUSTUM_CULLING
+        frustum = None
+        if ENABLE_FRUSTUM_CULLING:
+            width, height = gbuffer.size
+            aspect_ratio = width / height if height > 0 else 1.0
+            frustum = camera.get_frustum(aspect_ratio)
+
+        # Render all visible scene objects
+        scene.render_all(self.geometry_program, frustum=frustum, debug_label="Geometry Pass")
 
     def _set_camera_uniforms(self, camera: Camera, viewport_size: Tuple[int, int]):
         """

@@ -199,9 +199,16 @@ DEBUG_MODE = False
 SHOW_FPS = True
 LOG_LEVEL = "INFO"  # "DEBUG", "INFO", "WARNING", "ERROR"
 
+# Frustum culling debug
+DEBUG_FRUSTUM_CULLING = False  # Print culling statistics (very spammy - only enable for debugging)
+DEBUG_SHOW_CULLED_OBJECTS = False  # Print names of culled objects (requires DEBUG_FRUSTUM_CULLING)
+
 # ============================================================================
 # Performance Settings
 # ============================================================================
+
+# Frustum culling (skip rendering objects outside camera view)
+ENABLE_FRUSTUM_CULLING = True  # Highly recommended for performance
 
 # Target frame rate (0 = unlimited)
 # TARGET_FPS = 60

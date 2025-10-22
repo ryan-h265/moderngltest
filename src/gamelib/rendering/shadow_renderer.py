@@ -92,7 +92,7 @@ class ShadowRenderer:
 
     def render_single_shadow_map(self, light: Light, scene: Scene):
         """
-        Render shadow map for a single light.
+        Render shadow map for a single light with frustum culling.
 
         Args:
             light: Light to render shadow for
@@ -114,5 +114,12 @@ class ShadowRenderer:
         # Set shader uniform
         self.shadow_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
 
-        # Render scene from light's perspective
-        scene.render_all(self.shadow_program)
+        # Get frustum for light's view (for culling objects outside light's view)
+        from ..config.settings import ENABLE_FRUSTUM_CULLING
+        frustum = None
+        if ENABLE_FRUSTUM_CULLING:
+            from ..core.frustum import Frustum
+            frustum = Frustum(light_matrix)
+
+        # Render scene from light's perspective with frustum culling
+        scene.render_all(self.shadow_program, frustum=frustum)
