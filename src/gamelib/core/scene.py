@@ -138,15 +138,6 @@ class Scene:
         )
         self.add_object(pyramid3)
 
-        # Cube 4 - Orange
-        cube4 = SceneObject(
-            geometry.cube(size=(1.2, 1.2, 1.2)),
-            Vector3([-5.0, 0.6, -4.0]),
-            (0.9, 0.5, 0.2),
-            bounding_radius=1.0
-        )
-        self.add_object(cube4)
-
         # Sphere 5 - Purple
         sphere5 = SceneObject(
             geometry.sphere(radius=1.2),
@@ -174,15 +165,6 @@ class Scene:
         )
         self.add_object(sphere7)
 
-        # Cone 8 - Olive
-        cone8 = SceneObject(
-            geometry_utils.cone(radius=1.0, height=2.0),
-            Vector3([1.5, 0.0, 6.0]),
-            (0.6, 0.6, 0.2),
-            bounding_radius=1.4
-        )
-        self.add_object(cone8)
-
         # Sphere 9 - Sea Green
         sphere9 = SceneObject(
             geometry.sphere(radius=0.65),
@@ -191,24 +173,6 @@ class Scene:
             bounding_radius=0.65
         )
         self.add_object(sphere9)
-
-        # Cube 10 - Gold
-        cube10 = SceneObject(
-            geometry.cube(size=(0.9, 2.0, 0.9)),
-            Vector3([2.5, 1.0, -3.0]),
-            (0.8, 0.6, 0.3),
-            bounding_radius=1.2
-        )
-        self.add_object(cube10)
-
-        # Pyramid 11 - Maroon
-        pyramid11 = SceneObject(
-            geometry_utils.pyramid(base_size=1.6, height=1.5),
-            Vector3([-4.0, 0.0, 5.0]),
-            (0.7, 0.3, 0.3),
-            bounding_radius=1.3
-        )
-        self.add_object(pyramid11)
 
         # Cube 12 - Steel Blue
         cube12 = SceneObject(
@@ -237,41 +201,6 @@ class Scene:
         )
         self.add_object(cone14)
 
-        # Sphere 15 - Teal
-        sphere15 = SceneObject(
-            geometry.sphere(radius=0.9),
-            Vector3([-6.0, 0.9, -1.5]),
-            (0.3, 0.6, 0.6),
-            bounding_radius=0.9
-        )
-        self.add_object(sphere15)
-
-        # Pyramid 16 - Rust
-        pyramid16 = SceneObject(
-            geometry_utils.pyramid(base_size=1.0, height=2.5),
-            Vector3([3.5, 0.0, 4.5]),
-            (0.8, 0.4, 0.2),
-            bounding_radius=1.5
-        )
-        self.add_object(pyramid16)
-
-        # Sphere 17 - Lime
-        sphere17 = SceneObject(
-            geometry.sphere(radius=0.6),
-            Vector3([-3.5, 0.6, -2.5]),
-            (0.5, 0.8, 0.3),
-            bounding_radius=0.6
-        )
-        self.add_object(sphere17)
-
-        # Cone 18 - Lavender
-        cone18 = SceneObject(
-            geometry_utils.cone(radius=0.4, height=1.8),
-            Vector3([8.0, 0.0, 4.0]),
-            (0.6, 0.4, 0.7),
-            bounding_radius=1.0
-        )
-        self.add_object(cone18)
 
     def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = ""):
         """

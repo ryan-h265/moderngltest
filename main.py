@@ -85,6 +85,39 @@ class Game(mglw.WindowConfig):
         # Time tracking
         self.time = 0
 
+    def _create_light(self, color: Vector3, intensity: float = 1.0) -> Light:
+        """
+        Create a single light at a given angle.
+
+        Args:
+            angle: Angle in radians
+
+        Returns:
+            Light object
+        """
+        import math
+
+        radius = 12.0
+        height = 20
+
+        # Position on circle
+        x = radius * math.cos(0.0)
+        z = radius * math.sin(0.0)
+
+        # Normalize color
+        color = color / max(color)
+
+        # Create light
+        light = Light(
+            position=Vector3([x, height, z]),
+            target=Vector3([0.0, 0.0, 0.0]),
+            color=color,
+            intensity=intensity,
+            light_type='directional',
+        )
+
+        return light
+
     def _create_lights(self):
         """
         Create the default multi-light setup.
@@ -99,42 +132,9 @@ class Game(mglw.WindowConfig):
 
         lights = []
 
-        # Number of lights to create
-        num_lights = 6
+        light = self._create_light(Vector3([1.0, 0.5, 1.0]))
 
-        for i in range(num_lights):
-            # Arrange lights in a circle
-            angle = (i / num_lights) * 2 * math.pi
-            radius = 12.0
-            height = 8.0 + (i % 3) * 2.0  # Vary height slightly
-
-            # Position on circle
-            x = radius * math.cos(angle)
-            z = radius * math.sin(angle)
-
-            # Create different colored lights
-            # Use HSV to RGB conversion for nice color distribution
-            hue = i / num_lights
-            if hue < 1/3:
-                color = Vector3([1.0 - 3*hue*0.5, 0.5 + 3*hue*0.5, 0.3])
-            elif hue < 2/3:
-                color = Vector3([0.3, 1.0 - 3*(hue-1/3)*0.5, 0.5 + 3*(hue-1/3)*0.5])
-            else:
-                color = Vector3([0.5 + 3*(hue-2/3)*0.5, 0.3, 1.0 - 3*(hue-2/3)*0.5])
-
-            # Normalize color
-            color = color / max(color)
-
-            # Create light
-            light = Light(
-                position=Vector3([x, height, z]),
-                target=Vector3([0.0, 0.0, 0.0]),
-                color=color,
-                intensity= 0.3 + (i % 3) * 0.2,  # Vary intensity
-                light_type='directional'
-            )
-
-            lights.append(light)
+        lights.append(light)
 
         return lights
 
@@ -152,7 +152,7 @@ class Game(mglw.WindowConfig):
         for i, light in enumerate(self.lights):
             # Rotate every other light at different speeds
             if i % 2 == 0:
-                light.animate_rotation(time * (1.0 + i * 0.1))
+                light.animate_rotation(time * (1.0 + i * 0.1), speed=0.001)
 
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
