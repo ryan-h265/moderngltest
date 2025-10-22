@@ -1,7 +1,7 @@
 """
 Anti-Aliasing Renderer
 
-Handles MSAA and FXAA anti-aliasing techniques.
+Handles MSAA, FXAA, and SMAA anti-aliasing techniques.
 """
 
 from typing import Tuple, Optional

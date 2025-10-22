@@ -1,7 +1,7 @@
 """
 SMAA Renderer
 
-Implements Enhanced Subpixel Morphological Antialiasing (SMAA).
+Implements Subpixel Morphological Antialiasing (SMAA).
 A 3-pass technique that provides better quality than FXAA.
 
 Uses official SMAA 1.0 precomputed lookup textures for professional-grade antialiasing.
@@ -31,7 +31,7 @@ from textures.smaa_textures import (
 
 class SMAARenderer:
     """
-    SMAA (Enhanced Subpixel Morphological Antialiasing) Renderer.
+    SMAA (Subpixel Morphological Antialiasing) Renderer.
     
     SMAA is a 3-pass technique:
     1. Edge Detection - Find edges using color/luma
