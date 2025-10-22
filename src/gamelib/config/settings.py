@@ -151,3 +151,19 @@ SSAO_INTENSITY = 1.5
 CSM_ENABLED = False
 CSM_NUM_CASCADES = 3
 CSM_LAMBDA = 0.5  # Blend between uniform and logarithmic splits
+
+# ============================================================================
+# UI / Text Rendering Settings
+# ============================================================================
+
+# Font configuration
+UI_FONT_PATH = "assets/fonts/PixelOperatorMono.ttf"
+UI_FONT_SIZE = 16  # Font size in pixels
+UI_ATLAS_SIZE = 512  # Texture atlas resolution (512x512)
+
+# Debug overlay
+DEBUG_OVERLAY_ENABLED = True
+DEBUG_TEXT_COLOR = (0.0, 1.0, 0.0, 1.0)  # RGBA (green - original)
+DEBUG_TEXT_SCALE = 1.0  # Normal scale
+DEBUG_POSITION = (10, 10)  # Top-left
+DEBUG_LINE_SPACING = 20  # Pixels between lines

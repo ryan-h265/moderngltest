@@ -22,6 +22,10 @@ from src.gamelib import (
 from src.gamelib.input.input_manager import InputManager
 from src.gamelib.input.controllers import CameraController, RenderingController
 
+# Debug overlay
+from src.gamelib.debug import DebugOverlay
+from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED
+
 
 class Game(mglw.WindowConfig):
     """Main game class"""
@@ -71,6 +75,12 @@ class Game(mglw.WindowConfig):
 
         # Initialize shadow maps for lights (with camera for adaptive resolution)
         self.render_pipeline.initialize_lights(self.lights, self.camera)
+
+        # Setup debug overlay
+        if DEBUG_OVERLAY_ENABLED:
+            self.debug_overlay = DebugOverlay(self.render_pipeline.text_manager)
+        else:
+            self.debug_overlay = None
 
         # Time tracking
         self.time = 0
@@ -149,6 +159,11 @@ class Game(mglw.WindowConfig):
 
         # Update camera target after position changes
         self.camera.update_vectors()
+
+        # Update debug overlay
+        if self.debug_overlay:
+            fps = 1.0 / frametime if frametime > 0 else 0
+            self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene)
 
     def on_render(self, time, frametime):
         """
