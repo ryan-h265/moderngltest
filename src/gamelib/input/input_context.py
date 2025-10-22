@@ -101,7 +101,12 @@ class InputContextManager:
                 InputCommand.SYSTEM_PAUSE,
                 InputCommand.SYSTEM_QUICK_SAVE,
                 InputCommand.SYSTEM_QUICK_LOAD,
+                InputCommand.SYSTEM_CYCLE_AA_MODE,
                 InputCommand.SYSTEM_TOGGLE_SSAO,
+                InputCommand.SYSTEM_TOGGLE_MSAA,
+                InputCommand.SYSTEM_TOGGLE_FXAA,
+                InputCommand.SYSTEM_TOGGLE_SMAA,
+
             },
 
             # ================================================================

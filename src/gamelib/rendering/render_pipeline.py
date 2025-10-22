@@ -15,6 +15,7 @@ from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
 from .ssao_renderer import SSAORenderer
+from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
@@ -70,6 +71,17 @@ class RenderPipeline:
         self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
         self.shader_manager.load_program("ssao_blur", "ssao_blur.vert", "ssao_blur.frag")
 
+        # Anti-aliasing shaders
+        self.shader_manager.load_program("fxaa", "fxaa.vert", "fxaa.frag")
+        
+        # SMAA shaders (optional - handle gracefully if they don't exist)
+        try:
+            self.shader_manager.load_program("smaa_edge", "smaa_edge.vert", "smaa_edge.frag")
+            self.shader_manager.load_program("smaa_blend", "smaa_blend.vert", "smaa_blend.frag")
+            self.shader_manager.load_program("smaa_neighborhood", "smaa_neighborhood.vert", "smaa_neighborhood.frag")
+        except Exception as e:
+            print(f"Warning: SMAA shaders not found, SMAA will be disabled: {e}")
+
         # Create shadow renderer (used by both modes)
         self.shadow_renderer = ShadowRenderer(
             ctx,
@@ -101,6 +113,27 @@ class RenderPipeline:
             self.shader_manager.get("ssao"),
             self.shader_manager.get("ssao_blur")
         ) if SSAO_ENABLED else None
+
+        # Create anti-aliasing renderer with optional SMAA support
+        smaa_edge = None
+        smaa_blend = None
+        smaa_neighborhood = None
+        
+        try:
+            smaa_edge = self.shader_manager.get("smaa_edge")
+            smaa_blend = self.shader_manager.get("smaa_blend")
+            smaa_neighborhood = self.shader_manager.get("smaa_neighborhood")
+        except Exception:
+            pass  # SMAA shaders not available
+        
+        self.aa_renderer = AntiAliasingRenderer(
+            ctx,
+            WINDOW_SIZE,
+            self.shader_manager.get("fxaa"),
+            smaa_edge,
+            smaa_blend,
+            smaa_neighborhood
+        )
 
     def initialize_lights(self, lights: List[Light]):
         """
@@ -149,7 +182,17 @@ class RenderPipeline:
             camera: Camera for view
             lights: List of lights
         """
-        self.main_renderer.render(scene, camera, lights, self.window.viewport)
+        # Get AA render target
+        render_target = self.aa_renderer.get_render_target()
+        
+        # Check if AA is enabled
+        if render_target == self.ctx.screen:
+            # No AA - render directly to screen (original behavior)
+            self.main_renderer.render(scene, camera, lights, self.window.viewport)
+        else:
+            # AA enabled - render to AA framebuffer then resolve
+            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target)
+            self.aa_renderer.resolve_and_present()
 
     def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light]):
         """
@@ -179,14 +222,30 @@ class RenderPipeline:
             )
             ssao_texture = self.ssao_renderer.get_ssao_texture()
 
+        # Get AA render target
+        render_target = self.aa_renderer.get_render_target()
+
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
-        self.lighting_renderer.render(
-            lights,
-            self.gbuffer,
-            camera,
-            self.window.viewport,
-            ssao_texture=ssao_texture
-        )
+        if render_target == self.ctx.screen:
+            # No AA - render directly to screen (original behavior)
+            self.lighting_renderer.render(
+                lights,
+                self.gbuffer,
+                camera,
+                self.window.viewport,
+                ssao_texture=ssao_texture
+            )
+        else:
+            # AA enabled - render to AA framebuffer then resolve
+            self.lighting_renderer.render_to_target(
+                lights,
+                self.gbuffer,
+                camera,
+                self.window.viewport,
+                render_target,
+                ssao_texture=ssao_texture
+            )
+            self.aa_renderer.resolve_and_present()
 
     def get_shader(self, name: str) -> moderngl.Program:
         """
@@ -199,6 +258,46 @@ class RenderPipeline:
             Shader program
         """
         return self.shader_manager.get(name)
+
+    def cycle_aa_mode(self):
+        """Cycle to the next anti-aliasing mode"""
+        if hasattr(self, 'aa_renderer'):
+            mode = self.aa_renderer.cycle_aa_mode()
+            print(f"Anti-aliasing mode: {self.aa_renderer.get_aa_mode_name()}")
+            return mode
+
+    def toggle_msaa(self):
+        """Toggle MSAA on/off"""
+        if hasattr(self, 'aa_renderer'):
+            enabled = self.aa_renderer.toggle_msaa()
+            mode_name = self.aa_renderer.get_aa_mode_name()
+            print(f"MSAA {'enabled' if enabled else 'disabled'} - AA mode: {mode_name}")
+            return enabled
+
+    def toggle_fxaa(self):
+        """Toggle FXAA on/off"""
+        if hasattr(self, 'aa_renderer'):
+            enabled = self.aa_renderer.toggle_fxaa()
+            mode_name = self.aa_renderer.get_aa_mode_name()
+            print(f"FXAA {'enabled' if enabled else 'disabled'} - AA mode: {mode_name}")
+            return enabled
+
+    def toggle_smaa(self):
+        """Toggle SMAA on/off"""
+        if hasattr(self, 'aa_renderer'):
+            enabled = self.aa_renderer.toggle_smaa()
+            mode_name = self.aa_renderer.get_aa_mode_name()
+            if self.aa_renderer.smaa_renderer:
+                print(f"SMAA {'enabled' if enabled else 'disabled'} - AA mode: {mode_name}")
+            else:
+                print("SMAA not available (shaders not loaded)")
+            return enabled
+
+    def get_aa_mode_name(self) -> str:
+        """Get current anti-aliasing mode name"""
+        if hasattr(self, 'aa_renderer'):
+            return self.aa_renderer.get_aa_mode_name()
+        return "Not Available"
 
     def reload_shaders(self):
         """
