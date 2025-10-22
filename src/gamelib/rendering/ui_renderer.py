@@ -88,7 +88,7 @@ class UIRenderer:
         )
 
     def resize(self, screen_size: Tuple[int, int]):
-        pass
+        raise NotImplementedError("at some point we need to resize.")
 
     def release(self):
         for vao in self._vao_cache.values():

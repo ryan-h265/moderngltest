@@ -45,7 +45,7 @@ class ShadowRenderer:
         self.shadow_size = shadow_size
         self.last_stats: Optional[Dict[str, int]] = None
 
-    def create_shadow_map(self, resolution: int = None) -> Tuple[moderngl.Texture, moderngl.Framebuffer]:
+    def create_shadow_map(self, resolution: Optional[int] = None) -> Tuple[moderngl.Texture, moderngl.Framebuffer]:
         """
         Create a shadow map texture and framebuffer.
 

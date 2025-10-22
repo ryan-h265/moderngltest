@@ -8,7 +8,6 @@ from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
-from .text_sprite import TextSprite
 
 __all__ = [
     "RenderPipeline",
@@ -20,5 +19,4 @@ __all__ = [
     "LightingRenderer",
     "TextManager",
     "UIRenderer",
-    "TextSprite",
 ]
