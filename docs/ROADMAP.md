@@ -475,8 +475,3 @@ Ideas for further expansion after Phases 1-3:
 ### General Shadow Techniques
 - [GPU Gems - Shadow Techniques](https://developer.nvidia.com/gpugems/gpugems/part-ii-lighting-and-shadows)
 - [Advances in Real-Time Rendering (SIGGRAPH)](https://advances.realtimerendering.com/)
-
----
-
-**Built with Claude Code** 🤖
-Last updated: 2025-10-20
