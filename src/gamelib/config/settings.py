@@ -46,6 +46,97 @@ ENABLE_LIGHT_SORTING = True  # Sort lights by importance (brightness/distance)
 # PCF (Percentage Closer Filtering) for soft shadows
 PCF_SAMPLES = 3         # 3x3 grid = 9 samples (use 5 for 25 samples, 1 for no PCF)
 
+# ============================================================================
+# Anti-Aliasing Settings
+# ============================================================================
+#
+# The engine supports three AA techniques, each with different trade-offs:
+#
+# 1. MSAA (Multi-Sample Anti-Aliasing)
+#    - Hardware-based, excellent geometric edge quality
+#    - Higher GPU memory and fill-rate cost
+#    - Best for: Clean geometry edges, works with deferred rendering
+#
+# 2. FXAA (Fast Approximate Anti-Aliasing)
+#    - Post-process, very fast, minimal memory
+#    - Can blur textures/text slightly
+#    - Best for: Maximum performance, shader aliasing
+#
+# 3. SMAA (Enhanced Subpixel Morphological Anti-Aliasing)
+#    - Post-process, better quality than FXAA
+#    - Uses official SMAA 1.0 lookup textures for pattern matching
+#    - Best for: High quality post-AA, minimal blur
+#
+# Combined modes (e.g., MSAA 4x + SMAA) provide the best overall quality
+# by using MSAA for geometry and SMAA for post-processing.
+#
+# Runtime Controls:
+#   F7: Cycle through AA modes
+#   F8: Toggle MSAA on/off
+#   F9: Toggle SMAA on/off
+# ============================================================================
+
+# Default AA Mode
+# Options: "OFF", "FXAA", "SMAA", "MSAA_2X", "MSAA_4X", "MSAA_8X",
+#          "MSAA_2X_FXAA", "MSAA_4X_FXAA", "MSAA_2X_SMAA", "MSAA_4X_SMAA"
+DEFAULT_AA_MODE = "OFF"
+
+# ----------------------------------------------------------------------------
+# MSAA (Multi-Sample Anti-Aliasing) Settings
+# ----------------------------------------------------------------------------
+# Hardware-accelerated antialiasing using multiple samples per pixel
+# Higher quality but more GPU memory and fill-rate intensive
+
+DEFAULT_MSAA_SAMPLES = 4       # Default sample count (2, 4, or 8)
+MAX_MSAA_SAMPLES = 8           # Maximum supported samples (GPU dependent)
+
+# MSAA Quality vs Performance:
+# 2x: ~15% cost, good edge quality
+# 4x: ~25% cost, excellent edge quality (recommended)
+# 8x: ~40% cost, outstanding quality (high-end GPUs only)
+
+# ----------------------------------------------------------------------------
+# FXAA (Fast Approximate Anti-Aliasing) Settings
+# ----------------------------------------------------------------------------
+# Post-process AA using edge detection and blur
+# Very fast, works on all geometry, minimal memory cost
+
+FXAA_EDGE_THRESHOLD = 0.063    # Edge detection sensitivity (0.063 = default, lower = more blur)
+FXAA_EDGE_THRESHOLD_MIN = 0.0312  # Minimum threshold for very dark areas
+FXAA_SUBPIX_QUALITY = 0.75     # Sub-pixel aliasing removal (0.0-1.0, higher = more blur)
+
+# FXAA Presets:
+# PERFORMANCE: edge_threshold=0.125, subpix=0.50 (faster, less blur)
+# BALANCED:    edge_threshold=0.063, subpix=0.75 (default, good quality)
+# QUALITY:     edge_threshold=0.031, subpix=1.00 (slower, more blur)
+
+# ----------------------------------------------------------------------------
+# SMAA (Enhanced Subpixel Morphological Anti-Aliasing) Settings
+# ----------------------------------------------------------------------------
+# Advanced post-process AA using pattern detection and lookup tables
+# Better quality than FXAA, uses official SMAA 1.0 precomputed textures
+
+SMAA_PRESET = "HIGH"  # Options: "LOW", "MEDIUM", "HIGH", "ULTRA"
+
+# SMAA Quality Settings (auto-set based on preset, can be overridden)
+SMAA_THRESHOLD = 0.1           # Edge detection threshold (lower = more edges detected)
+SMAA_MAX_SEARCH_STEPS = 16     # Maximum steps when searching for edge patterns
+SMAA_MAX_SEARCH_STEPS_DIAG = 8 # Maximum steps for diagonal edges
+SMAA_CORNER_ROUNDING = 25      # Corner rounding percentage (0-100)
+
+# SMAA Presets define these values:
+# LOW:    threshold=0.15, search_steps=4,  diag_steps=0,  corner_rounding=0   (~2% cost)
+# MEDIUM: threshold=0.1,  search_steps=8,  diag_steps=0,  corner_rounding=25  (~3% cost)
+# HIGH:   threshold=0.1,  search_steps=16, diag_steps=8,  corner_rounding=25  (~4% cost)
+# ULTRA:  threshold=0.05, search_steps=32, diag_steps=16, corner_rounding=100 (~6% cost)
+
+# ----------------------------------------------------------------------------
+# Combined AA Modes
+# ----------------------------------------------------------------------------
+# MSAA + FXAA: MSAA handles geometry edges, FXAA smooths shader aliasing
+# MSAA + SMAA: MSAA handles geometry edges, SMAA provides superior post-processing
+# Recommended: MSAA 4x + SMAA (best quality, ~29% total cost)
+
 # Background clear color (R, G, B)
 CLEAR_COLOR = (0.1, 0.1, 0.15)  # Dark blue
 

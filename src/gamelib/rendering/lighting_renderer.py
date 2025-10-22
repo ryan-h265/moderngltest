@@ -101,8 +101,30 @@ class LightingRenderer:
             viewport: Viewport tuple (x, y, width, height)
             ssao_texture: Optional SSAO texture
         """
-        # Use screen framebuffer
-        self.ctx.screen.use()
+        self.render_to_target(lights, gbuffer, camera, viewport, self.ctx.screen, ssao_texture)
+
+    def render_to_target(
+        self,
+        lights: List[Light],
+        gbuffer: GBuffer,
+        camera: Camera,
+        viewport: tuple,
+        target: moderngl.Framebuffer,
+        ssao_texture: moderngl.Texture = None
+    ):
+        """
+        Render all lighting to a specific target.
+
+        Args:
+            lights: List of lights to render
+            gbuffer: G-Buffer with geometric data
+            camera: Camera for view position
+            viewport: Viewport tuple (x, y, width, height)
+            target: Target framebuffer
+            ssao_texture: Optional SSAO texture
+        """
+        # Use target framebuffer
+        target.use()
 
         # Set viewport
         self.ctx.viewport = viewport

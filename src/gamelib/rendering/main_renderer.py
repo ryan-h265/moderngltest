@@ -40,7 +40,7 @@ class MainRenderer:
         viewport: Tuple[int, int, int, int]
     ):
         """
-        Render the main scene.
+        Render the main scene to screen.
 
         Args:
             scene: Scene to render
@@ -48,8 +48,28 @@ class MainRenderer:
             lights: List of lights (with shadow maps already rendered)
             viewport: Viewport tuple (x, y, width, height)
         """
-        # Use screen framebuffer
-        self.ctx.screen.use()
+        self.render_to_target(scene, camera, lights, viewport, self.ctx.screen)
+
+    def render_to_target(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        viewport: Tuple[int, int, int, int],
+        target: moderngl.Framebuffer
+    ):
+        """
+        Render the main scene to a specific framebuffer.
+
+        Args:
+            scene: Scene to render
+            camera: Camera for view
+            lights: List of lights (with shadow maps already rendered)
+            viewport: Viewport tuple (x, y, width, height)
+            target: Target framebuffer
+        """
+        # Use target framebuffer
+        target.use()
 
         # Clear with background color
         self.ctx.clear(*CLEAR_COLOR)
