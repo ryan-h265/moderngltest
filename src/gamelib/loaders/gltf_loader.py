@@ -15,6 +15,7 @@ from pyrr import Matrix44
 
 from .material import Material
 from .model import Model, Mesh
+from .texture_transform import TextureTransform
 
 
 class GltfLoader:
@@ -616,6 +617,8 @@ class GltfLoader:
                 if pbr.baseColorTexture:
                     tex_idx = pbr.baseColorTexture.index
                     material.base_color_texture = self._load_texture(gltf, tex_idx, model_dir)
+                    # Load texture transform if present
+                    material.base_color_transform = self._load_texture_transform(pbr.baseColorTexture)
 
                 # Base color factor
                 if pbr.baseColorFactor:
@@ -625,6 +628,8 @@ class GltfLoader:
                 if pbr.metallicRoughnessTexture:
                     tex_idx = pbr.metallicRoughnessTexture.index
                     material.metallic_roughness_texture = self._load_texture(gltf, tex_idx, model_dir)
+                    # Load texture transform if present
+                    material.metallic_roughness_transform = self._load_texture_transform(pbr.metallicRoughnessTexture)
 
                 # Metallic/roughness factors
                 if pbr.metallicFactor is not None:
@@ -636,6 +641,8 @@ class GltfLoader:
             if gltf_mat.normalTexture:
                 tex_idx = gltf_mat.normalTexture.index
                 material.normal_texture = self._load_texture(gltf, tex_idx, model_dir)
+                # Load texture transform if present
+                material.normal_transform = self._load_texture_transform(gltf_mat.normalTexture)
                 # Load normal scale (optional, defaults to 1.0)
                 if hasattr(gltf_mat.normalTexture, 'scale') and gltf_mat.normalTexture.scale is not None:
                     material.normal_scale = gltf_mat.normalTexture.scale
@@ -644,6 +651,8 @@ class GltfLoader:
             if gltf_mat.occlusionTexture:
                 tex_idx = gltf_mat.occlusionTexture.index
                 material.occlusion_texture = self._load_texture(gltf, tex_idx, model_dir)
+                # Load texture transform if present
+                material.occlusion_transform = self._load_texture_transform(gltf_mat.occlusionTexture)
                 # Load occlusion strength (optional, defaults to 1.0)
                 if hasattr(gltf_mat.occlusionTexture, 'strength') and gltf_mat.occlusionTexture.strength is not None:
                     material.occlusion_strength = gltf_mat.occlusionTexture.strength
@@ -652,6 +661,8 @@ class GltfLoader:
             if gltf_mat.emissiveTexture:
                 tex_idx = gltf_mat.emissiveTexture.index
                 material.emissive_texture = self._load_texture(gltf, tex_idx, model_dir)
+                # Load texture transform if present
+                material.emissive_transform = self._load_texture_transform(gltf_mat.emissiveTexture)
 
             # Emissive factor
             if gltf_mat.emissiveFactor is not None:
@@ -667,12 +678,49 @@ class GltfLoader:
             if hasattr(gltf_mat, 'doubleSided') and gltf_mat.doubleSided:
                 material.double_sided = True
 
+            # Check for KHR_materials_unlit extension
+            if hasattr(gltf_mat, 'extensions') and gltf_mat.extensions:
+                if 'KHR_materials_unlit' in gltf_mat.extensions:
+                    material.unlit = True
+                    print(f"    Unlit: True (KHR_materials_unlit)")
+
             materials.append(material)
             print(f"  Material: {mat_name}")
             if material.emissive_texture or material.emissive_factor != (0.0, 0.0, 0.0):
                 print(f"    Emissive: factor={material.emissive_factor}, texture={material.emissive_texture is not None}")
 
         return materials
+
+    def _load_texture_transform(self, texture_info) -> Optional[TextureTransform]:
+        """
+        Load texture transform from GLTF texture info (KHR_texture_transform extension).
+
+        Args:
+            texture_info: GLTF texture info object (e.g., baseColorTexture, normalTexture, etc.)
+
+        Returns:
+            TextureTransform object if extension exists, None otherwise
+        """
+        if not hasattr(texture_info, 'extensions') or not texture_info.extensions:
+            return None
+
+        if 'KHR_texture_transform' not in texture_info.extensions:
+            return None
+
+        transform_data = texture_info.extensions['KHR_texture_transform']
+
+        # Extract offset, scale, rotation from extension data
+        offset = transform_data.get('offset', [0.0, 0.0])
+        scale = transform_data.get('scale', [1.0, 1.0])
+        rotation = transform_data.get('rotation', 0.0)
+        texcoord = transform_data.get('texCoord', 0)
+
+        return TextureTransform(
+            offset=tuple(offset),
+            scale=tuple(scale),
+            rotation=rotation,
+            texcoord=texcoord
+        )
 
     def _load_texture(self, gltf: pygltflib.GLTF2, texture_idx: int, model_dir: Path) -> Optional[moderngl.Texture]:
         """

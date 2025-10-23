@@ -120,6 +120,16 @@ class Scene:
                     self.add_object(lantern)
                     models_loaded += 1
 
+                glasses_path = PROJECT_ROOT / "assets/models/props/glasses/scene.gltf"
+                if glasses_path.exists():
+                    print(f"Loading GLTF model: {glasses_path}")
+                    glasses = loader.load(str(glasses_path))
+                    glasses.position = Vector3([8.0, 0.0, -1.0])
+                    glasses.scale = Vector3([1.0, 1.0, 1.0])
+                    glasses.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(glasses)
+                    models_loaded += 1
+
                 # 2. Tent - Place to the right
                 # tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
                 # if tent_path.exists():
@@ -132,15 +142,15 @@ class Scene:
                 #     models_loaded += 1
 
                 # 3. Japanese Bar - Place to the left
-                bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
-                if bar_path.exists():
-                    print(f"Loading GLTF model: {bar_path}")
-                    bar = loader.load(str(bar_path))
-                    bar.position = Vector3([-7.0, 0.0, -2.0])
-                    bar.scale = Vector3([1.2, 1.2, 1.2])
-                    bar.rotation = Vector3([0.0, 0.0, 0.0])
-                    self.add_object(bar)
-                    models_loaded += 1
+                # bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
+                # if bar_path.exists():
+                #     print(f"Loading GLTF model: {bar_path}")
+                #     bar = loader.load(str(bar_path))
+                #     bar.position = Vector3([-7.0, 0.0, -2.0])
+                #     bar.scale = Vector3([1.2, 1.2, 1.2])
+                #     bar.rotation = Vector3([0.0, 0.0, 0.0])
+                #     self.add_object(bar)
+                #     models_loaded += 1
 
                 print(f"\n=== Loaded {models_loaded} GLTF models successfully ===\n")
 
@@ -256,7 +266,7 @@ class Scene:
 
 
     def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = "",
-                   textured_program=None):
+                   textured_program=None, unlit_program=None):
         """
         Render all objects in the scene.
 
@@ -265,6 +275,7 @@ class Scene:
             frustum: Optional frustum for culling (if None, all objects rendered)
             debug_label: Label for debug output (e.g., "Main", "Shadow Light 0")
             textured_program: Optional shader program for textured models
+            unlit_program: Optional shader program for unlit materials (KHR_materials_unlit)
         """
         from ..config.settings import DEBUG_FRUSTUM_CULLING, DEBUG_SHOW_CULLED_OBJECTS
 
@@ -285,27 +296,41 @@ class Scene:
 
             if is_model:
                 # Model objects need special handling
-                if textured_program is not None:
-                    # Use textured shader for models (geometry pass)
+                if textured_program is not None or unlit_program is not None:
+                    # Geometry pass with texture support
                     # Note: Camera uniforms are already set by GeometryRenderer
-                    active_program = textured_program
 
-                    # Set material defaults
-                    if 'baseColorFactor' in active_program:
-                        active_program['baseColorFactor'].value = (1.0, 1.0, 1.0, 1.0)
-                    if 'hasBaseColorTexture' in active_program:
-                        active_program['hasBaseColorTexture'].value = False
-                    if 'hasNormalTexture' in active_program:
-                        active_program['hasNormalTexture'].value = False
-                    if 'hasMetallicRoughnessTexture' in active_program:
-                        active_program['hasMetallicRoughnessTexture'].value = False
-                    if 'hasEmissiveTexture' in active_program:
-                        active_program['hasEmissiveTexture'].value = False
-                    if 'emissiveFactor' in active_program:
-                        active_program['emissiveFactor'].value = (0.0, 0.0, 0.0)
+                    # Get parent model matrix
+                    parent_matrix = obj.get_model_matrix()
 
-                    # Set emissive uniforms for each mesh before rendering
+                    # Render each mesh with appropriate shader based on material properties
                     for mesh in obj.meshes:
+                        # Determine which shader to use for this mesh
+                        if mesh.material.unlit and unlit_program is not None:
+                            # Use unlit shader for materials marked as unlit (KHR_materials_unlit)
+                            active_program = unlit_program
+                        elif textured_program is not None:
+                            # Use standard textured shader
+                            active_program = textured_program
+                        else:
+                            # Fallback to primitive shader
+                            active_program = program
+
+                        # Set material defaults for the active program
+                        if 'baseColorFactor' in active_program:
+                            active_program['baseColorFactor'].value = (1.0, 1.0, 1.0, 1.0)
+                        if 'hasBaseColorTexture' in active_program:
+                            active_program['hasBaseColorTexture'].value = False
+                        if 'hasNormalTexture' in active_program:
+                            active_program['hasNormalTexture'].value = False
+                        if 'hasMetallicRoughnessTexture' in active_program:
+                            active_program['hasMetallicRoughnessTexture'].value = False
+                        if 'hasEmissiveTexture' in active_program:
+                            active_program['hasEmissiveTexture'].value = False
+                        if 'emissiveFactor' in active_program:
+                            active_program['emissiveFactor'].value = (0.0, 0.0, 0.0)
+
+                        # Set emissive uniforms for this mesh
                         if 'emissiveFactor' in active_program:
                             active_program['emissiveFactor'].value = mesh.material.emissive_factor
                         if 'hasEmissiveTexture' in active_program:
@@ -314,9 +339,9 @@ class Scene:
                             if has_emissive and 'emissiveTexture' in active_program:
                                 mesh.material.emissive_texture.use(location=3)
                                 active_program['emissiveTexture'].value = 3
-                    
-                    # Model handles its own rendering (sets model matrix, binds materials)
-                    obj.render(active_program)
+
+                        # Render this mesh with its shader
+                        mesh.render(active_program, parent_transform=parent_matrix, ctx=self.ctx)
                 else:
                     # Shadow pass or other passes without textured shader
                     # Render model using primitive shader (just geometry, no textures)

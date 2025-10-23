@@ -6,6 +6,7 @@ Handles PBR material properties and textures.
 
 from typing import Optional
 import moderngl
+from .texture_transform import TextureTransform
 
 
 class Material:
@@ -51,6 +52,17 @@ class Material:
 
         # Double-sided rendering
         self.double_sided = False
+
+        # Extensions
+        self.unlit = False  # KHR_materials_unlit extension
+
+        # Texture transforms (KHR_texture_transform extension)
+        # Each texture can have its own transform for offset/scale/rotation
+        self.base_color_transform: Optional[TextureTransform] = None
+        self.metallic_roughness_transform: Optional[TextureTransform] = None
+        self.normal_transform: Optional[TextureTransform] = None
+        self.emissive_transform: Optional[TextureTransform] = None
+        self.occlusion_transform: Optional[TextureTransform] = None
 
     def has_base_color(self) -> bool:
         """Check if material has base color texture"""
@@ -148,6 +160,49 @@ class Material:
             program['alphaMode'].value = mode_map.get(self.alpha_mode, 0)
         if 'alphaCutoff' in program:
             program['alphaCutoff'].value = self.alpha_cutoff
+
+        # Bind texture transform matrices (KHR_texture_transform)
+        # Each texture can have an independent 3x3 transformation matrix
+        if 'baseColorTransform' in program:
+            if self.base_color_transform:
+                program['baseColorTransform'].write(self.base_color_transform.get_matrix().tobytes())
+            else:
+                # Identity matrix if no transform
+                import numpy as np
+                identity = np.eye(3, dtype='f4')
+                program['baseColorTransform'].write(identity.tobytes())
+
+        if 'normalTransform' in program:
+            if self.normal_transform:
+                program['normalTransform'].write(self.normal_transform.get_matrix().tobytes())
+            else:
+                import numpy as np
+                identity = np.eye(3, dtype='f4')
+                program['normalTransform'].write(identity.tobytes())
+
+        if 'metallicRoughnessTransform' in program:
+            if self.metallic_roughness_transform:
+                program['metallicRoughnessTransform'].write(self.metallic_roughness_transform.get_matrix().tobytes())
+            else:
+                import numpy as np
+                identity = np.eye(3, dtype='f4')
+                program['metallicRoughnessTransform'].write(identity.tobytes())
+
+        if 'emissiveTransform' in program:
+            if self.emissive_transform:
+                program['emissiveTransform'].write(self.emissive_transform.get_matrix().tobytes())
+            else:
+                import numpy as np
+                identity = np.eye(3, dtype='f4')
+                program['emissiveTransform'].write(identity.tobytes())
+
+        if 'occlusionTransform' in program:
+            if self.occlusion_transform:
+                program['occlusionTransform'].write(self.occlusion_transform.get_matrix().tobytes())
+            else:
+                import numpy as np
+                identity = np.eye(3, dtype='f4')
+                program['occlusionTransform'].write(identity.tobytes())
 
     def release(self):
         """Release GPU resources"""

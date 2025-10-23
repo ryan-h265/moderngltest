@@ -17,6 +17,13 @@ uniform bool hasMetallicRoughnessTexture;
 uniform bool hasEmissiveTexture;
 uniform bool hasOcclusionTexture;
 
+// Texture transforms (KHR_texture_transform) - 3x3 matrices
+uniform mat3 baseColorTransform;
+uniform mat3 normalTransform;
+uniform mat3 metallicRoughnessTransform;
+uniform mat3 emissiveTransform;
+uniform mat3 occlusionTransform;
+
 // Material fallback properties
 uniform vec4 baseColorFactor;
 uniform vec3 emissiveFactor;
@@ -49,8 +56,10 @@ void main() {
     // Calculate normal (with optional normal mapping)
     vec3 normal;
     if (hasNormalTexture) {
+        // Apply texture transform to UV coordinates
+        vec2 transformed_uv = (normalTransform * vec3(v_texcoord, 1.0)).xy;
         // Sample normal map (tangent space, stored as [0,1])
-        vec3 normal_sample = texture(normalTexture, v_texcoord).rgb;
+        vec3 normal_sample = texture(normalTexture, transformed_uv).rgb;
         // Convert from [0,1] to [-1,1]
         normal_sample = normal_sample * 2.0 - 1.0;
 
@@ -69,7 +78,9 @@ void main() {
     // Sample base color
     vec4 albedo;
     if (hasBaseColorTexture) {
-        albedo = texture(baseColorTexture, v_texcoord);
+        // Apply texture transform to UV coordinates
+        vec2 transformed_uv = (baseColorTransform * vec3(v_texcoord, 1.0)).xy;
+        albedo = texture(baseColorTexture, transformed_uv);
         // Apply color factor
         albedo *= baseColorFactor;
     } else {
@@ -87,13 +98,17 @@ void main() {
     // Sample emissive contribution (stored separately, not affected by lighting)
     vec3 emissive = emissiveFactor;
     if (hasEmissiveTexture) {
-        emissive *= texture(emissiveTexture, v_texcoord).rgb;
+        // Apply texture transform to UV coordinates
+        vec2 transformed_uv = (emissiveTransform * vec3(v_texcoord, 1.0)).xy;
+        emissive *= texture(emissiveTexture, transformed_uv).rgb;
     }
 
     // Sample occlusion (baked AO from GLTF, stored in RED channel per spec)
     float occlusion = 1.0;
     if (hasOcclusionTexture) {
-        float ao_sample = texture(occlusionTexture, v_texcoord).r;
+        // Apply texture transform to UV coordinates
+        vec2 transformed_uv = (occlusionTransform * vec3(v_texcoord, 1.0)).xy;
+        float ao_sample = texture(occlusionTexture, transformed_uv).r;
         // Apply strength: lerp between no occlusion (1.0) and full occlusion
         occlusion = mix(1.0, ao_sample, occlusionStrength);
     }
@@ -102,8 +117,10 @@ void main() {
     float metallic = 0.0;   // Default: non-metallic (dielectric)
     float roughness = 0.5;  // Default: medium roughness
     if (hasMetallicRoughnessTexture) {
+        // Apply texture transform to UV coordinates
+        vec2 transformed_uv = (metallicRoughnessTransform * vec3(v_texcoord, 1.0)).xy;
         // Metallic-roughness texture: R=unused, G=roughness, B=metallic (glTF 2.0 standard)
-        vec3 mr = texture(metallicRoughnessTexture, v_texcoord).rgb;
+        vec3 mr = texture(metallicRoughnessTexture, transformed_uv).rgb;
         metallic = mr.b;
         roughness = mr.g;
     }
