@@ -109,28 +109,38 @@ class Scene:
                 loader = GltfLoader(self.ctx)
                 models_loaded = 0
 
+                # 1. dark_lantern_rigged
+                lantern_path = PROJECT_ROOT / "assets/models/props/dark_lantern_rigged/scene.gltf"
+                if lantern_path.exists():
+                    print(f"Loading GLTF model: {lantern_path}")
+                    lantern = loader.load(str(lantern_path))
+                    lantern.position = Vector3([-9.0, 0.0, 0.0])
+                    lantern.scale = Vector3([0.02, 0.02, 0.02])
+                    lantern.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(lantern)
+                    models_loaded += 1
 
                 # 2. Tent - Place to the right
-                tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
-                if tent_path.exists():
-                    print(f"Loading GLTF model: {tent_path}")
-                    tent = loader.load(str(tent_path))
-                    tent.position = Vector3([6.0, 0.0, 3.0])
-                    tent.scale = Vector3([1.5, 1.5, 1.5])
-                    tent.rotation = Vector3([0.0, 0.0, 0.0])
-                    self.add_object(tent)
-                    models_loaded += 1
+                # tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
+                # if tent_path.exists():
+                #     print(f"Loading GLTF model: {tent_path}")
+                #     tent = loader.load(str(tent_path))
+                #     tent.position = Vector3([6.0, 0.0, 3.0])
+                #     tent.scale = Vector3([1.5, 1.5, 1.5])
+                #     tent.rotation = Vector3([0.0, 0.0, 0.0])
+                #     self.add_object(tent)
+                #     models_loaded += 1
 
-                # 3. Japanese Bar - Place to the left
-                bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
-                if bar_path.exists():
-                    print(f"Loading GLTF model: {bar_path}")
-                    bar = loader.load(str(bar_path))
-                    bar.position = Vector3([-7.0, 0.0, -2.0])
-                    bar.scale = Vector3([1.2, 1.2, 1.2])
-                    bar.rotation = Vector3([0.0, 0.0, 0.0])
-                    self.add_object(bar)
-                    models_loaded += 1
+                # # 3. Japanese Bar - Place to the left
+                # bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
+                # if bar_path.exists():
+                #     print(f"Loading GLTF model: {bar_path}")
+                #     bar = loader.load(str(bar_path))
+                #     bar.position = Vector3([-7.0, 0.0, -2.0])
+                #     bar.scale = Vector3([1.2, 1.2, 1.2])
+                #     bar.rotation = Vector3([0.0, 0.0, 0.0])
+                #     self.add_object(bar)
+                #     models_loaded += 1
 
                 print(f"\n=== Loaded {models_loaded} GLTF models successfully ===\n")
 
@@ -289,7 +299,22 @@ class Scene:
                         active_program['hasNormalTexture'].value = False
                     if 'hasMetallicRoughnessTexture' in active_program:
                         active_program['hasMetallicRoughnessTexture'].value = False
+                    if 'hasEmissiveTexture' in active_program:
+                        active_program['hasEmissiveTexture'].value = False
+                    if 'emissiveFactor' in active_program:
+                        active_program['emissiveFactor'].value = (0.0, 0.0, 0.0)
 
+                    # Set emissive uniforms for each mesh before rendering
+                    for mesh in obj.meshes:
+                        if 'emissiveFactor' in active_program:
+                            active_program['emissiveFactor'].value = mesh.material.emissive_factor
+                        if 'hasEmissiveTexture' in active_program:
+                            has_emissive = mesh.material.emissive_texture is not None
+                            active_program['hasEmissiveTexture'].value = has_emissive
+                            if has_emissive and 'emissiveTexture' in active_program:
+                                mesh.material.emissive_texture.use(location=3)
+                                active_program['emissiveTexture'].value = 3
+                    
                     # Model handles its own rendering (sets model matrix, binds materials)
                     obj.render(active_program)
                 else:

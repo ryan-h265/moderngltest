@@ -217,3 +217,5 @@ __marimo__/
 
 # Game-specific
 keybindings.json  # User's custom key bindings
+
+.DS_Store

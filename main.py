@@ -89,7 +89,7 @@ class Game(mglw.WindowConfig):
         # Time tracking
         self.time = 0
 
-    def _create_light(self, color: Vector3, intensity: float = 1.0) -> Light:
+    def _create_light(self, color: Vector3, intensity: float = 1.0, angle: float = 0.0, height: float = 60.0) -> Light:
         """
         Create a single light at a given angle.
 
@@ -101,12 +101,11 @@ class Game(mglw.WindowConfig):
         """
         import math
 
-        radius = 12.0
-        height = 60
+        radius = 30.0
 
         # Position on circle
-        x = radius * math.cos(0.0)
-        z = radius * math.sin(0.0)
+        x = radius * math.cos(angle)
+        z = radius * math.sin(angle)
 
         # Normalize color
         color = color / max(color)
@@ -132,13 +131,11 @@ class Game(mglw.WindowConfig):
         Returns:
             List of Light objects
         """
-        import math
-
         lights = []
-
-        light = self._create_light(Vector3([1.0, 1.0, 0.8]), 2.0)
-
-        lights.append(light)
+        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=1.5, angle=0.0, height=10.0))
+        # lights.append(self._create_light(Vector3([1.0, 0.0, 0.0]), intensity=1.5, angle=0.0, height=10.0))
+        # lights.append(self._create_light(Vector3([0.0, 1.0, 0.0]), intensity=1.5, angle=135.0, height=10.0))
+        # lights.append(self._create_light(Vector3([0.0, 0.0, 1.0]), intensity=1.5, angle=270.0, height=10.0))
 
         return lights
 
@@ -154,9 +151,7 @@ class Game(mglw.WindowConfig):
 
         # Animate lights (create a rotating light show!)
         for i, light in enumerate(self.lights):
-            # Rotate every other light at different speeds
-            if i % 2 == 0:
-                light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
+            light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
 
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)

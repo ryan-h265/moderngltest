@@ -1,0 +1,11 @@
+Model Information:
+* title:	Dark Lantern Rigged
+* source:	https://sketchfab.com/3d-models/dark-lantern-rigged-ac8d4b048b194529a004d403a522cfc8
+* author:	Loopenkoopen (https://sketchfab.com/Loopenkoopen)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Dark Lantern Rigged" (https://sketchfab.com/3d-models/dark-lantern-rigged-ac8d4b048b194529a004d403a522cfc8) by Loopenkoopen (https://sketchfab.com/Loopenkoopen) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

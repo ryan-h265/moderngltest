@@ -32,6 +32,7 @@ class Material:
         self.base_color_texture: Optional[moderngl.Texture] = None
         self.metallic_roughness_texture: Optional[moderngl.Texture] = None
         self.normal_texture: Optional[moderngl.Texture] = None
+        self.emissive_factor: Optional[tuple] = (0.0, 0.0, 0.0)
         self.emissive_texture: Optional[moderngl.Texture] = None
 
         # Base color factor (used if no texture)
@@ -92,6 +93,21 @@ class Material:
         else:
             if 'hasMetallicRoughnessTexture' in program:
                 program['hasMetallicRoughnessTexture'].value = False
+
+        # Bind emissive texture to texture unit 3
+        if self.emissive_texture:
+            self.emissive_texture.use(location=3)
+            if 'emissiveTexture' in program:
+                program['emissiveTexture'].value = 3
+            if 'hasEmissiveTexture' in program:
+                program['hasEmissiveTexture'].value = True
+        else:
+            if 'hasEmissiveTexture' in program:
+                program['hasEmissiveTexture'].value = False
+
+        # Set emissive factor
+        if 'emissiveFactor' in program:
+            program['emissiveFactor'].value = self.emissive_factor
 
     def release(self):
         """Release GPU resources"""

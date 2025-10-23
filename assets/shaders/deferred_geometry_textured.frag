@@ -7,14 +7,17 @@
 uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D metallicRoughnessTexture;
+uniform sampler2D emissiveTexture;
 
 // Texture flags
 uniform bool hasBaseColorTexture;
 uniform bool hasNormalTexture;
 uniform bool hasMetallicRoughnessTexture;
+uniform bool hasEmissiveTexture;
 
 // Material fallback properties
 uniform vec4 baseColorFactor;
+uniform vec3 emissiveFactor;
 
 // Inputs from vertex shader
 in vec3 v_world_position;  // World space position
@@ -62,6 +65,15 @@ void main() {
         albedo = baseColorFactor;
     }
 
+    // Sample emissive contribution
+    vec3 emissive = emissiveFactor;
+    if (hasEmissiveTexture) {
+        emissive *= texture(emissiveTexture, v_texcoord).rgb;
+    }
+
+    // Add emissive to albedo (emissive materials glow regardless of lighting)
+    vec3 finalColor = albedo.rgb + emissive;
+
     // Sample metallic/roughness for PBR
     float metallic = 0.0;   // Default: non-metallic (dielectric)
     float roughness = 0.5;  // Default: medium roughness
@@ -72,8 +84,8 @@ void main() {
         roughness = mr.g;
     }
 
-    // Store albedo (RGB) + ambient occlusion (A, currently unused = 1.0)
-    gAlbedo = vec4(albedo.rgb, 1.0);
+    // Store final color (albedo + emissive) + ambient occlusion (A, currently unused = 1.0)
+    gAlbedo = vec4(finalColor, 1.0);
 
     // Store PBR material properties
     gMaterial = vec2(metallic, roughness);
