@@ -4,16 +4,14 @@ GLTF/GLB Loader
 Loads GLTF and GLB models into ModernGL-compatible format.
 """
 
-import os
-import struct
 import numpy as np
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
+from typing import List, Optional, Dict
 from PIL import Image
 import pygltflib
 import moderngl
 from moderngl_window.opengl.vao import VAO
-from pyrr import Vector3
+from pyrr import Matrix44
 
 from .material import Material
 from .model import Model, Mesh
@@ -80,8 +78,6 @@ class GltfLoader:
         Returns:
             List of Mesh objects with local transforms
         """
-        from pyrr import Matrix44
-
         meshes = []
 
         # Get the default scene (or first scene if no default)
@@ -111,7 +107,6 @@ class GltfLoader:
             materials: List of materials
             meshes: Output list to append meshes to
         """
-        from pyrr import Matrix44
 
         node = gltf.nodes[node_idx]
 
@@ -165,7 +160,7 @@ class GltfLoader:
         Returns:
             4x4 transformation matrix
         """
-        from pyrr import Matrix44, Quaternion
+        from pyrr import Quaternion
         import numpy as np
 
         # Check if node has a matrix property
@@ -173,7 +168,8 @@ class GltfLoader:
             # Matrix is provided directly (column-major)
             matrix = np.array(node.matrix, dtype='f4').reshape(4, 4)
             # GLTF uses column-major, pyrr uses row-major, so transpose
-            return Matrix44(matrix.T)
+            result = Matrix44(matrix.T)
+            return result
 
         # Otherwise, compose from TRS (Translation, Rotation, Scale)
         matrix = Matrix44.identity()
@@ -720,8 +716,6 @@ class GltfLoader:
         Returns:
             Bounding radius
         """
-        from pyrr import Matrix44
-
         max_radius = 0.0
 
         # Get the default scene (or first scene if no default)
@@ -750,8 +744,6 @@ class GltfLoader:
         Returns:
             Maximum bounding radius for this node and children
         """
-        from pyrr import Matrix44
-
         node = gltf.nodes[node_idx]
         max_radius = 0.0
 

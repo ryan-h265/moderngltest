@@ -109,15 +109,6 @@ class Scene:
                 loader = GltfLoader(self.ctx)
                 models_loaded = 0
 
-                # 1. Japanese Stone Lantern - Center piece
-                lantern_path = PROJECT_ROOT / "assets/models/props/japanese_stone_lantern/scene.gltf"
-                if lantern_path.exists():
-                    print(f"Loading GLTF model: {lantern_path}")
-                    lantern = loader.load(str(lantern_path))
-                    lantern.position = Vector3([0.0, 0.0, 0.0])
-                    lantern.scale = Vector3([1.0, 1.0, 1.0])
-                    self.add_object(lantern)
-                    models_loaded += 1
 
                 # 2. Tent - Place to the right
                 tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
@@ -168,7 +159,7 @@ class Scene:
         )
         self.add_object(sphere1)
 
-        # # Cube 2 - Blue
+        # Cube 2 - Blue
         # cube2 = SceneObject(
         #     geometry.cube(size=(1.5, 3.0, 1.5)),
         #     Vector3([3.0, 1.5, -2.0]),
@@ -178,30 +169,33 @@ class Scene:
         # )
         # self.add_object(cube2)
 
-        # # Pyramid 3 - Yellow
+        # Pyramid 3 - Yellow
         # pyramid3 = SceneObject(
         #     geometry_utils.pyramid(base_size=1.0, height=1.5),
-        #     Vector3([0.0, 0.0, 3.0]),
+        #     Vector3([0.0, 0.0, 0.0]),
         #     (0.8, 0.8, 0.3),
-        #     bounding_radius=1.0
+        #     bounding_radius=1.0,
+        #     name="Pyramid3_Yellow"
         # )
         # self.add_object(pyramid3)
 
-        # # Sphere 5 - Purple
+        # Sphere 5 - Purple
         # sphere5 = SceneObject(
         #     geometry.sphere(radius=1.2),
         #     Vector3([6.0, 1.25, 3.0]),
         #     (0.5, 0.2, 0.8),
-        #     bounding_radius=1.2
+        #     bounding_radius=1.2,
+        #     name="Sphere5_Purple"
         # )
         # self.add_object(sphere5)
 
-        # # Pyramid 6 - Cyan
+        # Pyramid 6 - Cyan
         # pyramid6 = SceneObject(
         #     geometry_utils.pyramid(base_size=1.5, height=2.0),
         #     Vector3([-2.0, 0.0, -6.0]),
         #     (0.2, 0.8, 0.8),
-        #     bounding_radius=1.5
+        #     bounding_radius=1.5,
+        #     name="Pyramid6_Cyan"
         # )
         # self.add_object(pyramid6)
 
