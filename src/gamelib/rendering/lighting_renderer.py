@@ -242,13 +242,15 @@ class LightingRenderer:
             camera: Camera for view position
             inverse_view: Inverse view matrix for world-space reconstruction
         """
-        # Set G-Buffer samplers (locations 0-3) - check if uniforms exist
+        # Set G-Buffer samplers (locations 0-4) - check if uniforms exist
         if 'gPosition' in self.lighting_program:
             self.lighting_program['gPosition'].value = 0
         if 'gNormal' in self.lighting_program:
             self.lighting_program['gNormal'].value = 1
         if 'gAlbedo' in self.lighting_program:
             self.lighting_program['gAlbedo'].value = 2
+        if 'gMaterial' in self.lighting_program:
+            self.lighting_program['gMaterial'].value = 3
 
         # Set inverse view matrix for world-space reconstruction
         if 'inverse_view' in self.lighting_program:

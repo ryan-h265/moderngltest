@@ -15,9 +15,10 @@ class GBuffer:
     G-Buffer for deferred rendering.
 
     Stores scene geometry properties in multiple textures:
-    - Position (RGB32F): World-space position
-    - Normal (RGB16F): World-space normal vectors
-    - Albedo (RGBA8): Base color + specular intensity
+    - Position (RGB32F): View-space position (for SSAO)
+    - Normal (RGB16F): View-space normal vectors (for SSAO)
+    - Albedo (RGBA8): Base color (RGB) + AO (A, currently unused)
+    - Material (RG16F): Metallic (R) + Roughness (G) for PBR
     - Depth (DEPTH24_STENCIL8): Depth and stencil information
 
     These textures are written in the geometry pass and read in the lighting pass.
@@ -59,14 +60,23 @@ class GBuffer:
         )
         self.normal_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
-        # Albedo + Specular texture (RGBA8)
-        # RGB = base color, A = specular intensity
+        # Albedo texture (RGBA8)
+        # RGB = base color, A = ambient occlusion (currently unused, set to 1.0)
         self.albedo_texture = self.ctx.texture(
             self.size,
             components=4,
             dtype='f1'  # 8-bit per channel
         )
         self.albedo_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
+
+        # Material properties texture (RG16F)
+        # R = metallic, G = roughness (for PBR)
+        self.material_texture = self.ctx.texture(
+            self.size,
+            components=2,
+            dtype='f2'  # 16-bit float
+        )
+        self.material_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
         # Depth buffer (required for depth testing)
         self.depth_texture = self.ctx.depth_texture(self.size)
@@ -79,6 +89,7 @@ class GBuffer:
                 self.position_texture,  # location = 0
                 self.normal_texture,    # location = 1
                 self.albedo_texture,    # location = 2
+                self.material_texture,  # location = 3 (metallic + roughness)
             ],
             depth_attachment=self.depth_texture
         )
@@ -101,6 +112,7 @@ class GBuffer:
         self.position_texture.release()
         self.normal_texture.release()
         self.albedo_texture.release()
+        self.material_texture.release()
         self.depth_texture.release()
 
         # Recreate with new size
@@ -126,12 +138,13 @@ class GBuffer:
 
         Args:
             start_location: Starting texture unit (default: 0)
-                           position=0, normal=1, albedo=2, depth=3
+                           position=0, normal=1, albedo=2, material=3, depth=4
         """
         self.position_texture.use(location=start_location + 0)
         self.normal_texture.use(location=start_location + 1)
         self.albedo_texture.use(location=start_location + 2)
-        self.depth_texture.use(location=start_location + 3)
+        self.material_texture.use(location=start_location + 3)
+        self.depth_texture.use(location=start_location + 4)
 
     def release(self):
         """Release all G-Buffer resources."""
@@ -139,6 +152,7 @@ class GBuffer:
         self.position_texture.release()
         self.normal_texture.release()
         self.albedo_texture.release()
+        self.material_texture.release()
         self.depth_texture.release()
 
     @property

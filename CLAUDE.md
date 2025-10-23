@@ -51,7 +51,8 @@ src/gamelib/
 ├── config/          # Centralized settings (window, rendering, camera, lighting)
 ├── core/            # Camera, Light, Scene - fundamental engine components
 ├── rendering/       # RenderPipeline, ShaderManager, ShadowRenderer, MainRenderer
-└── input/           # Command Pattern input system with InputManager and controllers
+├── input/           # Command Pattern input system with InputManager and controllers
+└── loaders/         # GLTF/GLB model loading with PBR material support
 ```
 
 ### Key Architectural Patterns
@@ -75,9 +76,11 @@ src/gamelib/
 2. **Main Pass**: MainRenderer renders final scene with lighting, using shadow maps to determine shadowing
 
 **Scene Management**
-- Scene contains SceneObjects (each has geometry VAO, position, color, model matrix)
-- Scene.create_default_scene() generates 18 cubes in a grid pattern
-- Rendering uses batched drawing for all objects in a single pass
+- Scene contains SceneObjects AND Model instances (unified rendering)
+- SceneObjects: Primitives (cubes, spheres, pyramids) with flat colors
+- Models: GLTF/GLB loaded models with PBR materials and textures
+- Scene.create_default_scene() creates mixed scene (primitives + GLTF models)
+- Automatic shader switching based on object type (textured vs flat-color)
 
 ### Important Implementation Details
 
@@ -121,7 +124,7 @@ When modifying behavior, check settings.py first before hardcoding values.
 
 ## Common Development Patterns
 
-### Adding a New Object to Scene
+### Adding a Primitive Object to Scene
 ```python
 # In Scene.create_default_scene() or create a new scene method:
 cube = SceneObject(
@@ -132,6 +135,37 @@ cube = SceneObject(
 )
 self.objects.append(cube)
 ```
+
+### Loading a GLTF/GLB Model
+```python
+# In Scene.create_default_scene() (requires self.ctx to be set):
+from ..loaders import GltfLoader
+from ..config.settings import PROJECT_ROOT
+
+loader = GltfLoader(self.ctx)
+model = loader.load(str(PROJECT_ROOT / "assets/models/props/japanese_stone_lantern/scene.gltf"))
+
+# Position and scale
+model.position = Vector3([0.0, 0.0, 0.0])
+model.scale = Vector3([2.0, 2.0, 2.0])  # Scale up 2x
+model.rotation = Vector3([0.0, math.radians(45), 0.0])  # Rotate 45° around Y-axis
+
+# Add to scene (works alongside primitives)
+self.add_object(model)
+
+# The model will:
+# - Use textured shaders automatically during geometry pass
+# - Cast shadows in shadow pass
+# - Be frustum culled like primitives
+# - Receive proper lighting in deferred lighting pass
+```
+
+**Available Models:**
+- `assets/models/props/japanese_stone_lantern/scene.gltf` - 4 meshes, PBR materials
+- `assets/models/props/tent/scene.gltf` - Simple tent model
+- `assets/models/props/japanese_bar/scene.gltf` - Large building with hierarchy
+
+**See [docs/MODEL_LOADING.md](docs/MODEL_LOADING.md) for complete GLTF loading guide.**
 
 ### Adding a New Input Command
 1. Add command to `InputCommand` enum in `input_commands.py`

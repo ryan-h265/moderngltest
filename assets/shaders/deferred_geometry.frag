@@ -14,10 +14,10 @@ in vec3 v_view_normal;     // View space normal
 
 // G-Buffer outputs (Multiple Render Targets)
 // NOTE: Position and Normal are in VIEW SPACE for SSAO compatibility
-// World-space can be reconstructed if needed using inverse view matrix
 layout(location = 0) out vec3 gPosition;  // View space position (for SSAO)
 layout(location = 1) out vec3 gNormal;    // View space normal (for SSAO)
-layout(location = 2) out vec4 gAlbedo;    // Base color + specular
+layout(location = 2) out vec4 gAlbedo;    // Base color (RGB) + AO (A, unused = 1.0)
+layout(location = 3) out vec2 gMaterial;  // Metallic (R) + Roughness (G)
 
 void main() {
     // Store view space position (required for SSAO)
@@ -26,7 +26,9 @@ void main() {
     // Store view space normalized normal (required for SSAO)
     gNormal = normalize(v_view_normal);
 
-    // Store albedo (base color) and specular intensity
-    // RGB = object color, A = specular intensity (currently hardcoded to 0.3)
-    gAlbedo = vec4(object_color, 0.3);
+    // Store albedo (base color) + ambient occlusion (unused = 1.0)
+    gAlbedo = vec4(object_color, 1.0);
+
+    // Primitives use default PBR values (non-metallic, medium roughness)
+    gMaterial = vec2(0.0, 0.5);  // metallic = 0, roughness = 0.5
 }

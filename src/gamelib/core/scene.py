@@ -74,9 +74,9 @@ class Scene:
         Initialize empty scene.
 
         Args:
-            ctx: ModernGL context (required for custom geometry like pyramids)
+            ctx: ModernGL context (required for custom geometry like pyramids and GLTF models)
         """
-        self.objects: List[SceneObject] = []
+        self.objects: List[SceneObject] = []  # Can contain both SceneObject and Model instances
         self.ctx = ctx
         self.last_render_stats: Dict[str, Dict[str, object]] = {}
 
@@ -95,10 +95,50 @@ class Scene:
 
     def create_default_scene(self):
         """
-        Create the default scene with ground plane and mixed shapes (cubes, spheres, pyramids, cones).
+        Create the default scene with ground plane, mixed shapes, and GLTF models.
 
-        This is the scene from the original game.py, now with variety in shapes.
+        Combines primitive shapes (cubes, spheres, pyramids, cones) with loaded GLTF models.
         """
+        # Load GLTF models if context is available
+        if self.ctx is not None:
+            try:
+                from ..loaders import GltfLoader
+                from ..config.settings import PROJECT_ROOT
+                import math
+
+                loader = GltfLoader(self.ctx)
+                models_loaded = 0
+
+
+                # 2. Tent - Place to the right
+                tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
+                if tent_path.exists():
+                    print(f"Loading GLTF model: {tent_path}")
+                    tent = loader.load(str(tent_path))
+                    tent.position = Vector3([6.0, 0.0, 3.0])
+                    tent.scale = Vector3([1.5, 1.5, 1.5])
+                    tent.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(tent)
+                    models_loaded += 1
+
+                # 3. Japanese Bar - Place to the left
+                bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
+                if bar_path.exists():
+                    print(f"Loading GLTF model: {bar_path}")
+                    bar = loader.load(str(bar_path))
+                    bar.position = Vector3([-7.0, 0.0, -2.0])
+                    bar.scale = Vector3([1.2, 1.2, 1.2])
+                    bar.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(bar)
+                    models_loaded += 1
+
+                print(f"\n=== Loaded {models_loaded} GLTF models successfully ===\n")
+
+            except Exception as e:
+                print(f"  Warning: Failed to load GLTF models: {e}")
+                import traceback
+                traceback.print_exc()
+
         # Ground plane
         ground = SceneObject(
             geometry.cube(size=(20.0, 0.5, 20.0)),
@@ -112,7 +152,7 @@ class Scene:
         # Sphere 1 - Red
         sphere1 = SceneObject(
             geometry.sphere(radius=1.0),
-            Vector3([-3.0, 1.0, 0.0]),
+            Vector3([-10.0, 1.0, 10.0]),
             (0.8, 0.3, 0.3),
             bounding_radius=1.0,
             name="Sphere1_Red"
@@ -120,167 +160,101 @@ class Scene:
         self.add_object(sphere1)
 
         # Cube 2 - Blue
-        cube2 = SceneObject(
-            geometry.cube(size=(1.5, 3.0, 1.5)),
-            Vector3([3.0, 1.5, -2.0]),
-            (0.3, 0.3, 0.8),
-            bounding_radius=1.9,  # Half diagonal of cube
-            name="Cube2_Blue"
-        )
-        self.add_object(cube2)
+        # cube2 = SceneObject(
+        #     geometry.cube(size=(1.5, 3.0, 1.5)),
+        #     Vector3([3.0, 1.5, -2.0]),
+        #     (0.3, 0.3, 0.8),
+        #     bounding_radius=1.9,  # Half diagonal of cube
+        #     name="Cube2_Blue"
+        # )
+        # self.add_object(cube2)
 
         # Pyramid 3 - Yellow
-        pyramid3 = SceneObject(
-            geometry_utils.pyramid(base_size=1.0, height=1.5),
-            Vector3([0.0, 0.0, 3.0]),
-            (0.8, 0.8, 0.3),
-            bounding_radius=1.0
-        )
-        self.add_object(pyramid3)
-
-        # Cube 4 - Orange
-        cube4 = SceneObject(
-            geometry.cube(size=(1.2, 1.2, 1.2)),
-            Vector3([-5.0, 0.6, -4.0]),
-            (0.9, 0.5, 0.2),
-            bounding_radius=1.0
-        )
-        self.add_object(cube4)
+        # pyramid3 = SceneObject(
+        #     geometry_utils.pyramid(base_size=1.0, height=1.5),
+        #     Vector3([0.0, 0.0, 0.0]),
+        #     (0.8, 0.8, 0.3),
+        #     bounding_radius=1.0,
+        #     name="Pyramid3_Yellow"
+        # )
+        # self.add_object(pyramid3)
 
         # Sphere 5 - Purple
-        sphere5 = SceneObject(
-            geometry.sphere(radius=1.2),
-            Vector3([6.0, 1.25, 3.0]),
-            (0.5, 0.2, 0.8),
-            bounding_radius=1.2
-        )
-        self.add_object(sphere5)
+        # sphere5 = SceneObject(
+        #     geometry.sphere(radius=1.2),
+        #     Vector3([6.0, 1.25, 3.0]),
+        #     (0.5, 0.2, 0.8),
+        #     bounding_radius=1.2,
+        #     name="Sphere5_Purple"
+        # )
+        # self.add_object(sphere5)
 
         # Pyramid 6 - Cyan
-        pyramid6 = SceneObject(
-            geometry_utils.pyramid(base_size=1.5, height=2.0),
-            Vector3([-2.0, 0.0, -6.0]),
-            (0.2, 0.8, 0.8),
-            bounding_radius=1.5
-        )
-        self.add_object(pyramid6)
+        # pyramid6 = SceneObject(
+        #     geometry_utils.pyramid(base_size=1.5, height=2.0),
+        #     Vector3([-2.0, 0.0, -6.0]),
+        #     (0.2, 0.8, 0.8),
+        #     bounding_radius=1.5,
+        #     name="Pyramid6_Cyan"
+        # )
+        # self.add_object(pyramid6)
 
-        # Sphere 7 - Pink
-        sphere7 = SceneObject(
-            geometry.sphere(radius=0.9),
-            Vector3([4.5, 0.9, -5.0]),
-            (0.9, 0.3, 0.6),
-            bounding_radius=0.9
-        )
-        self.add_object(sphere7)
+        # # Sphere 7 - Pink
+        # sphere7 = SceneObject(
+        #     geometry.sphere(radius=0.9),
+        #     Vector3([4.5, 0.9, -5.0]),
+        #     (0.9, 0.3, 0.6),
+        #     bounding_radius=0.9
+        # )
+        # self.add_object(sphere7)
 
-        # Cone 8 - Olive
-        cone8 = SceneObject(
-            geometry_utils.cone(radius=1.0, height=2.0),
-            Vector3([1.5, 0.0, 6.0]),
-            (0.6, 0.6, 0.2),
-            bounding_radius=1.4
-        )
-        self.add_object(cone8)
+        # # Sphere 9 - Sea Green
+        # sphere9 = SceneObject(
+        #     geometry.sphere(radius=0.65),
+        #     Vector3([-7.0, 0.65, 2.0]),
+        #     (0.3, 0.7, 0.4),
+        #     bounding_radius=0.65
+        # )
+        # self.add_object(sphere9)
 
-        # Sphere 9 - Sea Green
-        sphere9 = SceneObject(
-            geometry.sphere(radius=0.65),
-            Vector3([-7.0, 0.65, 2.0]),
-            (0.3, 0.7, 0.4),
-            bounding_radius=0.65
-        )
-        self.add_object(sphere9)
+        # # Cube 12 - Steel Blue
+        # cube12 = SceneObject(
+        #     geometry.cube(size=(1.1, 1.5, 1.1)),
+        #     Vector3([7.5, 0.75, -2.0]),
+        #     (0.4, 0.5, 0.8),
+        #     bounding_radius=1.1
+        # )
+        # self.add_object(cube12)
 
-        # Cube 10 - Gold
-        cube10 = SceneObject(
-            geometry.cube(size=(0.9, 2.0, 0.9)),
-            Vector3([2.5, 1.0, -3.0]),
-            (0.8, 0.6, 0.3),
-            bounding_radius=1.2
-        )
-        self.add_object(cube10)
+        # # Sphere 13 - Peach
+        # sphere13 = SceneObject(
+        #     geometry.sphere(radius=0.35),
+        #     Vector3([-1.0, 0.35, 7.0]),
+        #     (0.9, 0.7, 0.5),
+        #     bounding_radius=0.35
+        # )
+        # self.add_object(sphere13)
 
-        # Pyramid 11 - Maroon
-        pyramid11 = SceneObject(
-            geometry_utils.pyramid(base_size=1.6, height=1.5),
-            Vector3([-4.0, 0.0, 5.0]),
-            (0.7, 0.3, 0.3),
-            bounding_radius=1.3
-        )
-        self.add_object(pyramid11)
+        # # Cone 14 - Plum
+        # cone14 = SceneObject(
+        #     geometry_utils.cone(radius=0.7, height=2.0),
+        #     Vector3([5.5, 0.0, 1.0]),
+        #     (0.5, 0.3, 0.6),
+        #     bounding_radius=1.2
+        # )
+        # self.add_object(cone14)
 
-        # Cube 12 - Steel Blue
-        cube12 = SceneObject(
-            geometry.cube(size=(1.1, 1.5, 1.1)),
-            Vector3([7.5, 0.75, -2.0]),
-            (0.4, 0.5, 0.8),
-            bounding_radius=1.1
-        )
-        self.add_object(cube12)
 
-        # Sphere 13 - Peach
-        sphere13 = SceneObject(
-            geometry.sphere(radius=0.35),
-            Vector3([-1.0, 0.35, 7.0]),
-            (0.9, 0.7, 0.5),
-            bounding_radius=0.35
-        )
-        self.add_object(sphere13)
-
-        # Cone 14 - Plum
-        cone14 = SceneObject(
-            geometry_utils.cone(radius=0.7, height=2.0),
-            Vector3([5.5, 0.0, 1.0]),
-            (0.5, 0.3, 0.6),
-            bounding_radius=1.2
-        )
-        self.add_object(cone14)
-
-        # Sphere 15 - Teal
-        sphere15 = SceneObject(
-            geometry.sphere(radius=0.9),
-            Vector3([-6.0, 0.9, -1.5]),
-            (0.3, 0.6, 0.6),
-            bounding_radius=0.9
-        )
-        self.add_object(sphere15)
-
-        # Pyramid 16 - Rust
-        pyramid16 = SceneObject(
-            geometry_utils.pyramid(base_size=1.0, height=2.5),
-            Vector3([3.5, 0.0, 4.5]),
-            (0.8, 0.4, 0.2),
-            bounding_radius=1.5
-        )
-        self.add_object(pyramid16)
-
-        # Sphere 17 - Lime
-        sphere17 = SceneObject(
-            geometry.sphere(radius=0.6),
-            Vector3([-3.5, 0.6, -2.5]),
-            (0.5, 0.8, 0.3),
-            bounding_radius=0.6
-        )
-        self.add_object(sphere17)
-
-        # Cone 18 - Lavender
-        cone18 = SceneObject(
-            geometry_utils.cone(radius=0.4, height=1.8),
-            Vector3([8.0, 0.0, 4.0]),
-            (0.6, 0.4, 0.7),
-            bounding_radius=1.0
-        )
-        self.add_object(cone18)
-
-    def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = ""):
+    def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = "",
+                   textured_program=None):
         """
         Render all objects in the scene.
 
         Args:
-            program: Shader program to use for rendering
+            program: Shader program to use for rendering primitives
             frustum: Optional frustum for culling (if None, all objects rendered)
             debug_label: Label for debug output (e.g., "Main", "Shadow Light 0")
+            textured_program: Optional shader program for textured models
         """
         from ..config.settings import DEBUG_FRUSTUM_CULLING, DEBUG_SHOW_CULLED_OBJECTS
 
@@ -296,16 +270,54 @@ class Scene:
                     culled_objects.append(f"{obj.name} (pos: {obj.position}, radius: {obj.bounding_radius})")
                 continue
 
-            # Set model matrix
-            model = obj.get_model_matrix()
-            program['model'].write(model.astype('f4').tobytes())
+            # Check if this is a Model (textured) or SceneObject (primitive)
+            is_model = hasattr(obj, 'is_model') and obj.is_model
 
-            # Set color (only if this uniform exists in the shader)
-            if 'object_color' in program:
-                program['object_color'].write(Vector3(obj.color).astype('f4').tobytes())
+            if is_model:
+                # Model objects need special handling
+                if textured_program is not None:
+                    # Use textured shader for models (geometry pass)
+                    # Note: Camera uniforms are already set by GeometryRenderer
+                    active_program = textured_program
 
-            # Render geometry
-            obj.geometry.render(program)
+                    # Set material defaults
+                    if 'baseColorFactor' in active_program:
+                        active_program['baseColorFactor'].value = (1.0, 1.0, 1.0, 1.0)
+                    if 'hasBaseColorTexture' in active_program:
+                        active_program['hasBaseColorTexture'].value = False
+                    if 'hasNormalTexture' in active_program:
+                        active_program['hasNormalTexture'].value = False
+                    if 'hasMetallicRoughnessTexture' in active_program:
+                        active_program['hasMetallicRoughnessTexture'].value = False
+
+                    # Model handles its own rendering (sets model matrix, binds materials)
+                    obj.render(active_program)
+                else:
+                    # Shadow pass or other passes without textured shader
+                    # Render model using primitive shader (just geometry, no textures)
+                    active_program = program
+
+                    # Get parent model matrix
+                    parent_matrix = obj.get_model_matrix()
+
+                    # Render each mesh with its local transform
+                    for mesh in obj.meshes:
+                        mesh.render(active_program, parent_transform=parent_matrix)
+            else:
+                # Use primitive shader for regular SceneObjects
+                active_program = program
+
+                # Set model matrix
+                model = obj.get_model_matrix()
+                active_program['model'].write(model.astype('f4').tobytes())
+
+                # Set color (only if this uniform exists in the shader)
+                if 'object_color' in active_program:
+                    active_program['object_color'].write(Vector3(obj.color).astype('f4').tobytes())
+
+                # Render geometry
+                obj.geometry.render(active_program)
+
             rendered_count += 1
 
         # Debug output

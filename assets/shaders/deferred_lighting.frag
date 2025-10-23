@@ -4,9 +4,10 @@
 // Calculates lighting for a single light using G-Buffer data
 
 // G-Buffer textures (NOTE: position and normal are in VIEW SPACE)
-uniform sampler2D gPosition;// View space position
-uniform sampler2D gNormal;// View space normal
-uniform sampler2D gAlbedo;// Base color + specular
+uniform sampler2D gPosition;   // View space position
+uniform sampler2D gNormal;     // View space normal
+uniform sampler2D gAlbedo;     // Base color (RGB) + AO (A)
+uniform sampler2D gMaterial;   // Metallic (R) + Roughness (G)
 
 // Transform from view space to world space
 uniform mat4 inverse_view;
@@ -70,15 +71,69 @@ float calculate_shadow(vec3 position){
     return shadow;
 }
 
+/**
+ * Fresnel-Schlick approximation
+ * Returns the ratio of reflected light based on view angle
+ * f0: Base reflectivity at normal incidence (0° angle)
+ * cosTheta: cos(angle between halfway vector and view direction)
+ */
+vec3 fresnelSchlick(float cosTheta, vec3 f0) {
+    return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+/**
+ * GGX (Trowbridge-Reitz) Normal Distribution Function
+ * Models the distribution of microfacet normals
+ * Returns: Higher values = more microfacets aligned with halfway vector
+ */
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float num = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = 3.14159265359 * denom * denom;
+
+    return num / denom;
+}
+
+/**
+ * Smith's Geometry Function with GGX
+ * Models self-shadowing of microfacets (geometric attenuation)
+ */
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float num = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return num / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
 void main(){
     // Sample G-Buffer (view space data)
     vec3 view_position=texture(gPosition,v_texcoord).rgb;
     vec3 view_normal=texture(gNormal,v_texcoord).rgb;
     vec4 albedo=texture(gAlbedo,v_texcoord);
+    vec2 material=texture(gMaterial,v_texcoord).rg;
 
     // Extract material properties
     vec3 base_color=albedo.rgb;
-    float specular_intensity=albedo.a;
+    float ao = albedo.a;  // Ambient occlusion (currently unused, set to 1.0)
+    float metallic = material.r;
+    float roughness = material.g;
 
     // Early exit for background pixels (no geometry)
     if(length(view_normal)<.1){
@@ -91,29 +146,52 @@ void main(){
     vec3 normal=normalize(mat3(inverse_view)*view_normal);
 
     // Lighting calculations
-    vec3 light_dir=normalize(light_position-position);
-    vec3 view_dir=normalize(camera_pos-position);
-    
-    // Diffuse (Lambert)
-    float diff=max(dot(normal,light_dir),0.);
-    vec3 diffuse=diff*base_color*light_color;
-    
-    // Specular (Blinn-Phong)
-    vec3 halfway_dir=normalize(light_dir+view_dir);
-    float spec=pow(max(dot(normal,halfway_dir),0.),32.);
-    vec3 specular=specular_intensity*spec*light_color;
+    vec3 N = normal;
+    vec3 V = normalize(camera_pos - position);
+    vec3 L = normalize(light_position - position);
+    vec3 H = normalize(V + L);
+
+    // Calculate base reflectivity (f0)
+    // For dielectrics (non-metals): f0 = 0.04 (4% reflection)
+    // For metals: f0 = albedo color (they have no diffuse, only specular)
+    vec3 f0 = vec3(0.04);
+    f0 = mix(f0, base_color, metallic);
+
+    // Cook-Torrance BRDF
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, V, L, roughness);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), f0);
+
+    // Calculate specular component
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    // Energy conservation: kS (specular) + kD (diffuse) = 1.0
+    vec3 kS = F;  // Fresnel tells us the specular contribution
+    vec3 kD = vec3(1.0) - kS;
+
+    // Metals have no diffuse lighting (energy goes to specular only)
+    kD *= 1.0 - metallic;
+
+    // Lambert diffuse
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 diffuse = kD * base_color / 3.14159265359;
+
+    // Combine diffuse and specular
+    vec3 brdf = (diffuse + specular) * light_color * NdotL;
     
     // Calculate shadow
-    float shadow=calculate_shadow(position);
-    
+    float shadow = calculate_shadow(position);
+
     // DEBUG MODE: Visualize shadows
     // Uncomment one of these to debug:
     // f_color=vec4(vec3(shadow),1.);return;// Show shadow mask (white=shadowed)
     // f_color=vec4(vec3(1.-shadow),1.);return;// Show lighting mask (white=lit)
-    
-    // Combine lighting (attenuated by intensity and shadow)
-    vec3 lighting=light_intensity*(1.-shadow)*(diffuse+specular);
-    
+
+    // Apply shadow and light intensity to BRDF result
+    vec3 lighting = light_intensity * (1.0 - shadow) * brdf;
+
     // Output this light's contribution (will be additively blended)
-    f_color=vec4(lighting,1.);
+    f_color = vec4(lighting, 1.0);
 }
