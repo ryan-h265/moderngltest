@@ -59,8 +59,8 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.S] = InputCommand.CAMERA_MOVE_BACKWARD   # S
         self.keyboard_bindings[self.keys.A] = InputCommand.CAMERA_MOVE_LEFT       # A
         self.keyboard_bindings[self.keys.D] = InputCommand.CAMERA_MOVE_RIGHT      # D
-        self.keyboard_bindings[self.keys.Q] = InputCommand.CAMERA_MOVE_DOWN       # Q
-        self.keyboard_bindings[self.keys.E] = InputCommand.CAMERA_MOVE_UP         # E
+        self.keyboard_bindings[self.keys.LEFT_SHIFT] = InputCommand.CAMERA_MOVE_DOWN       # SHIFT
+        self.keyboard_bindings[self.keys.SPACE] = InputCommand.CAMERA_MOVE_UP         # SPACE
 
         # Alternative arrow keys for camera movement
         # self.keyboard_bindings[self.keys.UP] = InputCommand.CAMERA_MOVE_FORWARD  # UP
