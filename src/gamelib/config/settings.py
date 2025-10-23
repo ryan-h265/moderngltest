@@ -19,7 +19,7 @@ SHADERS_DIR = ASSETS_DIR / "shaders"
 # Window Configuration
 # ============================================================================
 
-WINDOW_SIZE = (1920, 1080)
+WINDOW_SIZE = (1280, 720)  # Width, Height
 ASPECT_RATIO = 16 / 9
 WINDOW_TITLE = "ModernGL 3D Engine"
 RESIZABLE = True

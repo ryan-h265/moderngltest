@@ -161,15 +161,15 @@ class Scene:
         )
         self.add_object(ground)
 
-        # # Sphere 1 - Red
-        # sphere1 = SceneObject(
-        #     geometry.sphere(radius=1.0),
-        #     Vector3([-3.0, 1.0, 0.0]),
-        #     (0.8, 0.3, 0.3),
-        #     bounding_radius=1.0,
-        #     name="Sphere1_Red"
-        # )
-        # self.add_object(sphere1)
+        # Sphere 1 - Red
+        sphere1 = SceneObject(
+            geometry.sphere(radius=1.0),
+            Vector3([-10.0, 1.0, 10.0]),
+            (0.8, 0.3, 0.3),
+            bounding_radius=1.0,
+            name="Sphere1_Red"
+        )
+        self.add_object(sphere1)
 
         # # Cube 2 - Blue
         # cube2 = SceneObject(

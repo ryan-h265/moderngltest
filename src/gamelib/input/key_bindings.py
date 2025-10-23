@@ -63,37 +63,37 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.E] = InputCommand.CAMERA_MOVE_UP         # E
 
         # Alternative arrow keys for camera movement
-        # self.keyboard_bindings[265] = InputCommand.CAMERA_MOVE_FORWARD  # UP
-        # self.keyboard_bindings[264] = InputCommand.CAMERA_MOVE_BACKWARD # DOWN
-        # self.keyboard_bindings[263] = InputCommand.CAMERA_MOVE_LEFT     # LEFT
-        # self.keyboard_bindings[262] = InputCommand.CAMERA_MOVE_RIGHT    # RIGHT
+        # self.keyboard_bindings[self.keys.UP] = InputCommand.CAMERA_MOVE_FORWARD  # UP
+        # self.keyboard_bindings[self.keys.DOWN] = InputCommand.CAMERA_MOVE_BACKWARD # DOWN
+        # self.keyboard_bindings[self.keys.LEFT] = InputCommand.CAMERA_MOVE_LEFT     # LEFT
+        # self.keyboard_bindings[self.keys.RIGHT] = InputCommand.CAMERA_MOVE_RIGHT    # RIGHT
 
         # ====================================================================
         # Game Actions (Future - examples)
         # ====================================================================
-        # self.keyboard_bindings[32] = InputCommand.GAME_JUMP           # SPACE
-        # self.keyboard_bindings[340] = InputCommand.GAME_CROUCH        # LEFT SHIFT
-        # self.keyboard_bindings[341] = InputCommand.GAME_SPRINT        # LEFT CTRL
-        # self.keyboard_bindings[70] = InputCommand.GAME_INTERACT       # F
-        # self.keyboard_bindings[82] = InputCommand.GAME_RELOAD         # R
-        # self.keyboard_bindings[71] = InputCommand.GAME_THROW          # G
+        # self.keyboard_bindings[self.keys.SPACE] = InputCommand.GAME_JUMP           # SPACE
+        # self.keyboard_bindings[self.keys.LEFT_SHIFT] = InputCommand.GAME_CROUCH        # LEFT SHIFT
+        # self.keyboard_bindings[self.keys.LEFT_CTRL] = InputCommand.GAME_SPRINT        # LEFT CTRL
+        # self.keyboard_bindings[self.keys.F] = InputCommand.GAME_INTERACT       # F
+        # self.keyboard_bindings[self.keys.R] = InputCommand.GAME_RELOAD         # R
+        # self.keyboard_bindings[self.keys.G] = InputCommand.GAME_THROW          # G
 
         # ====================================================================
         # UI Actions (Future - examples)
         # ====================================================================
-        # self.keyboard_bindings[73] = InputCommand.UI_OPEN_INVENTORY  # I
-        # self.keyboard_bindings[77] = InputCommand.UI_OPEN_MAP        # M
-        # self.keyboard_bindings[256] = InputCommand.UI_CANCEL         # ESC (alternative)
-        # self.keyboard_bindings[258] = InputCommand.UI_TAB_NEXT       # TAB
-        # self.keyboard_bindings[257] = InputCommand.UI_CONFIRM        # ENTER
+        # self.keyboard_bindings[self.keys.I] = InputCommand.UI_OPEN_INVENTORY  # I
+        # self.keyboard_bindings[self.keys.M] = InputCommand.UI_OPEN_MAP        # M
+        # self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.UI_CANCEL         # ESC (alternative)
+        # self.keyboard_bindings[self.keys.TAB] = InputCommand.UI_TAB_NEXT       # TAB
+        # self.keyboard_bindings[self.keys.ENTER] = InputCommand.UI_CONFIRM        # ENTER
 
         # ====================================================================
         # System Commands
         # ====================================================================
-        self.keyboard_bindings[256] = InputCommand.SYSTEM_TOGGLE_MOUSE  # ESC
-        self.keyboard_bindings[290] = InputCommand.SYSTEM_SCREENSHOT    # F1
-        self.keyboard_bindings[293] = InputCommand.SYSTEM_TOGGLE_DEBUG  # F4
-        # self.keyboard_bindings[294] = InputCommand.SYSTEM_QUICK_SAVE  # F5
+        self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.SYSTEM_TOGGLE_MOUSE  # ESC
+        self.keyboard_bindings[self.keys.F1] = InputCommand.SYSTEM_SCREENSHOT    # F1
+        self.keyboard_bindings[self.keys.F4] = InputCommand.SYSTEM_TOGGLE_DEBUG  # F4
+        # self.keyboard_bindings[self.keys.F5] = InputCommand.SYSTEM_QUICK_SAVE  # F5
         self.keyboard_bindings[self.keys.F6] = InputCommand.SYSTEM_TOGGLE_SSAO   # F6
         self.keyboard_bindings[self.keys.F7] = InputCommand.SYSTEM_CYCLE_AA_MODE # F7
         self.keyboard_bindings[self.keys.F8] = InputCommand.SYSTEM_TOGGLE_MSAA   # F8

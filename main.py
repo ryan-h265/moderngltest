@@ -60,6 +60,10 @@ class Game(mglw.WindowConfig):
         self.wnd.mouse_exclusivity = True
         self.wnd.cursor = False
 
+        # eventually set this to none and have a better
+        # method to close the window
+        self.wnd.exit_key = self.wnd.keys.Q
+
         # Setup rendering pipeline
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
 
