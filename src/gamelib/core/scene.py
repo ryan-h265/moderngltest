@@ -131,16 +131,16 @@ class Scene:
                 #     self.add_object(tent)
                 #     models_loaded += 1
 
-                # # 3. Japanese Bar - Place to the left
-                # bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
-                # if bar_path.exists():
-                #     print(f"Loading GLTF model: {bar_path}")
-                #     bar = loader.load(str(bar_path))
-                #     bar.position = Vector3([-7.0, 0.0, -2.0])
-                #     bar.scale = Vector3([1.2, 1.2, 1.2])
-                #     bar.rotation = Vector3([0.0, 0.0, 0.0])
-                #     self.add_object(bar)
-                #     models_loaded += 1
+                # 3. Japanese Bar - Place to the left
+                bar_path = PROJECT_ROOT / "assets/models/props/japanese_bar/scene.gltf"
+                if bar_path.exists():
+                    print(f"Loading GLTF model: {bar_path}")
+                    bar = loader.load(str(bar_path))
+                    bar.position = Vector3([-7.0, 0.0, -2.0])
+                    bar.scale = Vector3([1.2, 1.2, 1.2])
+                    bar.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(bar)
+                    models_loaded += 1
 
                 print(f"\n=== Loaded {models_loaded} GLTF models successfully ===\n")
 

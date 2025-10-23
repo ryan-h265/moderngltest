@@ -132,7 +132,7 @@ class Game(mglw.WindowConfig):
             List of Light objects
         """
         lights = []
-        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=1.5, angle=0.0, height=10.0))
+        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=1.5, angle=90.0, height=10.0))
         # lights.append(self._create_light(Vector3([1.0, 0.0, 0.0]), intensity=1.5, angle=0.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 1.0, 0.0]), intensity=1.5, angle=135.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 0.0, 1.0]), intensity=1.5, angle=270.0, height=10.0))
@@ -150,8 +150,8 @@ class Game(mglw.WindowConfig):
         self.time = time
 
         # Animate lights (create a rotating light show!)
-        for i, light in enumerate(self.lights):
-            light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
+        # for i, light in enumerate(self.lights):
+        #     light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
 
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
