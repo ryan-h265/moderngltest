@@ -227,6 +227,14 @@ class GltfDiagnostics:
             # Check normal map
             if hasattr(material, 'normalTexture') and material.normalTexture:
                 print(f"      📷 Normal map: {material.normalTexture.index}")
+
+            # Check emissive texture
+            if hasattr(material, 'emissiveTexture') and material.emissiveTexture:
+                print(f"      📷 Emissive texture: {material.emissiveTexture.index}")
+
+            # Check emissive factor
+            if hasattr(material, 'emissiveFactor') and material.emissiveFactor:
+                print(f"      🔆 Emissive factor: {material.emissiveFactor}")
     
     def _print_summary(self):
         """Print analysis summary."""

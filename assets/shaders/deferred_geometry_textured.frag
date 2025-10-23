@@ -32,6 +32,7 @@ layout(location = 0) out vec3 gPosition;  // View space position (for SSAO)
 layout(location = 1) out vec3 gNormal;    // View space normal (for SSAO)
 layout(location = 2) out vec4 gAlbedo;    // Base color (RGB) + AO (A, unused = 1.0)
 layout(location = 3) out vec2 gMaterial;  // Metallic (R) + Roughness (G)
+layout(location = 4) out vec3 gEmissive;  // Emissive color (self-illumination)
 
 void main() {
     // Store view space position (required for SSAO)
@@ -65,14 +66,11 @@ void main() {
         albedo = baseColorFactor;
     }
 
-    // Sample emissive contribution
+    // Sample emissive contribution (stored separately, not affected by lighting)
     vec3 emissive = emissiveFactor;
     if (hasEmissiveTexture) {
         emissive *= texture(emissiveTexture, v_texcoord).rgb;
     }
-
-    // Add emissive to albedo (emissive materials glow regardless of lighting)
-    vec3 finalColor = albedo.rgb + emissive;
 
     // Sample metallic/roughness for PBR
     float metallic = 0.0;   // Default: non-metallic (dielectric)
@@ -84,9 +82,12 @@ void main() {
         roughness = mr.g;
     }
 
-    // Store final color (albedo + emissive) + ambient occlusion (A, currently unused = 1.0)
-    gAlbedo = vec4(finalColor, 1.0);
+    // Store albedo (base color only, no emissive) + ambient occlusion (A, currently unused = 1.0)
+    gAlbedo = vec4(albedo.rgb, 1.0);
 
     // Store PBR material properties
     gMaterial = vec2(metallic, roughness);
+
+    // Store emissive separately (will be added after lighting to create glow effect)
+    gEmissive = emissive;
 }

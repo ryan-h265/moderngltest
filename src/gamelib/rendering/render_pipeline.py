@@ -73,6 +73,7 @@ class RenderPipeline:
         self.shader_manager.load_program("geometry_textured", "deferred_geometry_textured.vert", "deferred_geometry_textured.frag")
         self.shader_manager.load_program("lighting", "deferred_lighting.vert", "deferred_lighting.frag")
         self.shader_manager.load_program("ambient", "deferred_lighting.vert", "deferred_ambient.frag")
+        self.shader_manager.load_program("emissive", "deferred_lighting.vert", "deferred_emissive.frag")
 
         # SSAO shaders
         self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
@@ -111,7 +112,8 @@ class RenderPipeline:
         self.lighting_renderer = LightingRenderer(
             ctx,
             self.shader_manager.get("lighting"),
-            self.shader_manager.get("ambient")
+            self.shader_manager.get("ambient"),
+            self.shader_manager.get("emissive")
         )
 
         # Create SSAO renderer (only used in deferred mode)

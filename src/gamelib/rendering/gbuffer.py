@@ -19,6 +19,7 @@ class GBuffer:
     - Normal (RGB16F): View-space normal vectors (for SSAO)
     - Albedo (RGBA8): Base color (RGB) + AO (A, currently unused)
     - Material (RG16F): Metallic (R) + Roughness (G) for PBR
+    - Emissive (RGB16F): Emissive color (self-illumination, added after lighting)
     - Depth (DEPTH24_STENCIL8): Depth and stencil information
 
     These textures are written in the geometry pass and read in the lighting pass.
@@ -78,6 +79,15 @@ class GBuffer:
         )
         self.material_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
 
+        # Emissive texture (RGB16F)
+        # RGB = emissive color (self-illumination, not affected by lighting)
+        self.emissive_texture = self.ctx.texture(
+            self.size,
+            components=3,
+            dtype='f2'  # 16-bit float
+        )
+        self.emissive_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
+
         # Depth buffer (required for depth testing)
         self.depth_texture = self.ctx.depth_texture(self.size)
         self.depth_texture.filter = (moderngl.NEAREST, moderngl.NEAREST)
@@ -90,6 +100,7 @@ class GBuffer:
                 self.normal_texture,    # location = 1
                 self.albedo_texture,    # location = 2
                 self.material_texture,  # location = 3 (metallic + roughness)
+                self.emissive_texture,  # location = 4 (emissive color)
             ],
             depth_attachment=self.depth_texture
         )
@@ -113,6 +124,7 @@ class GBuffer:
         self.normal_texture.release()
         self.albedo_texture.release()
         self.material_texture.release()
+        self.emissive_texture.release()
         self.depth_texture.release()
 
         # Recreate with new size
@@ -138,13 +150,14 @@ class GBuffer:
 
         Args:
             start_location: Starting texture unit (default: 0)
-                           position=0, normal=1, albedo=2, material=3, depth=4
+                           position=0, normal=1, albedo=2, material=3, emissive=4, depth=5
         """
         self.position_texture.use(location=start_location + 0)
         self.normal_texture.use(location=start_location + 1)
         self.albedo_texture.use(location=start_location + 2)
         self.material_texture.use(location=start_location + 3)
-        self.depth_texture.use(location=start_location + 4)
+        self.emissive_texture.use(location=start_location + 4)
+        self.depth_texture.use(location=start_location + 5)
 
     def release(self):
         """Release all G-Buffer resources."""
@@ -153,6 +166,7 @@ class GBuffer:
         self.normal_texture.release()
         self.albedo_texture.release()
         self.material_texture.release()
+        self.emissive_texture.release()
         self.depth_texture.release()
 
     @property

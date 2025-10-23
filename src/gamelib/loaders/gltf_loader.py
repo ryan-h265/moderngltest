@@ -642,8 +642,14 @@ class GltfLoader:
                 tex_idx = gltf_mat.emissiveTexture.index
                 material.emissive_texture = self._load_texture(gltf, tex_idx, model_dir)
 
+            # Emissive factor
+            if gltf_mat.emissiveFactor is not None:
+                material.emissive_factor = tuple(gltf_mat.emissiveFactor)
+
             materials.append(material)
             print(f"  Material: {mat_name}")
+            if material.emissive_texture or material.emissive_factor != (0.0, 0.0, 0.0):
+                print(f"    Emissive: factor={material.emissive_factor}, texture={material.emissive_texture is not None}")
 
         return materials
 

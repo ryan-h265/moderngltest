@@ -33,7 +33,8 @@ class LightingRenderer:
         self,
         ctx: moderngl.Context,
         lighting_program: moderngl.Program,
-        ambient_program: moderngl.Program
+        ambient_program: moderngl.Program,
+        emissive_program: moderngl.Program
     ):
         """
         Initialize lighting renderer.
@@ -42,10 +43,12 @@ class LightingRenderer:
             ctx: ModernGL context
             lighting_program: Shader program for per-light lighting
             ambient_program: Shader program for ambient lighting
+            emissive_program: Shader program for emissive pass
         """
         self.ctx = ctx
         self.lighting_program = lighting_program
         self.ambient_program = ambient_program
+        self.emissive_program = emissive_program
 
         # Create full-screen quad for rendering
         self._create_fullscreen_quad()
@@ -80,6 +83,12 @@ class LightingRenderer:
         # Create VAO for ambient pass
         self.quad_vao_ambient = self.ctx.vertex_array(
             self.ambient_program,
+            [(self.quad_vbo, '2f', 'in_position')]
+        )
+
+        # Create VAO for emissive pass
+        self.quad_vao_emissive = self.ctx.vertex_array(
+            self.emissive_program,
             [(self.quad_vbo, '2f', 'in_position')]
         )
 
@@ -152,6 +161,9 @@ class LightingRenderer:
         for light_index, light in enumerate(lights_to_render):
             self._render_light(light, light_index, camera, inverse_view)
 
+        # Step 4: Add emissive contribution (additive blending still enabled)
+        self._render_emissive(gbuffer)
+
         # Restore blending state
         self.ctx.disable(moderngl.BLEND)
 
@@ -215,11 +227,11 @@ class LightingRenderer:
         if 'ambient_strength' in self.ambient_program:
             self.ambient_program['ambient_strength'].value = AMBIENT_STRENGTH
 
-        # Set SSAO texture and parameters
+        # Set SSAO texture and parameters (use location 6 to avoid conflict with gEmissive at location 4)
         if ssao_texture is not None:
-            ssao_texture.use(location=4)
+            ssao_texture.use(location=6)
             if 'ssaoTexture' in self.ambient_program:
-                self.ambient_program['ssaoTexture'].value = 4
+                self.ambient_program['ssaoTexture'].value = 6
             if 'ssaoEnabled' in self.ambient_program:
                 self.ambient_program['ssaoEnabled'].value = True
             if 'ssaoIntensity' in self.ambient_program:
@@ -294,3 +306,20 @@ class LightingRenderer:
 
         # Render full-screen quad
         self.quad_vao_lighting.render(moderngl.TRIANGLES)
+
+    def _render_emissive(self, gbuffer: GBuffer):
+        """
+        Render emissive contribution pass.
+
+        This pass reads the emissive texture from the G-Buffer and additively blends
+        it onto the accumulated lighting. Emissive materials glow independently of lighting.
+
+        Args:
+            gbuffer: G-Buffer containing emissive texture
+        """
+        # Set gEmissive sampler (location 4)
+        if 'gEmissive' in self.emissive_program:
+            self.emissive_program['gEmissive'].value = 4
+
+        # Render full-screen quad with emissive shader
+        self.quad_vao_emissive.render(moderngl.TRIANGLES)

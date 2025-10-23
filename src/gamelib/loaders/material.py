@@ -72,6 +72,10 @@ class Material:
             if 'hasBaseColorTexture' in program:
                 program['hasBaseColorTexture'].value = False
 
+        # Set base color factor (always set, used as multiplier or solid color)
+        if 'baseColorFactor' in program:
+            program['baseColorFactor'].value = self.base_color_factor
+
         # Bind normal map to texture unit 1
         if self.normal_texture:
             self.normal_texture.use(location=1)
