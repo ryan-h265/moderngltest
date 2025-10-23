@@ -23,8 +23,10 @@ in vec2 v_texcoord;
 out vec4 f_color;
 
 void main() {
-    // Sample albedo from G-Buffer
-    vec3 base_color = texture(gAlbedo, v_texcoord).rgb;
+    // Sample albedo + baked AO from G-Buffer
+    vec4 albedo_ao = texture(gAlbedo, v_texcoord);
+    vec3 base_color = albedo_ao.rgb;
+    float baked_ao = albedo_ao.a;  // Baked occlusion from GLTF texture (1.0 if none)
     vec3 normal = texture(gNormal, v_texcoord).rgb;
 
     // Early exit for background pixels (no geometry)
@@ -34,16 +36,21 @@ void main() {
         return;
     }
 
-    // Get SSAO occlusion factor
-    float occlusion = 1.0;
+    // Get SSAO occlusion factor (screen-space, dynamic)
+    float ssao = 1.0;
     if (ssaoEnabled) {
-        float ao = texture(ssaoTexture, v_texcoord).r;
-        // Mix between full occlusion (0.0) and no occlusion (1.0)
-        occlusion = mix(1.0 - ssaoIntensity, 1.0, ao);
+        float ssao_sample = texture(ssaoTexture, v_texcoord).r;
+        // Mix between full occlusion and no occlusion
+        ssao = mix(1.0 - ssaoIntensity, 1.0, ssao_sample);
     }
 
-    // Ambient lighting (modulated by SSAO)
-    vec3 ambient = ambient_strength * base_color * occlusion;
+    // Combine baked AO and SSAO (multiply for best results)
+    // - Baked AO: High-quality, fine detail (crevices, seams)
+    // - SSAO: Dynamic, large-scale occlusion (nearby geometry)
+    float combined_ao = baked_ao * ssao;
+
+    // Ambient lighting modulated by combined AO
+    vec3 ambient = ambient_strength * base_color * combined_ao;
 
     f_color = vec4(ambient, 1.0);
 }

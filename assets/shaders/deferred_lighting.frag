@@ -189,8 +189,9 @@ void main(){
     // f_color=vec4(vec3(shadow),1.);return;// Show shadow mask (white=shadowed)
     // f_color=vec4(vec3(1.-shadow),1.);return;// Show lighting mask (white=lit)
 
-    // Apply shadow and light intensity to BRDF result
-    vec3 lighting = light_intensity * (1.0 - shadow) * brdf;
+    // Apply shadow, light intensity, and baked AO to BRDF result
+    // Note: Baked AO affects direct lighting (darkens crevices for all lights)
+    vec3 lighting = light_intensity * (1.0 - shadow) * brdf * ao;
 
     // Output this light's contribution (will be additively blended)
     f_color = vec4(lighting, 1.0);

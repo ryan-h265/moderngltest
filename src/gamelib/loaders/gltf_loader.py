@@ -636,6 +636,17 @@ class GltfLoader:
             if gltf_mat.normalTexture:
                 tex_idx = gltf_mat.normalTexture.index
                 material.normal_texture = self._load_texture(gltf, tex_idx, model_dir)
+                # Load normal scale (optional, defaults to 1.0)
+                if hasattr(gltf_mat.normalTexture, 'scale') and gltf_mat.normalTexture.scale is not None:
+                    material.normal_scale = gltf_mat.normalTexture.scale
+
+            # Occlusion texture
+            if gltf_mat.occlusionTexture:
+                tex_idx = gltf_mat.occlusionTexture.index
+                material.occlusion_texture = self._load_texture(gltf, tex_idx, model_dir)
+                # Load occlusion strength (optional, defaults to 1.0)
+                if hasattr(gltf_mat.occlusionTexture, 'strength') and gltf_mat.occlusionTexture.strength is not None:
+                    material.occlusion_strength = gltf_mat.occlusionTexture.strength
 
             # Emissive texture
             if gltf_mat.emissiveTexture:
@@ -645,6 +656,16 @@ class GltfLoader:
             # Emissive factor
             if gltf_mat.emissiveFactor is not None:
                 material.emissive_factor = tuple(gltf_mat.emissiveFactor)
+
+            # Alpha mode and cutoff
+            if hasattr(gltf_mat, 'alphaMode') and gltf_mat.alphaMode:
+                material.alpha_mode = gltf_mat.alphaMode  # "OPAQUE", "MASK", or "BLEND"
+            if hasattr(gltf_mat, 'alphaCutoff') and gltf_mat.alphaCutoff is not None:
+                material.alpha_cutoff = gltf_mat.alphaCutoff
+
+            # Double-sided rendering
+            if hasattr(gltf_mat, 'doubleSided') and gltf_mat.doubleSided:
+                material.double_sided = True
 
             materials.append(material)
             print(f"  Material: {mat_name}")

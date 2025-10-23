@@ -35,14 +35,24 @@ class Mesh:
         # Local transform (from GLTF node hierarchy)
         self.local_transform = local_transform if local_transform is not None else Matrix44.identity()
 
-    def render(self, program, parent_transform: Matrix44 = None):
+    def render(self, program, parent_transform: Matrix44 = None, ctx=None):
         """
         Render this mesh with optional parent transform.
 
         Args:
             program: Shader program to use
             parent_transform: Parent model matrix (applied before local transform)
+            ctx: ModernGL context (for face culling control)
         """
+        # Handle double-sided materials (disable backface culling)
+        restore_culling = False
+        if ctx and self.material.double_sided:
+            # Check if culling is currently enabled
+            import moderngl
+            if ctx.front_face == 'ccw':  # Default state has culling enabled
+                ctx.disable(moderngl.CULL_FACE)
+                restore_culling = True
+
         # Calculate final transform
         if parent_transform is not None:
             # Combine parent transform with local transform
@@ -59,6 +69,11 @@ class Mesh:
 
         # Render geometry
         self.vao.render(program)
+
+        # Restore culling state
+        if restore_culling:
+            import moderngl
+            ctx.enable(moderngl.CULL_FACE)
 
 
 class Model:
@@ -129,19 +144,20 @@ class Model:
         """
         return frustum.contains_sphere(self.position, self.bounding_radius)
 
-    def render(self, program):
+    def render(self, program, ctx=None):
         """
         Render all meshes in this model.
 
         Args:
             program: Shader program to use
+            ctx: ModernGL context (for face culling control)
         """
         # Get parent model matrix (position, rotation, scale of the whole model)
         parent_matrix = self.get_model_matrix()
 
         # Render each mesh with its local transform
         for mesh in self.meshes:
-            mesh.render(program, parent_transform=parent_matrix)
+            mesh.render(program, parent_transform=parent_matrix, ctx=ctx)
 
     def release(self):
         """Release GPU resources"""

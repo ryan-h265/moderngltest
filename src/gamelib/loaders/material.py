@@ -34,6 +34,7 @@ class Material:
         self.normal_texture: Optional[moderngl.Texture] = None
         self.emissive_factor: Optional[tuple] = (0.0, 0.0, 0.0)
         self.emissive_texture: Optional[moderngl.Texture] = None
+        self.occlusion_texture: Optional[moderngl.Texture] = None
 
         # Base color factor (used if no texture)
         self.base_color_factor = (1.0, 1.0, 1.0, 1.0)
@@ -41,6 +42,15 @@ class Material:
         # PBR factors
         self.metallic_factor = 1.0
         self.roughness_factor = 1.0
+        self.occlusion_strength = 1.0  # Strength of baked ambient occlusion
+        self.normal_scale = 1.0  # Normal map intensity
+
+        # Alpha mode ("OPAQUE", "MASK", "BLEND")
+        self.alpha_mode = "OPAQUE"
+        self.alpha_cutoff = 0.5  # Threshold for MASK mode
+
+        # Double-sided rendering
+        self.double_sided = False
 
     def has_base_color(self) -> bool:
         """Check if material has base color texture"""
@@ -113,6 +123,32 @@ class Material:
         if 'emissiveFactor' in program:
             program['emissiveFactor'].value = self.emissive_factor
 
+        # Bind occlusion texture to texture unit 7
+        if self.occlusion_texture:
+            self.occlusion_texture.use(location=7)
+            if 'occlusionTexture' in program:
+                program['occlusionTexture'].value = 7
+            if 'hasOcclusionTexture' in program:
+                program['hasOcclusionTexture'].value = True
+        else:
+            if 'hasOcclusionTexture' in program:
+                program['hasOcclusionTexture'].value = False
+
+        # Set occlusion strength
+        if 'occlusionStrength' in program:
+            program['occlusionStrength'].value = self.occlusion_strength
+
+        # Set normal scale
+        if 'normalScale' in program:
+            program['normalScale'].value = self.normal_scale
+
+        # Set alpha mode (convert to int: OPAQUE=0, MASK=1, BLEND=2)
+        if 'alphaMode' in program:
+            mode_map = {"OPAQUE": 0, "MASK": 1, "BLEND": 2}
+            program['alphaMode'].value = mode_map.get(self.alpha_mode, 0)
+        if 'alphaCutoff' in program:
+            program['alphaCutoff'].value = self.alpha_cutoff
+
     def release(self):
         """Release GPU resources"""
         if self.base_color_texture:
@@ -123,3 +159,5 @@ class Material:
             self.normal_texture.release()
         if self.emissive_texture:
             self.emissive_texture.release()
+        if self.occlusion_texture:
+            self.occlusion_texture.release()

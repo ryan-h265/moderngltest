@@ -235,6 +235,27 @@ class GltfDiagnostics:
             # Check emissive factor
             if hasattr(material, 'emissiveFactor') and material.emissiveFactor:
                 print(f"      🔆 Emissive factor: {material.emissiveFactor}")
+
+            # Check occlusion texture
+            if hasattr(material, 'occlusionTexture') and material.occlusionTexture:
+                print(f"      📷 Occlusion texture: {material.occlusionTexture.index}")
+                if hasattr(material.occlusionTexture, 'strength') and material.occlusionTexture.strength is not None:
+                    print(f"         Strength: {material.occlusionTexture.strength}")
+
+            # Check alpha mode
+            if hasattr(material, 'alphaMode') and material.alphaMode and material.alphaMode != "OPAQUE":
+                print(f"      🎭 Alpha mode: {material.alphaMode}")
+                if material.alphaMode == "MASK" and hasattr(material, 'alphaCutoff'):
+                    print(f"         Cutoff: {material.alphaCutoff}")
+
+            # Check double sided
+            if hasattr(material, 'doubleSided') and material.doubleSided:
+                print(f"      ↔️  Double sided: True")
+
+            # Check normal scale
+            if hasattr(material, 'normalTexture') and material.normalTexture:
+                if hasattr(material.normalTexture, 'scale') and material.normalTexture.scale is not None and material.normalTexture.scale != 1.0:
+                    print(f"      📐 Normal scale: {material.normalTexture.scale}")
     
     def _print_summary(self):
         """Print analysis summary."""

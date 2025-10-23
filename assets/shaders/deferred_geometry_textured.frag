@@ -8,16 +8,24 @@ uniform sampler2D baseColorTexture;
 uniform sampler2D normalTexture;
 uniform sampler2D metallicRoughnessTexture;
 uniform sampler2D emissiveTexture;
+uniform sampler2D occlusionTexture;
 
 // Texture flags
 uniform bool hasBaseColorTexture;
 uniform bool hasNormalTexture;
 uniform bool hasMetallicRoughnessTexture;
 uniform bool hasEmissiveTexture;
+uniform bool hasOcclusionTexture;
 
 // Material fallback properties
 uniform vec4 baseColorFactor;
 uniform vec3 emissiveFactor;
+uniform float occlusionStrength;  // Strength of baked AO (0.0 = none, 1.0 = full)
+uniform float normalScale;        // Normal map intensity
+
+// Alpha transparency
+uniform int alphaMode;      // 0=OPAQUE, 1=MASK, 2=BLEND
+uniform float alphaCutoff;  // Threshold for MASK mode (default 0.5)
 
 // Inputs from vertex shader
 in vec3 v_world_position;  // World space position
@@ -46,6 +54,9 @@ void main() {
         // Convert from [0,1] to [-1,1]
         normal_sample = normal_sample * 2.0 - 1.0;
 
+        // Apply normal scale to XY components (tangent-space perturbation)
+        normal_sample.xy *= normalScale;
+
         // Transform from tangent space to view space using TBN matrix
         normal = normalize(v_TBN * normal_sample);
     } else {
@@ -66,10 +77,25 @@ void main() {
         albedo = baseColorFactor;
     }
 
+    // Alpha testing for MASK mode (cutout transparency)
+    if (alphaMode == 1) {  // MASK mode
+        if (albedo.a < alphaCutoff) {
+            discard;  // Discard fragment, creates cutout effect (for vegetation, fences, etc.)
+        }
+    }
+
     // Sample emissive contribution (stored separately, not affected by lighting)
     vec3 emissive = emissiveFactor;
     if (hasEmissiveTexture) {
         emissive *= texture(emissiveTexture, v_texcoord).rgb;
+    }
+
+    // Sample occlusion (baked AO from GLTF, stored in RED channel per spec)
+    float occlusion = 1.0;
+    if (hasOcclusionTexture) {
+        float ao_sample = texture(occlusionTexture, v_texcoord).r;
+        // Apply strength: lerp between no occlusion (1.0) and full occlusion
+        occlusion = mix(1.0, ao_sample, occlusionStrength);
     }
 
     // Sample metallic/roughness for PBR
@@ -82,8 +108,8 @@ void main() {
         roughness = mr.g;
     }
 
-    // Store albedo (base color only, no emissive) + ambient occlusion (A, currently unused = 1.0)
-    gAlbedo = vec4(albedo.rgb, 1.0);
+    // Store albedo (base color) + baked ambient occlusion (A channel)
+    gAlbedo = vec4(albedo.rgb, occlusion);
 
     // Store PBR material properties
     gMaterial = vec2(metallic, roughness);

@@ -327,7 +327,7 @@ class Scene:
 
                     # Render each mesh with its local transform
                     for mesh in obj.meshes:
-                        mesh.render(active_program, parent_transform=parent_matrix)
+                        mesh.render(active_program, parent_transform=parent_matrix, ctx=self.ctx)
             else:
                 # Use primitive shader for regular SceneObjects
                 active_program = program
