@@ -5,6 +5,8 @@ ModernGL 3D Engine - Main Entry Point
 A modular 3D game engine with multi-light shadow mapping.
 """
 
+import math
+
 import moderngl
 import moderngl_window as mglw
 from pyrr import Vector3
@@ -16,6 +18,8 @@ from src.gamelib import (
     Camera, Light, Scene,
     # Rendering
     RenderPipeline,
+    # UI
+    PlayerHUD,
 )
 
 # New input system
@@ -24,7 +28,7 @@ from src.gamelib.input.controllers import CameraController, RenderingController
 
 # Debug overlay
 from src.gamelib.debug import DebugOverlay
-from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED
+from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED, HUD_ENABLED
 
 
 class Game(mglw.WindowConfig):
@@ -85,6 +89,19 @@ class Game(mglw.WindowConfig):
             self.debug_overlay = DebugOverlay(self.render_pipeline)
         else:
             self.debug_overlay = None
+
+        # Setup HUD
+        if HUD_ENABLED:
+            self.player_hud = PlayerHUD(self.render_pipeline)
+            self.player_hud.set_health(86, 100)
+            self.player_hud.set_minimap_status("no map")
+            self.player_hud.set_equipped_tool("None")
+            self.player_hud.set_hints([
+                "WASD to move",
+                "Space to jump",
+            ])
+        else:
+            self.player_hud = None
 
         # Time tracking
         self.time = 0
@@ -171,7 +188,13 @@ class Game(mglw.WindowConfig):
                 if light.cast_shadows:
                     light.mark_shadow_dirty()
 
-        # Update debug overlay
+        # Update HUD and debug overlay
+        if self.player_hud:
+            # Animate the health bar for demonstration purposes.
+            oscillating_health = 70.0 + 30.0 * (0.5 + 0.5 * math.sin(time * 0.35))
+            self.player_hud.set_health(oscillating_health, 100.0)
+            self.player_hud.update(self.camera, frametime)
+
         if self.debug_overlay:
             fps = 1.0 / frametime if frametime > 0 else 0
             self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene)

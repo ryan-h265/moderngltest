@@ -18,6 +18,8 @@ from .ssao_renderer import SSAORenderer
 from .transparent_renderer import TransparentRenderer
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
+from .icon_manager import IconManager
+from .ui_sprite_renderer import UISpriteRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from .bloom_renderer import BloomRenderer
 from ..core.camera import Camera
@@ -30,7 +32,6 @@ from ..config.settings import (
     SSAO_KERNEL_SIZE,
     UI_FONT_PATH,
     UI_FONT_SIZE,
-    DEBUG_OVERLAY_ENABLED,
     PROJECT_ROOT,
     BLOOM_ENABLED,
 )
@@ -179,11 +180,17 @@ class RenderPipeline:
 
         # Create UI rendering system
         self.shader_manager.load_program("ui_text", "ui_text.vert", "ui_text.frag")
+        self.shader_manager.load_program("ui_sprite", "ui_sprite.vert", "ui_sprite.frag")
         font_path = str(PROJECT_ROOT / UI_FONT_PATH)
         self.text_manager = TextManager(font_path, UI_FONT_SIZE)
         self.ui_renderer = UIRenderer(
             ctx,
             self.shader_manager.get("ui_text"),
+        )
+        self.icon_manager = IconManager(ctx)
+        self.ui_sprite_renderer = UISpriteRenderer(
+            ctx,
+            self.shader_manager.get("ui_sprite"),
         )
         self.viewport_size: Tuple[int, int] = tuple(self.window.size)
 
@@ -230,7 +237,10 @@ class RenderPipeline:
             self._render_forward(scene, camera, lights)
 
         # Final pass: Render UI overlay
-        if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
+        if hasattr(self, "icon_manager") and self.icon_manager.has_icons():
+            self.ui_sprite_renderer.render(self.icon_manager, self.window.size)
+
+        if len(self.text_manager.get_all_layers()) > 0:
             self.ui_renderer.render(self.text_manager, self.window.size)
 
     def resize(self, size: Tuple[int, int]):
@@ -260,6 +270,9 @@ class RenderPipeline:
 
         if hasattr(self.ui_renderer, "resize"):
             self.ui_renderer.resize(self.viewport_size)
+
+        if hasattr(self.ui_sprite_renderer, "resize"):
+            self.ui_sprite_renderer.resize(self.viewport_size)
 
         if hasattr(self.text_manager, "refresh_layout_metrics"):
             self.text_manager.refresh_layout_metrics()

@@ -15,6 +15,7 @@ from .core.scene import Scene, SceneObject
 
 # Rendering
 from .rendering.render_pipeline import RenderPipeline
+from .ui.player_hud import PlayerHUD
 
 # Input (new Command Pattern system)
 from .input.input_manager import InputManager
@@ -33,6 +34,7 @@ __all__ = [
     "SceneObject",
     # Rendering
     "RenderPipeline",
+    "PlayerHUD",
     # Input
     "InputManager",
     "InputCommand",
