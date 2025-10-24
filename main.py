@@ -73,7 +73,10 @@ class Game(mglw.WindowConfig):
         # Scene management (JSON-driven scenes)
         self.scene_manager = SceneManager(self.ctx, self.render_pipeline)
         self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
-        loaded_scene = self.scene_manager.load("default", camera=self.camera)
+        self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
+
+        # Load scene (change between "default" and "donut_terrain")
+        loaded_scene = self.scene_manager.load("donut_terrain", camera=self.camera)
         self.scene = loaded_scene.scene
         self.lights = loaded_scene.lights
 

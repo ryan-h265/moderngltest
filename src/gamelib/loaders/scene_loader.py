@@ -120,6 +120,30 @@ class SceneLoader:
             geometry_obj = geometry_utils.pyramid(base_size=base_size, height=height)
             if bounding_radius is None:
                 bounding_radius = math.sqrt(2 * (base_size * 0.5) ** 2 + (height * 0.5) ** 2)
+        elif primitive == "donut_terrain":
+            resolution = int(node.extras.get("resolution", 128))
+            outer_radius = float(node.extras.get("outer_radius", 200.0))
+            inner_radius = float(node.extras.get("inner_radius", 80.0))
+            height = float(node.extras.get("height", 50.0))
+            rim_width = float(node.extras.get("rim_width", 40.0))
+            seed = int(node.extras.get("seed", 42))
+            geometry_obj = geometry_utils.donut_terrain(
+                resolution=resolution,
+                outer_radius=outer_radius,
+                inner_radius=inner_radius,
+                height=height,
+                rim_width=rim_width,
+                seed=seed
+            )
+            if bounding_radius is None:
+                # Bounding sphere needs to encompass the entire terrain mesh
+                # The mesh extends to world_size/2 where world_size = outer_radius * 2.2
+                # So mesh extends from -offset to +offset in both X and Z
+                # Furthest corner is at diagonal distance: sqrt(offset^2 + offset^2)
+                world_size = outer_radius * 2.2
+                offset = world_size / 2
+                diagonal_dist = math.sqrt(offset ** 2 + offset ** 2)
+                bounding_radius = math.sqrt(diagonal_dist ** 2 + height ** 2)
         else:
             raise ValueError(f"Unsupported primitive type: {node.primitive}")
 
