@@ -292,6 +292,17 @@ class LightingRenderer:
             self.lighting_program['light_color'].write(light.color.astype('f4').tobytes())
         if 'light_intensity' in self.lighting_program:
             self.lighting_program['light_intensity'].value = light.intensity
+        if 'light_type' in self.lighting_program:
+            self.lighting_program['light_type'].value = light.get_light_type_id()
+        if 'light_range' in self.lighting_program:
+            self.lighting_program['light_range'].value = light.range
+        if 'light_direction' in self.lighting_program:
+            direction = light.get_direction()
+            self.lighting_program['light_direction'].write(direction.astype('f4').tobytes())
+        if 'spot_inner_cos' in self.lighting_program and 'spot_outer_cos' in self.lighting_program:
+            inner_cos, outer_cos = light.get_spot_cosines()
+            self.lighting_program['spot_inner_cos'].value = inner_cos
+            self.lighting_program['spot_outer_cos'].value = outer_cos
 
         # Set shadow map (use higher texture units to avoid G-Buffer conflict)
         # For non-shadow-casting lights, we still need to bind something to avoid shader errors

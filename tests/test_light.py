@@ -78,3 +78,32 @@ def test_light_setters():
 
     light.set_intensity(0.8)
     assert light.intensity == 0.8
+
+
+def test_directional_light_defaults():
+    """Directional lights derive direction from target and have infinite range."""
+    light = Light(
+        position=Vector3([5.0, 10.0, 5.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='directional'
+    )
+
+    direction = light.get_direction()
+    length = np.linalg.norm(direction)
+    assert np.isclose(length, 1.0)
+    assert np.isclose(light.range, 0.0)
+
+
+def test_spot_light_cone_cosines():
+    """Spot lights expose cosine falloff values for shaders."""
+    light = Light(
+        position=Vector3([0.0, 5.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='spot',
+        inner_cone_angle=15.0,
+        outer_cone_angle=30.0
+    )
+
+    inner, outer = light.get_spot_cosines()
+    assert inner <= 1.0
+    assert outer <= inner

@@ -4,6 +4,7 @@ Light Module
 Shadow-casting light sources with support for directional, point, and spot lights.
 """
 
+import math
 import numpy as np
 from dataclasses import dataclass, field
 from pyrr import Matrix44, Vector3
@@ -40,6 +41,9 @@ class Light:
     intensity: float = DEFAULT_LIGHT_INTENSITY
     light_type: str = 'directional'
     cast_shadows: bool = True  # If False, light contributes illumination without shadows
+    range: float = 10.0  # Effective radius for point/spot lights (0 = infinite)
+    inner_cone_angle: float = 20.0  # Degrees (spot lights)
+    outer_cone_angle: float = 30.0  # Degrees (spot lights - must be >= inner angle)
 
     # Shadow map resources (set by ShadowRenderer)
     shadow_map: moderngl.Texture = None
@@ -53,6 +57,48 @@ class Light:
 
     # Shadow map throttling (optimization)
     _frames_since_shadow_update: int = field(default=0, init=False, repr=False)
+
+    def __post_init__(self):
+        """Normalize configuration and validate parameters."""
+        # Ensure cone angles make sense
+        if self.inner_cone_angle < 0.0:
+            self.inner_cone_angle = 0.0
+        if self.outer_cone_angle < self.inner_cone_angle:
+            self.outer_cone_angle = self.inner_cone_angle
+
+        # Directional lights have infinite range
+        if self.light_type == 'directional':
+            self.range = 0.0
+
+    def get_light_type_id(self) -> int:
+        """Return integer identifier for shaders."""
+        if self.light_type == 'directional':
+            return 0
+        if self.light_type == 'point':
+            return 1
+        if self.light_type == 'spot':
+            return 2
+        raise ValueError(f"Unknown light type: {self.light_type}")
+
+    def get_direction(self) -> Vector3:
+        """
+        Calculate a normalized direction vector for directional/spot lights.
+
+        Direction is derived from target - position when available. Falls back to
+        global downward vector if the light is co-located with its target.
+        """
+        direction = self.target - self.position
+        length = np.linalg.norm(direction)
+        if length < 1e-5:
+            # Avoid divide-by-zero; default to downward facing vector
+            return Vector3([0.0, -1.0, 0.0])
+        return Vector3(direction / length)
+
+    def get_spot_cosines(self) -> tuple:
+        """Return cosine of inner/outer cone angles (for shader falloff)."""
+        inner_cos = math.cos(math.radians(self.inner_cone_angle))
+        outer_cos = math.cos(math.radians(self.outer_cone_angle))
+        return inner_cos, outer_cos
 
     def get_light_matrix(
         self,
@@ -83,11 +129,9 @@ class Light:
             )
         elif self.light_type == 'point':
             # Point lights need cube map shadows (6 perspectives)
-            # Not yet implemented - would use perspective projection
             raise NotImplementedError("Point light shadow maps not yet implemented")
         elif self.light_type == 'spot':
             # Spotlight uses perspective projection
-            # Not yet implemented
             raise NotImplementedError("Spot light shadow maps not yet implemented")
         else:
             raise ValueError(f"Unknown light type: {self.light_type}")
