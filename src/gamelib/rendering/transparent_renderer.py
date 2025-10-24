@@ -5,7 +5,7 @@ Handles forward rendering of transparent objects with alpha blending.
 Objects are depth-sorted back-to-front to ensure correct transparency.
 """
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import moderngl
 from pyrr import Vector3
 
@@ -35,6 +35,7 @@ class TransparentRenderer:
         """
         self.ctx = ctx
         self.transparent_program = transparent_program
+        self._last_viewport_size: Optional[Tuple[int, int]] = None
 
     def render(
         self,
@@ -95,6 +96,10 @@ class TransparentRenderer:
         # Restore state
         self.ctx.depth_mask = True  # Re-enable depth writes
         self.ctx.disable(moderngl.BLEND)
+
+    def resize(self, viewport_size: Tuple[int, int]):
+        """Hook for future resize-specific logic (currently no cached resources)."""
+        self._last_viewport_size = viewport_size
 
     def _set_camera_uniforms(self, camera: Camera, aspect_ratio: float):
         """

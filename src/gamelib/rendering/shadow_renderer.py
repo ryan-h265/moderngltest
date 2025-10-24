@@ -43,7 +43,12 @@ class ShadowRenderer:
         self.ctx = ctx
         self.shadow_program = shadow_program
         self.shadow_size = shadow_size
+        self._screen_viewport: Optional[Tuple[int, int, int, int]] = None
         self.last_stats: Optional[Dict[str, int]] = None
+
+    def set_screen_viewport(self, viewport: Tuple[int, int, int, int]) -> None:
+        """Persist the default screen viewport to restore after shadow passes."""
+        self._screen_viewport = viewport
 
     def create_shadow_map(self, resolution: Optional[int] = None) -> Tuple[moderngl.Texture, moderngl.Framebuffer]:
         """
@@ -188,6 +193,9 @@ class ShadowRenderer:
             print(f"Shadow Maps: Rendered {rendered}/{total}, "
                   f"Skipped (intensity={skipped_intensity}, throttle={skipped_throttle}, "
                   f"non-casting={skipped_non_casting})")
+
+        if self._screen_viewport is not None:
+            self.ctx.viewport = self._screen_viewport
 
     def render_single_shadow_map(self, light: Light, scene: Scene):
         """

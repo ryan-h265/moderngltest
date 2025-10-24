@@ -5,7 +5,7 @@ Orchestrates the complete rendering pipeline with shadow mapping.
 Supports both forward and deferred rendering modes.
 """
 
-from typing import List
+from typing import List, Tuple
 import moderngl
 
 from .shader_manager import ShaderManager
@@ -103,6 +103,7 @@ class RenderPipeline:
             ctx,
             self.shader_manager.get("shadow")
         )
+        self.shadow_renderer.set_screen_viewport((0, 0, WINDOW_SIZE[0], WINDOW_SIZE[1]))
 
         # Create forward rendering pipeline
         self.main_renderer = MainRenderer(
@@ -184,6 +185,7 @@ class RenderPipeline:
             ctx,
             self.shader_manager.get("ui_text"),
         )
+        self.viewport_size: Tuple[int, int] = tuple(self.window.size)
 
     def initialize_lights(self, lights: List[Light], camera: Camera = None):
         """
@@ -230,6 +232,37 @@ class RenderPipeline:
         # Final pass: Render UI overlay
         if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
             self.ui_renderer.render(self.text_manager, self.window.size)
+
+    def resize(self, size: Tuple[int, int]):
+        """Resize internal render targets and update cached viewport size."""
+        if not size or size == self.viewport_size:
+            return
+
+        width, height = size
+        if width <= 0 or height <= 0:
+            return
+
+        self.viewport_size = (width, height)
+        screen_viewport = (0, 0, width, height)
+        self.window.viewport = screen_viewport
+        self.ctx.viewport = screen_viewport
+        self.shadow_renderer.set_screen_viewport(screen_viewport)
+
+        self.gbuffer.resize(self.viewport_size)
+
+        if self.ssao_renderer is not None:
+            self.ssao_renderer.resize(self.viewport_size)
+
+        self.aa_renderer.resize(self.viewport_size)
+
+        if hasattr(self.transparent_renderer, "resize"):
+            self.transparent_renderer.resize(self.viewport_size)
+
+        if hasattr(self.ui_renderer, "resize"):
+            self.ui_renderer.resize(self.viewport_size)
+
+        if hasattr(self.text_manager, "refresh_layout_metrics"):
+            self.text_manager.refresh_layout_metrics()
 
     def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light]):
         """
