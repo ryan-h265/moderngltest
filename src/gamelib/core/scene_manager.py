@@ -99,8 +99,8 @@ class SceneManager:
             camera.position = Vector3(self._camera_position)
         if self._camera_target is not None:
             direction = vector.normalise(self._camera_target - camera.position)
-            camera.pitch = float(np.degrees(np.arcsin(direction.y)))
-            camera.yaw = float(np.degrees(np.arctan2(direction.z, direction.x)))
+            camera.pitch = float(np.degrees(np.arcsin(direction[1])))
+            camera.yaw = float(np.degrees(np.arctan2(direction[2], direction[0])))
             camera.update_vectors()
             camera.target = Vector3(self._camera_target)
 
