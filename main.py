@@ -89,7 +89,18 @@ class Game(mglw.WindowConfig):
         # Time tracking
         self.time = 0
 
-    def _create_light(self, color: Vector3, intensity: float = 1.0, angle: float = 0.0, height: float = 60.0) -> Light:
+    def _create_light(
+        self,
+        color: Vector3,
+        intensity: float = 1.0,
+        angle: float = 0.0,
+        pos: Vector3 = Vector3([0.0, 10.0, 0.0]),
+        *,
+        illuminance: float = None,
+        luminous_flux: float = None,
+        cast_shadows: bool = True,
+        light_type: str = 'directional',
+    ) -> Light:
         """
         Create a single light at a given angle.
 
@@ -99,24 +110,25 @@ class Game(mglw.WindowConfig):
         Returns:
             Light object
         """
-        import math
-
         radius = 30.0
 
-        # Position on circle
-        x = radius * math.cos(angle)
-        z = radius * math.sin(angle)
-
         # Normalize color
-        color = color / max(color)
+        max_component = max(color)
+        if max_component > 0.0:
+            color = color / max_component
+
+        print(f"Creating light at angle {angle:.2f} radians -> position ({pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f})")
 
         # Create light
         light = Light(
-            position=Vector3([x, height, z]),
+            position=pos,
             target=Vector3([0.0, 0.0, 0.0]),
             color=color,
             intensity=intensity,
-            light_type='directional',
+            light_type=light_type,
+            cast_shadows=cast_shadows,
+            illuminance=illuminance,
+            luminous_flux=luminous_flux,
         )
 
         return light
@@ -131,8 +143,15 @@ class Game(mglw.WindowConfig):
         Returns:
             List of Light objects
         """
-        lights = []
-        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=3.5, angle=90.0, height=10.0))
+        lights = [
+            self._create_light(
+                Vector3([1.0, 0.98, 0.92]),
+                angle=90.0,
+                pos=Vector3([0.0, 5.0, 0.0]),
+                illuminance=79350.0,
+                cast_shadows=True,
+            )
+        ]
         # lights.append(self._create_light(Vector3([1.0, 0.0, 0.0]), intensity=1.5, angle=0.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 1.0, 0.0]), intensity=1.5, angle=135.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 0.0, 1.0]), intensity=1.5, angle=270.0, height=10.0))

@@ -111,6 +111,22 @@ class DebugOverlay:
         shadow_res = SHADOW_MAP_SIZE
         lines.append(f"Lights: {len(lights)} | Shadows: {shadow_res}x{shadow_res}")
 
+        tonemap = getattr(self.pipeline, 'tonemap_renderer', None)
+        if tonemap is not None:
+            exposure = tonemap.exposure
+            auto_state = "ON" if tonemap.auto_enabled else "OFF"
+            lines.append(f"HDR: exposure={exposure:.2f} auto={auto_state} operator={tonemap.operator}")
+
+        if lights:
+            primary = lights[0]
+            mode = getattr(primary, 'intensity_mode', 'multiplier')
+            lux = getattr(primary, 'illuminance', None)
+            lumens = getattr(primary, 'luminous_flux', None)
+            lines.append(
+                f"Light0: type={primary.light_type} I={primary.intensity:.2f} mode={mode} "
+                f"lux={lux if lux is not None else '-'} lumens={lumens if lumens is not None else '-'}"
+            )
+
         # Scene info
         if scene:
             total_objects = len(scene.objects)
@@ -130,6 +146,7 @@ class DebugOverlay:
         # Controls hint
         lines.append("")
         lines.append("ESC: Release mouse | T: Toggle SSAO")
+        lines.append("PgUp/PgDn: Exposure +/- | Home: Reset | End: Auto Exp | F10: Print Light Info")
 
         return lines
 

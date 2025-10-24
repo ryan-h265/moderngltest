@@ -59,7 +59,7 @@ PCF_SAMPLES = 3         # 3x3 grid = 9 samples (use 5 for 25 samples, 1 for no P
 BLOOM_ENABLED = True
 BLOOM_THRESHOLD = 0.7        # Brightness threshold for bloom extraction (in HDR units)
 BLOOM_SOFT_KNEE = 0.25       # Soft thresholding transition [0-1]
-BLOOM_INTENSITY = 0.65       # Intensity multiplier when compositing bloom
+BLOOM_INTENSITY = 0.05       # Intensity multiplier when compositing bloom
 BLOOM_FILTER_RADIUS = 1.1    # Upsample filter radius (higher = softer bloom)
 BLOOM_MAX_LEVELS = 5         # Number of downsample/upsample levels (more = softer, slower)
 BLOOM_TINT = (1.0, 1.0, 1.0) # Optional bloom tint (RGB)
@@ -194,16 +194,39 @@ MAX_PITCH = 89.0
 AMBIENT_STRENGTH = 0.1         # 0.0 = pitch black, 1.0 = fully lit
 
 # Directional light projection bounds
-LIGHT_ORTHO_LEFT = -15.0
-LIGHT_ORTHO_RIGHT = 15.0
-LIGHT_ORTHO_BOTTOM = -15.0
-LIGHT_ORTHO_TOP = 15.0
+LIGHT_ORTHO_LEFT = -50.0
+LIGHT_ORTHO_RIGHT = 50.0
+LIGHT_ORTHO_BOTTOM = -50.0
+LIGHT_ORTHO_TOP = 50.0
 LIGHT_ORTHO_NEAR = 0.1
-LIGHT_ORTHO_FAR = 50.0
+LIGHT_ORTHO_FAR = 150.0
+
+# Spotlight / point light shadow defaults
+SPOT_LIGHT_NEAR_PLANE = 0.1
+SPOT_LIGHT_DEFAULT_FAR = 25.0
+POINT_LIGHT_NEAR_PLANE = 0.1
+POINT_LIGHT_DEFAULT_FAR = 25.0
 
 # Default light properties
 DEFAULT_LIGHT_INTENSITY = 1.0
 DEFAULT_LIGHT_COLOR = (1.0, 1.0, 1.0)  # White
+
+# Photometric lighting support
+PHOTOMETRIC_UNITS_ENABLED = True
+LUMINOUS_FLUX_TO_INTENSITY = 0.0795774715  # 1 / (4π)
+ILLUMINANCE_TO_INTENSITY = 0.0072          # Approx Lux -> normalized intensity scale
+
+# HDR / Tonemapping
+HDR_RENDERING_ENABLED = True
+HDR_COLOR_FORMAT = "f2"           # 16-bit float
+HDR_DEFAULT_EXPOSURE = 1.0
+HDR_MIN_EXPOSURE = 0.05
+HDR_MAX_EXPOSURE = 16.0
+HDR_AUTO_EXPOSURE = False
+HDR_AUTO_EXPOSURE_SPEED = 1.0
+HDR_AUTO_EXPOSURE_KEY = 0.18      # Middle-grey target
+TONEMAP_OPERATOR = "ACES"         # Options: "ACES", "REINHARD", "UNCHARTED2"
+
 
 # ============================================================================
 # Input Settings
@@ -220,6 +243,11 @@ LOG_LEVEL = "INFO"  # "DEBUG", "INFO", "WARNING", "ERROR"
 # Frustum culling debug
 DEBUG_FRUSTUM_CULLING = False  # Print culling statistics (very spammy - only enable for debugging)
 DEBUG_SHOW_CULLED_OBJECTS = False  # Print names of culled objects (requires DEBUG_FRUSTUM_CULLING)
+DEBUG_LIGHT_GIZMOS_ENABLED = True
+DEBUG_LIGHT_GIZMO_SPHERE_RADIUS = 0.35
+DEBUG_LIGHT_GIZMO_FALLBACK_RANGE = 20.0
+DEBUG_LIGHT_GIZMO_LINE_WIDTH = 2.0
+LAST_LIGHT_SNAPSHOT = []
 
 # ============================================================================
 # Performance Settings

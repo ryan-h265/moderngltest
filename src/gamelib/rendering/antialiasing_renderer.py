@@ -25,6 +25,17 @@ class AAMode(Enum):
     MSAA_4X_SMAA = auto()
 
 
+MSAA_MODES = {
+    AAMode.MSAA_2X,
+    AAMode.MSAA_4X,
+    AAMode.MSAA_8X,
+    AAMode.MSAA_2X_FXAA,
+    AAMode.MSAA_4X_FXAA,
+    AAMode.MSAA_2X_SMAA,
+    AAMode.MSAA_4X_SMAA,
+}
+
+
 class AntiAliasingRenderer:
     """
     Handles MSAA and FXAA anti-aliasing.
@@ -59,6 +70,7 @@ class AntiAliasingRenderer:
         self.ctx = ctx
         self.size = size
         self.fxaa_program = fxaa_program
+        self.hdr_mode = False
         
         # Current AA settings
         self.aa_mode = AAMode.OFF
@@ -200,6 +212,10 @@ class AntiAliasingRenderer:
         Args:
             mode: AA mode to set
         """
+        if self.hdr_mode and mode in MSAA_MODES:
+            fallback = AAMode.FXAA if self.fxaa_program else AAMode.OFF
+            print("HDR pipeline disables MSAA-based AA modes. Falling back to", fallback.name)
+            mode = fallback
         self.aa_mode = mode
         
         # Configure settings based on mode
@@ -256,11 +272,11 @@ class AntiAliasingRenderer:
         """
         if self.msaa_samples > 0:
             return self.msaa_fbo
-        elif self.fxaa_enabled or self.smaa_enabled:
+        if self.fxaa_enabled or self.smaa_enabled:
             return self.resolve_fbo
-        else:
-            # No AA - render directly to screen
+        if self.hdr_mode:
             return self.ctx.screen
+        return self.ctx.screen
     
     def resolve_and_present(self):
         """
@@ -281,6 +297,19 @@ class AntiAliasingRenderer:
         else:
             # Present resolve buffer to screen
             self._present_to_screen(self.resolve_color)
+
+    def set_hdr_mode(self, enabled: bool):
+        """Enable or disable HDR pipeline compatibility (disables MSAA paths)."""
+        if self.hdr_mode == enabled:
+            return
+
+        self.hdr_mode = enabled
+        if self.hdr_mode and self.aa_mode in MSAA_MODES:
+            fallback = AAMode.FXAA if self.fxaa_program else AAMode.OFF
+            print("HDR pipeline disables MSAA-based AA modes. Falling back to", fallback.name)
+            self.set_aa_mode(fallback)
+        else:
+            self._create_framebuffers()
     
     def _apply_fxaa(self):
         """Apply FXAA post-processing"""
@@ -336,6 +365,11 @@ class AntiAliasingRenderer:
             modes = [AAMode.OFF, AAMode.FXAA, AAMode.SMAA, AAMode.MSAA_2X, AAMode.MSAA_4X, AAMode.MSAA_4X_SMAA]
         else:
             modes = [AAMode.OFF, AAMode.FXAA, AAMode.MSAA_2X, AAMode.MSAA_4X, AAMode.MSAA_4X_FXAA]
+
+        if self.hdr_mode:
+            modes = [mode for mode in modes if mode not in MSAA_MODES]
+            if not modes:
+                modes = [AAMode.OFF, AAMode.FXAA]
         
         try:
             current_index = modes.index(self.aa_mode)
@@ -355,6 +389,9 @@ class AntiAliasingRenderer:
         Returns:
             True if MSAA is now enabled
         """
+        if self.hdr_mode:
+            print("MSAA is disabled while HDR pipeline is active.")
+            return False
         if self.msaa_samples > 0:
             # Turn off MSAA
             if self.fxaa_enabled:

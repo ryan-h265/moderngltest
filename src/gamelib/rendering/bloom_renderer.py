@@ -162,14 +162,14 @@ class BloomRenderer:
     # ------------------------------------------------------------------
     def apply(
         self,
-        emissive_texture: moderngl.Texture,
+        source_texture: moderngl.Texture,
         viewport: Tuple[int, int, int, int],
         target: moderngl.Framebuffer,
     ) -> None:
         """Run the bloom pipeline and composite the blurred glow.
 
         Args:
-            emissive_texture: HDR emissive texture sourced from the G-Buffer.
+            source_texture: HDR texture to extract bloom from (lighting result or emissive).
             viewport: Target viewport (x, y, width, height).
             target: Framebuffer to composite the bloom result onto.
         """
@@ -192,7 +192,7 @@ class BloomRenderer:
         # Downsample chain: progressively shrink emissive texture while
         # applying a brightness threshold on the first level.
         # ------------------------------------------------------------------
-        current_source = emissive_texture
+        current_source = source_texture
         for index, level in enumerate(self.levels):
             level.downsample_fbo.use()
             self.ctx.viewport = (0, 0, *level.size)

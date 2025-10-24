@@ -107,6 +107,11 @@ class InputContextManager:
                 InputCommand.SYSTEM_TOGGLE_FXAA,
                 InputCommand.SYSTEM_TOGGLE_SMAA,
 
+                InputCommand.SYSTEM_EXPOSURE_INCREASE,
+                InputCommand.SYSTEM_EXPOSURE_DECREASE,
+                InputCommand.SYSTEM_EXPOSURE_RESET,
+                InputCommand.SYSTEM_TOGGLE_AUTO_EXPOSURE,
+                InputCommand.SYSTEM_PRINT_LIGHT_INFO,
             },
 
             # ================================================================

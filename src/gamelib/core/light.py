@@ -19,6 +19,10 @@ from ..config.settings import (
     LIGHT_ORTHO_TOP,
     LIGHT_ORTHO_NEAR,
     LIGHT_ORTHO_FAR,
+    SPOT_LIGHT_NEAR_PLANE,
+    SPOT_LIGHT_DEFAULT_FAR,
+    POINT_LIGHT_NEAR_PLANE,
+    POINT_LIGHT_DEFAULT_FAR,
 )
 
 
@@ -41,14 +45,19 @@ class Light:
     intensity: float = DEFAULT_LIGHT_INTENSITY
     light_type: str = 'directional'
     cast_shadows: bool = True  # If False, light contributes illumination without shadows
-    range: float = 10.0  # Effective radius for point/spot lights (0 = infinite)
+    range: float = 0.0  # Effective radius for point/spot lights (0 = infinite)
     inner_cone_angle: float = 20.0  # Degrees (spot lights)
     outer_cone_angle: float = 30.0  # Degrees (spot lights - must be >= inner angle)
+    luminous_flux: float = None     # Lumens (point/spot lights)
+    illuminance: float = None       # Lux (directional lights)
+    intensity_mode: str = 'multiplier'  # 'multiplier', 'lumens', 'lux'
 
     # Shadow map resources (set by ShadowRenderer)
     shadow_map: moderngl.Texture = None
     shadow_fbo: moderngl.Framebuffer = None
     shadow_resolution: int = None  # Actual resolution of this light's shadow map
+    shadow_near_plane: float = field(default=None, init=False, repr=False)
+    shadow_far_plane: float = field(default=None, init=False, repr=False)
 
     # Shadow map caching (optimization)
     _shadow_dirty: bool = field(default=True, init=False, repr=False)
@@ -66,9 +75,28 @@ class Light:
         if self.outer_cone_angle < self.inner_cone_angle:
             self.outer_cone_angle = self.inner_cone_angle
 
+        from ..config.settings import (
+            PHOTOMETRIC_UNITS_ENABLED,
+            LUMINOUS_FLUX_TO_INTENSITY,
+            ILLUMINANCE_TO_INTENSITY,
+        )
+
         # Directional lights have infinite range
         if self.light_type == 'directional':
             self.range = 0.0
+        elif self.range <= 0.0:
+            self.range = 15.0
+
+        if not PHOTOMETRIC_UNITS_ENABLED:
+            return
+
+        if self.luminous_flux is not None:
+            self.intensity_mode = 'lumens'
+            self.intensity = max(self.luminous_flux * LUMINOUS_FLUX_TO_INTENSITY, 0.0)
+
+        if self.illuminance is not None:
+            self.intensity_mode = 'lux'
+            self.intensity = max(self.illuminance * ILLUMINANCE_TO_INTENSITY, 0.0)
 
     def get_light_type_id(self) -> int:
         """Return integer identifier for shaders."""
@@ -127,12 +155,26 @@ class Light:
             light_projection = Matrix44.orthogonal_projection(
                 left, right, bottom, top, near, far
             )
+            self.shadow_near_plane = near
+            self.shadow_far_plane = far
         elif self.light_type == 'point':
-            # Point lights need cube map shadows (6 perspectives)
             raise NotImplementedError("Point light shadow maps not yet implemented")
         elif self.light_type == 'spot':
-            # Spotlight uses perspective projection
-            raise NotImplementedError("Spot light shadow maps not yet implemented")
+            fov = max(1.0, min(179.0, self.outer_cone_angle * 2.0))
+            aspect = 1.0
+            near_plane = max(SPOT_LIGHT_NEAR_PLANE, 0.001)
+            far_plane = self.range if self.range > near_plane else SPOT_LIGHT_DEFAULT_FAR
+            if far_plane <= near_plane:
+                far_plane = near_plane + 0.1
+
+            light_projection = Matrix44.perspective_projection(
+                fov,
+                aspect,
+                near_plane,
+                far_plane,
+            )
+            self.shadow_near_plane = near_plane
+            self.shadow_far_plane = far_plane
         else:
             raise ValueError(f"Unknown light type: {self.light_type}")
 
@@ -144,6 +186,47 @@ class Light:
         )
 
         return light_projection * light_view
+
+    def get_point_shadow_matrices(self):
+        """Return the 6 view-projection matrices for point light cube shadows."""
+        if self.light_type != 'point':
+            raise ValueError("Point shadow matrices requested for non-point light")
+
+        near_plane = max(POINT_LIGHT_NEAR_PLANE, 0.001)
+        far_plane = self.range if self.range > near_plane else POINT_LIGHT_DEFAULT_FAR
+        if far_plane <= near_plane:
+            far_plane = near_plane + 0.1
+
+        self.shadow_near_plane = near_plane
+        self.shadow_far_plane = far_plane
+
+        projection = Matrix44.perspective_projection(90.0, 1.0, near_plane, far_plane)
+
+        directions = [
+            Vector3([1.0, 0.0, 0.0]),
+            Vector3([-1.0, 0.0, 0.0]),
+            Vector3([0.0, 1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+        ]
+
+        up_vectors = [
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+        ]
+
+        matrices = []
+        for direction, up in zip(directions, up_vectors):
+            target = Vector3(self.position + direction)
+            view = Matrix44.look_at(self.position, target, up)
+            matrices.append(projection * view)
+
+        return matrices
 
     def should_render_shadow(self, intensity_threshold: float = 0.01, throttle_frames: int = 0) -> bool:
         """
@@ -278,4 +361,25 @@ class Light:
         Args:
             intensity: Multiplier for light contribution (typically 0.0 to 2.0)
         """
+        self.intensity_mode = 'multiplier'
         self.intensity = intensity
+
+    def set_luminous_flux(self, lumens: float):
+        """
+        Set luminous flux (in lumens) for point/spot lights and derive intensity.
+        """
+        from ..config.settings import LUMINOUS_FLUX_TO_INTENSITY
+
+        self.luminous_flux = lumens
+        self.intensity_mode = 'lumens'
+        self.intensity = max(lumens * LUMINOUS_FLUX_TO_INTENSITY, 0.0)
+
+    def set_illuminance(self, lux: float):
+        """
+        Set illuminance (in lux) for directional lights and derive intensity.
+        """
+        from ..config.settings import ILLUMINANCE_TO_INTENSITY
+
+        self.illuminance = lux
+        self.intensity_mode = 'lux'
+        self.intensity = max(lux * ILLUMINANCE_TO_INTENSITY, 0.0)

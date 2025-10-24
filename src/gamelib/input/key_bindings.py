@@ -98,6 +98,11 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.F7] = InputCommand.SYSTEM_CYCLE_AA_MODE # F7
         self.keyboard_bindings[self.keys.F8] = InputCommand.SYSTEM_TOGGLE_MSAA   # F8
         self.keyboard_bindings[self.keys.F9] = InputCommand.SYSTEM_TOGGLE_SMAA   # F9
+        self.keyboard_bindings[self.keys.PAGE_UP] = InputCommand.SYSTEM_EXPOSURE_INCREASE
+        self.keyboard_bindings[self.keys.PAGE_DOWN] = InputCommand.SYSTEM_EXPOSURE_DECREASE
+        self.keyboard_bindings[self.keys.HOME] = InputCommand.SYSTEM_EXPOSURE_RESET
+        self.keyboard_bindings[self.keys.END] = InputCommand.SYSTEM_TOGGLE_AUTO_EXPOSURE
+        self.keyboard_bindings[self.keys.F10] = InputCommand.SYSTEM_PRINT_LIGHT_INFO
 
         # ====================================================================
         # Mouse Bindings (Future - examples)

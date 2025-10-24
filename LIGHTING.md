@@ -18,5 +18,5 @@ Suggested Next Steps
 
 - [x] Finalize light data model: extend Light with type-specific parameters (direction, cone angles, range, attenuation) and plumb them through the renderer/shaders.
 - [ ] Rework shadow subsystem: add perspective shadow matrices for spots, cube-map generation path for points, and cascaded shadow mapping for directional lights.
-- [ ] Introduce physically based lighting units/HDR pipeline so bloom/exposure respond correctly and artists can rely on real-world intensities.
+- [x] Introduce physically based lighting units/HDR pipeline so bloom/exposure respond correctly and artists can rely on real-world intensities. *(Lights now accept lumens/lux, deferred pipeline renders into an HDR buffer with ACES/Reinhard/Uncharted tone mapping and manual exposure control.)*
 - [ ] Plan for IBL/reflection probes and volumetrics to close the gap between current direct-light-only look and modern AAA scene lighting.

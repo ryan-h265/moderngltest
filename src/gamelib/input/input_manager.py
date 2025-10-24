@@ -92,7 +92,7 @@ class InputManager:
         # Get command for this key
         command = self.key_bindings.get_command(key, is_mouse=False)
 
-        print(f"Key pressed in InputManager: {key}, command: {command}")
+        # print(f"Key pressed in InputManager: {key}, command: {command}")
 
 
         if command is None:

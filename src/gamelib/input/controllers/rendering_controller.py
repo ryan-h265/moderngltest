@@ -60,6 +60,26 @@ class RenderingController:
             InputCommand.SYSTEM_TOGGLE_SMAA,
             self.toggle_smaa
         )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_EXPOSURE_INCREASE,
+            lambda dt=0.0: self.change_exposure(1.0)
+        )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_EXPOSURE_DECREASE,
+            lambda dt=0.0: self.change_exposure(-1.0)
+        )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_EXPOSURE_RESET,
+            self.reset_exposure
+        )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_TOGGLE_AUTO_EXPOSURE,
+            self.toggle_auto_exposure
+        )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_PRINT_LIGHT_INFO,
+            self.print_light_info
+        )
 
     def toggle_ssao(self, delta_time: float = 0.0):
         """
@@ -114,3 +134,45 @@ class RenderingController:
             delta_time: Time since last frame (unused, for handler compatibility)
         """
         self.render_pipeline.toggle_smaa()
+
+    # ------------------------------------------------------------------
+    # HDR Exposure controls
+    # ------------------------------------------------------------------
+
+    def change_exposure(self, ev_delta: float):
+        """Adjust exposure by delta EV (stops).
+
+        Positive values brighten, negative values darken.
+        """
+        if self.render_pipeline.adjust_exposure(ev_delta):
+            exposure = self.render_pipeline.get_exposure()
+            print(f"Exposure adjusted to {exposure:.3f}")
+
+    def reset_exposure(self, delta_time: float = 0.0):
+        if self.render_pipeline.reset_exposure():
+            exposure = self.render_pipeline.get_exposure()
+            print(f"Exposure reset to {exposure:.3f}")
+
+    def toggle_auto_exposure(self, delta_time: float = 0.0):
+        enabled = self.render_pipeline.toggle_auto_exposure()
+        state = "ON" if enabled else "OFF"
+        print(f"Auto exposure {state}")
+
+    def print_light_info(self, delta_time: float = 0.0):
+        lights = self.render_pipeline.get_last_lights()
+        if not lights:
+            print("No lights available.")
+            return
+
+        print("--- Light Debug ---")
+        for idx, light in enumerate(lights):
+            mode = getattr(light, 'intensity_mode', 'multiplier')
+            illuminance = getattr(light, 'illuminance', None)
+            luminous_flux = getattr(light, 'luminous_flux', None)
+            position = tuple(float(val) for val in light.position)
+            direction = tuple(float(val) for val in light.get_direction())
+            print(
+                f"Light {idx}: type={light.light_type} intensity={light.intensity:.3f} "
+                f"mode={mode} lux={illuminance} lumens={luminous_flux} range={light.range} casts={light.cast_shadows}"
+            )
+            print(f"           position={position} direction={direction}")

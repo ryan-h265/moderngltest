@@ -286,6 +286,7 @@ class LightingRenderer:
             self.lighting_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
 
         # Set light properties
+        casts_shadow = bool(light.cast_shadows and light.shadow_map is not None)
         if 'light_position' in self.lighting_program:
             self.lighting_program['light_position'].write(light.position.astype('f4').tobytes())
         if 'light_color' in self.lighting_program:
@@ -303,19 +304,36 @@ class LightingRenderer:
             inner_cos, outer_cos = light.get_spot_cosines()
             self.lighting_program['spot_inner_cos'].value = inner_cos
             self.lighting_program['spot_outer_cos'].value = outer_cos
+        if 'light_casts_shadow' in self.lighting_program:
+            self.lighting_program['light_casts_shadow'].value = int(casts_shadow)
 
         # Set shadow map (use higher texture units to avoid G-Buffer conflict)
         # For non-shadow-casting lights, we still need to bind something to avoid shader errors
-        if light.cast_shadows and light.shadow_map is not None:
+        if casts_shadow:
             shadow_texture_unit = 10 + light_index
             light.shadow_map.use(location=shadow_texture_unit)
-            if 'shadow_map' in self.lighting_program:
-                self.lighting_program['shadow_map'].value = shadow_texture_unit
-
-            # Set light matrix for shadow mapping
-            if 'light_matrix' in self.lighting_program:
-                light_matrix = light.get_light_matrix()
-                self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+            if light.light_type == 'point':
+                if 'shadow_cube_map' in self.lighting_program:
+                    self.lighting_program['shadow_cube_map'].value = shadow_texture_unit
+                if 'shadow_map' in self.lighting_program:
+                    self.lighting_program['shadow_map'].value = shadow_texture_unit
+                if 'shadow_far_plane' in self.lighting_program:
+                    far_plane = light.shadow_far_plane if hasattr(light, 'shadow_far_plane') and light.shadow_far_plane is not None else 0.0
+                    self.lighting_program['shadow_far_plane'].value = far_plane
+                if 'light_matrix' in self.lighting_program:
+                    identity = np.eye(4, dtype='f4')
+                    self.lighting_program['light_matrix'].write(identity.tobytes())
+            else:
+                if 'shadow_map' in self.lighting_program:
+                    self.lighting_program['shadow_map'].value = shadow_texture_unit
+                if 'shadow_cube_map' in self.lighting_program:
+                    self.lighting_program['shadow_cube_map'].value = shadow_texture_unit
+                if 'light_matrix' in self.lighting_program:
+                    light_matrix = light.get_light_matrix()
+                    self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+                if 'shadow_far_plane' in self.lighting_program:
+                    far_plane = light.shadow_far_plane if hasattr(light, 'shadow_far_plane') and light.shadow_far_plane is not None else 0.0
+                    self.lighting_program['shadow_far_plane'].value = far_plane
         else:
             # Non-shadow-casting light: bind a dummy texture or use a zero matrix
             # The shader will see shadow factor = 0 (no shadow)
@@ -323,10 +341,13 @@ class LightingRenderer:
                 # Bind first shadow map or create dummy (shader won't use it effectively)
                 shadow_texture_unit = 10
                 if 'light_matrix' in self.lighting_program:
-                    import numpy as np
                     # Identity matrix will cause all shadow tests to fail gracefully
                     identity = np.eye(4, dtype='f4')
                     self.lighting_program['light_matrix'].write(identity.tobytes())
+            if 'shadow_cube_map' in self.lighting_program:
+                self.lighting_program['shadow_cube_map'].value = 10
+            if 'shadow_far_plane' in self.lighting_program:
+                self.lighting_program['shadow_far_plane'].value = 0.0
 
         # Set camera position
         if 'camera_pos' in self.lighting_program:

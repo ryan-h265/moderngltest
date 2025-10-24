@@ -107,3 +107,32 @@ def test_spot_light_cone_cosines():
     inner, outer = light.get_spot_cosines()
     assert inner <= 1.0
     assert outer <= inner
+
+
+def test_photometric_luminous_flux_conversion():
+    """Setting lumens should update intensity with configured conversion."""
+    lumens = 1600.0
+    light = Light(
+        position=Vector3([0.0, 2.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='point',
+        luminous_flux=lumens,
+    )
+
+    from src.gamelib.config.settings import LUMINOUS_FLUX_TO_INTENSITY
+
+    assert light.intensity_mode == 'lumens'
+    assert np.isclose(light.intensity, lumens * LUMINOUS_FLUX_TO_INTENSITY)
+
+
+def test_set_illuminance_updates_intensity():
+    light = Light(
+        position=Vector3([0.0, 10.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='directional'
+    )
+
+    light.set_illuminance(10000.0)
+    from src.gamelib.config.settings import ILLUMINANCE_TO_INTENSITY
+    assert light.intensity_mode == 'lux'
+    assert np.isclose(light.intensity, 10000.0 * ILLUMINANCE_TO_INTENSITY)

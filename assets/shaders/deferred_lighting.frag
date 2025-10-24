@@ -24,7 +24,10 @@ uniform float spot_outer_cos;    // Cosine of outer cone angle (spot)
 
 // Shadow map for this light
 uniform sampler2D shadow_map;
+uniform samplerCube shadow_cube_map;
 uniform mat4 light_matrix;
+uniform float shadow_far_plane;
+uniform bool light_casts_shadow;
 
 // Camera
 uniform vec3 camera_pos;
@@ -40,6 +43,41 @@ out vec4 f_color;
 * Returns: 0.0 = no shadow, 1.0 = full shadow
 */
 float calculate_shadow(vec3 position){
+    if (!light_casts_shadow) {
+        return 0.0;
+    }
+
+    if (light_type == 1) {
+        if (shadow_far_plane <= 0.0) {
+            return 0.0;
+        }
+
+        vec3 frag_to_light = position - light_position;
+        float current_depth = length(frag_to_light);
+        float bias = 0.05;
+
+        float shadow = 0.0;
+        float disk_radius = 0.05;
+        const int sample_count = 20;
+        vec3 sample_offset_directions[20] = vec3[](
+            vec3(1, 1, 1), vec3(-1, 1, 1), vec3(1, -1, 1), vec3(-1, -1, 1),
+            vec3(1, 1, -1), vec3(-1, 1, -1), vec3(1, -1, -1), vec3(-1, -1, -1),
+            vec3(1, 0, 0), vec3(-1, 0, 0), vec3(0, 1, 0), vec3(0, -1, 0),
+            vec3(0, 0, 1), vec3(0, 0, -1), vec3(1, 1, 0), vec3(-1, 1, 0),
+            vec3(1, -1, 0), vec3(-1, -1, 0), vec3(1, 0, 1), vec3(-1, 0, 1)
+        );
+
+        for (int i = 0; i < sample_count; ++i) {
+            vec3 sample_vec = frag_to_light + sample_offset_directions[i] * disk_radius;
+            float closest_depth = texture(shadow_cube_map, sample_vec).r * shadow_far_plane;
+            if (current_depth - bias > closest_depth) {
+                shadow += 1.0;
+            }
+        }
+
+        return shadow / float(sample_count);
+    }
+
     // Transform position to light space
     vec4 light_space_pos=light_matrix*vec4(position,1.);
     

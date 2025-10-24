@@ -20,9 +20,13 @@ from .text_manager import TextManager
 from .ui_renderer import UIRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from .bloom_renderer import BloomRenderer
+from .hdr_buffer import HDRFramebuffer
+from .tonemap_renderer import ToneMappingRenderer
+from .light_debug_renderer import LightDebugRenderer
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
+from ..config import settings
 from ..config.settings import (
     RENDERING_MODE,
     WINDOW_SIZE,
@@ -89,6 +93,9 @@ class RenderPipeline:
 
         # Anti-aliasing shaders
         self.shader_manager.load_program("fxaa", "fxaa.vert", "fxaa.frag")
+        if settings.DEBUG_LIGHT_GIZMOS_ENABLED:
+            self.shader_manager.load_program("light_debug", "light_debug.vert", "light_debug.frag")
+        self.shader_manager.load_program("tonemap", "tonemap.vert", "tonemap.frag")
         
         # SMAA shaders (optional - handle gracefully if they don't exist)
         try:
@@ -177,6 +184,13 @@ class RenderPipeline:
             smaa_neighborhood
         )
 
+        self.hdr_buffer = None
+        self.tonemap_renderer = None
+        if settings.HDR_RENDERING_ENABLED:
+            self.hdr_buffer = HDRFramebuffer(ctx, WINDOW_SIZE, settings.HDR_COLOR_FORMAT)
+            self.tonemap_renderer = ToneMappingRenderer(ctx, self.shader_manager.get("tonemap"))
+            self.aa_renderer.set_hdr_mode(True)
+
         # Create UI rendering system
         self.shader_manager.load_program("ui_text", "ui_text.vert", "ui_text.frag")
         font_path = str(PROJECT_ROOT / UI_FONT_PATH)
@@ -186,6 +200,15 @@ class RenderPipeline:
             self.shader_manager.get("ui_text"),
         )
         self.viewport_size: Tuple[int, int] = tuple(self.window.size)
+        self._last_lights: List[Light] = []
+        self._snapshot_lights()
+
+        self.light_debug_renderer: LightDebugRenderer = None
+        if settings.DEBUG_LIGHT_GIZMOS_ENABLED:
+            try:
+                self.light_debug_renderer = LightDebugRenderer(ctx, self.shader_manager.get("light_debug"))
+            except Exception as exc:
+                print(f"Warning: could not initialize light debug renderer: {exc}")
 
     def initialize_lights(self, lights: List[Light], camera: Camera = None):
         """
@@ -221,6 +244,8 @@ class RenderPipeline:
             lights: List of lights
         """
         # Pass 1: Render shadow maps for all lights (both modes)
+        self._last_lights = list(lights)
+        self._snapshot_lights()
         self.shadow_renderer.render_shadow_maps(lights, scene)
 
         # Pass 2+: Render scene (mode-dependent)
@@ -229,9 +254,28 @@ class RenderPipeline:
         else:
             self._render_forward(scene, camera, lights)
 
+        if self.light_debug_renderer is not None:
+            self.light_debug_renderer.render(self._last_lights, camera, self.ctx.screen, self.window.viewport)
+
         # Final pass: Render UI overlay
         if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
             self.ui_renderer.render(self.text_manager, self.window.size)
+
+    def _snapshot_lights(self) -> None:
+        if not settings.DEBUG_LIGHT_GIZMOS_ENABLED:
+            return
+        snapshot = []
+        for light in self._last_lights:
+            direction = light.get_direction()
+            snapshot.append({
+                'type': light.light_type,
+                'position': [float(light.position.x), float(light.position.y), float(light.position.z)],
+                'direction': [float(direction.x), float(direction.y), float(direction.z)],
+                'range': float(light.range),
+                'color': [float(light.color.x), float(light.color.y), float(light.color.z)],
+                'casts': bool(light.cast_shadows),
+            })
+        settings.LAST_LIGHT_SNAPSHOT = snapshot
 
     def resize(self, size: Tuple[int, int]):
         """Resize internal render targets and update cached viewport size."""
@@ -255,6 +299,9 @@ class RenderPipeline:
 
         self.aa_renderer.resize(self.viewport_size)
 
+        if self.hdr_buffer is not None:
+            self.hdr_buffer.resize(self.viewport_size)
+
         if hasattr(self.transparent_renderer, "resize"):
             self.transparent_renderer.resize(self.viewport_size)
 
@@ -273,17 +320,29 @@ class RenderPipeline:
             camera: Camera for view
             lights: List of lights
         """
-        # Get AA render target
         render_target = self.aa_renderer.get_render_target()
-        
-        # Check if AA is enabled
-        if render_target == self.ctx.screen:
-            # No AA - render directly to screen (original behavior)
-            self.main_renderer.render(scene, camera, lights, self.window.viewport)
+        hdr_enabled = settings.HDR_RENDERING_ENABLED and self.hdr_buffer is not None and self.tonemap_renderer is not None
+
+        lighting_target = self.hdr_buffer.fbo if hdr_enabled else render_target
+        if hdr_enabled:
+            lighting_target.use()
+            lighting_target.clear(0.0, 0.0, 0.0, 0.0)
+
+        self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, lighting_target)
+
+        if hdr_enabled:
+            tonemap_target = render_target if render_target != self.ctx.screen else self.ctx.screen
+            self.tonemap_renderer.apply(
+                self.hdr_buffer.color_texture,
+                tonemap_target,
+                self.window.viewport,
+            )
+
+            if tonemap_target != self.ctx.screen:
+                self.aa_renderer.resolve_and_present()
         else:
-            # AA enabled - render to AA framebuffer then resolve
-            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target)
-            self.aa_renderer.resolve_and_present()
+            if render_target != self.ctx.screen:
+                self.aa_renderer.resolve_and_present()
 
     def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light]):
         """
@@ -299,8 +358,6 @@ class RenderPipeline:
 
         # Pass 2.5: SSAO pass (optional, if enabled)
         ssao_texture = None
-        # Import settings dynamically to get current runtime value
-        from ..config import settings
         if self.ssao_renderer is not None and settings.SSAO_ENABLED:
             aspect_ratio = self.window.size[0] / self.window.size[1]
             self.ssao_renderer.render(
@@ -313,84 +370,70 @@ class RenderPipeline:
             )
             ssao_texture = self.ssao_renderer.get_ssao_texture()
 
-        # Get AA render target
+        # Get AA render target (may be screen when AA disabled)
         render_target = self.aa_renderer.get_render_target()
+        hdr_enabled = settings.HDR_RENDERING_ENABLED and self.hdr_buffer is not None and self.tonemap_renderer is not None
 
-        # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
-        if render_target == self.ctx.screen:
-            # No AA - render directly to screen (original behavior)
-            apply_post_lighting = None
-            if self.bloom_renderer:
-                target_fbo = self.ctx.screen
+        lighting_target = self.hdr_buffer.fbo if hdr_enabled else render_target
+        if hdr_enabled:
+            lighting_target.use()
+            lighting_target.clear(0.0, 0.0, 0.0, 0.0)
 
+        bloom_target = lighting_target if hdr_enabled else (render_target if render_target != self.ctx.screen else self.ctx.screen)
+
+        apply_post_lighting = None
+        if self.bloom_renderer:
+            if hdr_enabled:
+                def _apply_post_lighting():
+                    self.bloom_renderer.apply(
+                        self.hdr_buffer.color_texture,
+                        self.window.viewport,
+                        bloom_target,
+                    )
+            else:
                 def _apply_post_lighting():
                     self.bloom_renderer.apply(
                         self.gbuffer.emissive_texture,
                         self.window.viewport,
-                        target_fbo,
+                        bloom_target,
                     )
 
-                apply_post_lighting = _apply_post_lighting
+            apply_post_lighting = _apply_post_lighting
 
-            self.lighting_renderer.render(
-                lights,
-                self.gbuffer,
+        self.lighting_renderer.render_to_target(
+            lights,
+            self.gbuffer,
+            camera,
+            self.window.viewport,
+            lighting_target,
+            ssao_texture=ssao_texture,
+            apply_post_lighting=apply_post_lighting,
+        )
+
+        if scene.has_transparent_objects():
+            shadow_maps = [light.shadow_map for light in lights]
+            self.transparent_renderer.render(
+                scene,
                 camera,
-                self.window.viewport,
-                ssao_texture=ssao_texture,
-                apply_post_lighting=apply_post_lighting,
+                lights,
+                lighting_target,
+                shadow_maps,
+                self.window.size
             )
 
-            # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
-            if scene.has_transparent_objects():
-                shadow_maps = [light.shadow_map for light in lights]
-                self.transparent_renderer.render(
-                    scene,
-                    camera,
-                    lights,
-                    self.ctx.screen,
-                    shadow_maps,
-                    self.window.size
-                )
+        if hdr_enabled:
+            tonemap_target = render_target if render_target != self.ctx.screen else self.ctx.screen
+            self.tonemap_renderer.apply(
+                self.hdr_buffer.color_texture,
+                tonemap_target,
+                self.window.viewport,
+            )
+
+            if tonemap_target != self.ctx.screen:
+                self.aa_renderer.resolve_and_present()
         else:
-            # AA enabled - render to AA framebuffer then resolve
-            apply_post_lighting = None
-            if self.bloom_renderer:
-                target_fbo = render_target
-
-                def _apply_post_lighting():
-                    self.bloom_renderer.apply(
-                        self.gbuffer.emissive_texture,
-                        self.window.viewport,
-                        target_fbo,
-                    )
-
-                apply_post_lighting = _apply_post_lighting
-
-            self.lighting_renderer.render_to_target(
-                lights,
-                self.gbuffer,
-                camera,
-                self.window.viewport,
-                render_target,
-                ssao_texture=ssao_texture,
-                apply_post_lighting=apply_post_lighting,
-            )
-
-            # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
-            # Render into AA buffer before resolving
-            if scene.has_transparent_objects():
-                shadow_maps = [light.shadow_map for light in lights]
-                self.transparent_renderer.render(
-                    scene,
-                    camera,
-                    lights,
-                    render_target,
-                    shadow_maps,
-                    self.window.size
-                )
-
-            self.aa_renderer.resolve_and_present()
+            if render_target != self.ctx.screen:
+                self.aa_renderer.resolve_and_present()
 
     def get_shader(self, name: str) -> moderngl.Program:
         """
@@ -403,6 +446,50 @@ class RenderPipeline:
             Shader program
         """
         return self.shader_manager.get(name)
+
+    def set_exposure(self, exposure: float) -> bool:
+        """Set manual exposure for the HDR pipeline."""
+        if not self.tonemap_renderer:
+            return False
+        self.tonemap_renderer.set_exposure(exposure)
+        self.tonemap_renderer.auto_enabled = False
+        return True
+
+    def enable_auto_exposure(self, enabled: bool) -> bool:
+        """Enable/disable auto exposure."""
+        if not self.tonemap_renderer:
+            return False
+        self.tonemap_renderer.auto_enabled = enabled
+        return True
+
+    def adjust_exposure(self, ev_delta: float) -> bool:
+        if not self.tonemap_renderer:
+            return False
+        current = self.tonemap_renderer.exposure
+        factor = pow(2.0, ev_delta)
+        self.set_exposure(current * factor)
+        return True
+
+    def reset_exposure(self) -> bool:
+        if not self.tonemap_renderer:
+            return False
+        self.set_exposure(settings.HDR_DEFAULT_EXPOSURE)
+        return True
+
+    def toggle_auto_exposure(self) -> bool:
+        if not self.tonemap_renderer:
+            return False
+        new_state = not self.tonemap_renderer.auto_enabled
+        self.tonemap_renderer.auto_enabled = new_state
+        return new_state
+
+    def get_exposure(self) -> float:
+        if self.tonemap_renderer:
+            return self.tonemap_renderer.exposure
+        return 1.0
+
+    def get_last_lights(self) -> List[Light]:
+        return list(self._last_lights)
 
     def cycle_aa_mode(self):
         """Cycle to the next anti-aliasing mode"""

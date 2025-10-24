@@ -112,6 +112,11 @@ class InputCommand(Enum):
     SYSTEM_TOGGLE_FXAA = auto()      # Toggle FXAA on/off
     SYSTEM_TOGGLE_SMAA = auto()      # Toggle SMAA on/off
     SYSTEM_CYCLE_AA_MODE = auto()    # Cycle through AA modes
+    SYSTEM_EXPOSURE_INCREASE = auto()
+    SYSTEM_EXPOSURE_DECREASE = auto()
+    SYSTEM_EXPOSURE_RESET = auto()
+    SYSTEM_TOGGLE_AUTO_EXPOSURE = auto()
+    SYSTEM_PRINT_LIGHT_INFO = auto()
     SYSTEM_QUICK_SAVE = auto()
     SYSTEM_QUICK_LOAD = auto()
     SYSTEM_PAUSE = auto()
@@ -167,6 +172,11 @@ COMMAND_TYPES = {
     InputCommand.SYSTEM_TOGGLE_FXAA: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_SMAA: InputType.INSTANT,
     InputCommand.SYSTEM_CYCLE_AA_MODE: InputType.INSTANT,
+    InputCommand.SYSTEM_EXPOSURE_INCREASE: InputType.INSTANT,
+    InputCommand.SYSTEM_EXPOSURE_DECREASE: InputType.INSTANT,
+    InputCommand.SYSTEM_EXPOSURE_RESET: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_AUTO_EXPOSURE: InputType.INSTANT,
+    InputCommand.SYSTEM_PRINT_LIGHT_INFO: InputType.INSTANT,
 
     # Toggle (on/off state)
     InputCommand.GAME_CROUCH: InputType.TOGGLE,
