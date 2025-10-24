@@ -44,6 +44,9 @@ class Joint:
         # World transform (absolute, computed from hierarchy)
         self.world_transform = Matrix44.identity()
 
+        # Optional transform from non-joint parents (used for root joints)
+        self.root_parent_transform = Matrix44.identity()
+
         # Animated transform (overrides local_transform during animation)
         self.animated_transform: Optional[Matrix44] = None
 
@@ -126,7 +129,8 @@ class Skeleton:
         Call this after updating animated transforms.
         """
         for root in self.root_joints:
-            self._update_joint_recursive(root, Matrix44.identity())
+            parent_world = root.root_parent_transform if hasattr(root, 'root_parent_transform') else Matrix44.identity()
+            self._update_joint_recursive(root, parent_world)
 
     def _update_joint_recursive(self, joint: Joint, parent_world: Matrix44):
         """

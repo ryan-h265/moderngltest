@@ -5,6 +5,7 @@ Handles scene objects and rendering.
 """
 
 from typing import Dict, List, Tuple, Optional
+import numpy as np
 from pyrr import Matrix44, Vector3
 from moderngl_window import geometry
 from . import geometry_utils
@@ -115,7 +116,7 @@ class Scene:
                     print(f"Loading GLTF model: {lantern_path}")
                     lantern = loader.load(str(lantern_path))
                     lantern.position = Vector3([0.0, 2.0, 0.0])  # Center, slightly elevated
-                    lantern.scale = Vector3([0.05, 0.05, 0.05])  # Make it bigger so we can see it
+                    lantern.scale = Vector3([0.05, 0.05, 0.05])
                     lantern.rotation = Vector3([0.0, 0.0, 0.0])
                     # Play first animation if available
                     if lantern.animations:
@@ -150,20 +151,20 @@ class Scene:
                 #     self.add_object(rigged_simple)
                 #     models_loaded += 1
 
-                animated_cube_path = PROJECT_ROOT / "assets/models/props/animatedcube/AnimatedCube.gltf"
-                if animated_cube_path.exists():
-                    print(f"Loading GLTF model: {animated_cube_path}")
-                    animated_cube = loader.load(str(animated_cube_path))
-                    animated_cube.position = Vector3([2.0, 3.0, 2.0])
-                    animated_cube.scale = Vector3([1.0, 1.0, 1.0])
-                    animated_cube.rotation = Vector3([0.0, 0.0, 0.0])
-                    # Play first animation if available
-                    if animated_cube.animations:
-                        first_anim_name = list(animated_cube.animations.keys())[0]
-                        animated_cube.play_animation(first_anim_name, loop=True)
-                        print(f"  Playing animation: {first_anim_name}")
-                    self.add_object(animated_cube)
-                    models_loaded += 1
+                # animated_cube_path = PROJECT_ROOT / "assets/models/props/animatedcube/AnimatedCube.gltf"
+                # if animated_cube_path.exists():
+                #     print(f"Loading GLTF model: {animated_cube_path}")
+                #     animated_cube = loader.load(str(animated_cube_path))
+                #     animated_cube.position = Vector3([2.0, 3.0, 2.0])
+                #     animated_cube.scale = Vector3([1.0, 1.0, 1.0])
+                #     animated_cube.rotation = Vector3([0.0, 0.0, 0.0])
+                #     # Play first animation if available
+                #     if animated_cube.animations:
+                #         first_anim_name = list(animated_cube.animations.keys())[0]
+                #         animated_cube.play_animation(first_anim_name, loop=True)
+                #         print(f"  Playing animation: {first_anim_name}")
+                #     self.add_object(animated_cube)
+                #     models_loaded += 1
 
                 # glasses_path = PROJECT_ROOT / "assets/models/props/glasses/scene.gltf"
                 # if glasses_path.exists():
@@ -361,17 +362,13 @@ class Scene:
                             active_program = textured_skinned_program
 
                             # Upload joint matrices for skinning
-                            if mesh.skin is not None:
+                            if mesh.skin is not None and 'jointMatrices' in active_program:
                                 joint_matrices = mesh.skin.get_joint_matrices_array()
-                                if len(joint_matrices) > 0:
-                                    # Upload each joint matrix individually
-                                    # ModernGL requires array uniforms to be uploaded element by element
-                                    for i, matrix in enumerate(joint_matrices):
-                                        if i >= 128:
-                                            break
-                                        uniform_name = f'jointMatrices[{i}]'
-                                        if uniform_name in active_program:
-                                            active_program[uniform_name].write(matrix.astype('f4').tobytes())
+                                if joint_matrices.size > 0:
+                                    max_joints = min(joint_matrices.shape[0], 128)
+                                    identity_stack = np.repeat(np.eye(4, dtype='f4')[None, :, :], 128, axis=0)
+                                    identity_stack[:max_joints] = joint_matrices[:max_joints]
+                                    active_program['jointMatrices'].write(identity_stack.tobytes())
                         elif mesh.material.unlit and unlit_program is not None:
                             # Use unlit shader for materials marked as unlit (KHR_materials_unlit)
                             active_program = unlit_program

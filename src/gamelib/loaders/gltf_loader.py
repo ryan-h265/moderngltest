@@ -923,6 +923,46 @@ class GltfLoader:
 
         return float(max_radius) if max_radius > 0 else 1.0
 
+    def _compute_node_world_transforms(self, gltf: pygltflib.GLTF2) -> Dict[int, Matrix44]:
+        """
+        Compute world transforms for all nodes, including non-joint ancestors.
+
+        Args:
+            gltf: GLTF data
+
+        Returns:
+            Dictionary mapping node index to world transform (Matrix44)
+        """
+        node_world: Dict[int, Matrix44] = {}
+
+        def traverse(node_idx: int, parent_transform: Matrix44):
+            node = gltf.nodes[node_idx]
+            local_transform = self._get_node_transform(node)
+            world_transform = local_transform @ parent_transform
+            node_world[node_idx] = world_transform
+            if node.children:
+                for child_idx in node.children:
+                    traverse(child_idx, world_transform)
+
+        if gltf.scenes:
+            scene_indices = []
+            if gltf.scene is not None and gltf.scene < len(gltf.scenes):
+                scene_indices = [gltf.scene]
+            else:
+                scene_indices = list(range(len(gltf.scenes)))
+
+            for scene_idx in scene_indices:
+                scene = gltf.scenes[scene_idx]
+                for node_idx in scene.nodes:
+                    traverse(node_idx, Matrix44.identity())
+        else:
+            # Fallback: traverse any nodes not already visited
+            for node_idx in range(len(gltf.nodes)):
+                if node_idx not in node_world:
+                    traverse(node_idx, Matrix44.identity())
+
+        return node_world
+
     def _calculate_node_bounding_radius(self, gltf: pygltflib.GLTF2, node_idx: int, parent_transform: 'Matrix44') -> float:
         """
         Recursively calculate bounding radius for a node and its children.
@@ -1020,6 +1060,16 @@ class GltfLoader:
         """
         skeleton = Skeleton()
 
+        # Precompute world transforms for all nodes (including non-joint ancestors)
+        node_world_transforms = self._compute_node_world_transforms(gltf)
+
+        # Build parent map for nodes
+        parent_map: Dict[int, int] = {}
+        for idx, node in enumerate(gltf.nodes):
+            if node.children:
+                for child_idx in node.children:
+                    parent_map[child_idx] = idx
+
         # GLTF stores joints as indices into the nodes array
         # We need to build the skeleton from all joints referenced by skins
         joint_indices = set()
@@ -1063,6 +1113,17 @@ class GltfLoader:
 
         # Rebuild root joints list now that hierarchy is set up
         skeleton.root_joints = [j for j in skeleton.joints if j.parent is None]
+
+        # Assign root parent transforms (non-joint ancestors) for root joints
+        for joint_idx, joint in joint_map.items():
+            if joint.parent is not None:
+                continue
+
+            parent_idx = parent_map.get(joint_idx)
+            root_parent_transform = Matrix44.identity()
+            if parent_idx is not None and parent_idx not in joint_map:
+                root_parent_transform = node_world_transforms.get(parent_idx, Matrix44.identity())
+            joint.root_parent_transform = root_parent_transform
         
         # Initialize world transforms from bind pose
         skeleton.update_world_transforms()
