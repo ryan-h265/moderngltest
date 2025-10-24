@@ -13,7 +13,7 @@ from src.gamelib import (
     # Configuration
     WINDOW_SIZE, ASPECT_RATIO, GL_VERSION, WINDOW_TITLE, RESIZABLE,
     # Core
-    Camera, Light, Scene,
+    Camera, SceneManager,
     # Rendering
     RenderPipeline,
 )
@@ -70,15 +70,12 @@ class Game(mglw.WindowConfig):
         # Setup rendering controller for SSAO toggle, etc.
         self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
-        # Create scene (pass context for GLTF model loading)
-        self.scene = Scene(ctx=self.ctx)
-        self.scene.create_default_scene()
-
-        # Create lights
-        self.lights = self._create_lights()
-
-        # Initialize shadow maps for lights (with camera for adaptive resolution)
-        self.render_pipeline.initialize_lights(self.lights, self.camera)
+        # Scene management (JSON-driven scenes)
+        self.scene_manager = SceneManager(self.ctx, self.render_pipeline)
+        self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
+        loaded_scene = self.scene_manager.load("default", camera=self.camera)
+        self.scene = loaded_scene.scene
+        self.lights = loaded_scene.lights
 
         # Setup debug overlay
         if DEBUG_OVERLAY_ENABLED:
@@ -88,56 +85,6 @@ class Game(mglw.WindowConfig):
 
         # Time tracking
         self.time = 0
-
-    def _create_light(self, color: Vector3, intensity: float = 1.0, angle: float = 0.0, height: float = 60.0) -> Light:
-        """
-        Create a single light at a given angle.
-
-        Args:
-            angle: Angle in radians
-
-        Returns:
-            Light object
-        """
-        import math
-
-        radius = 30.0
-
-        # Position on circle
-        x = radius * math.cos(angle)
-        z = radius * math.sin(angle)
-
-        # Normalize color
-        color = color / max(color)
-
-        # Create light
-        light = Light(
-            position=Vector3([x, height, z]),
-            target=Vector3([0.0, 0.0, 0.0]),
-            color=color,
-            intensity=intensity,
-            light_type='directional',
-        )
-
-        return light
-
-    def _create_lights(self):
-        """
-        Create the default multi-light setup.
-
-        With deferred rendering, we can have many lights!
-        This creates 10 lights arranged in a circle around the scene.
-
-        Returns:
-            List of Light objects
-        """
-        lights = []
-        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=3.5, angle=90.0, height=10.0))
-        # lights.append(self._create_light(Vector3([1.0, 0.0, 0.0]), intensity=1.5, angle=0.0, height=10.0))
-        # lights.append(self._create_light(Vector3([0.0, 1.0, 0.0]), intensity=1.5, angle=135.0, height=10.0))
-        # lights.append(self._create_light(Vector3([0.0, 0.0, 1.0]), intensity=1.5, angle=270.0, height=10.0))
-
-        return lights
 
     def on_update(self, time, frametime):
         """
