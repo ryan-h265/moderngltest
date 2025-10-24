@@ -46,8 +46,19 @@ void main() {
             vec3 dir = normalize(view_dir.xyz / view_dir.w);
             vec3 world_dir = mat3(inverse_view) * dir;
             vec3 rotated_dir = mat3(skybox_rotation) * world_dir;
-            vec3 sky_color = texture(skybox_texture, rotated_dir).rgb * skybox_intensity;
-            f_color = vec4(sky_color, 1.0);
+
+            // DEBUG: Rainbow skybox based on direction
+            // Map x, y, z from [-1, 1] to [0, 1] for RGB
+            vec3 rainbow = vec3(
+                rotated_dir.x * 0.5 + 0.5,  // Red channel
+                rotated_dir.y * 0.5 + 0.5,  // Green channel
+                rotated_dir.z * 0.5 + 0.5   // Blue channel
+            );
+            f_color = vec4(rainbow * skybox_intensity, 1.0);
+
+            // Original skybox texture sampling (commented out for debugging):
+            // vec3 sky_color = texture(skybox_texture, rotated_dir).rgb * skybox_intensity;
+            // f_color = vec4(sky_color, 1.0);
         } else {
             f_color = vec4(0.1, 0.1, 0.15, 1.0);
         }

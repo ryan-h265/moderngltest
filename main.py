@@ -17,6 +17,7 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
 )
+from src.gamelib.core.skybox import Skybox
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
@@ -73,6 +74,11 @@ class Game(mglw.WindowConfig):
         # Create scene (pass context for GLTF model loading)
         self.scene = Scene(ctx=self.ctx)
         self.scene.create_default_scene()
+
+        # Create and set skybox (for debugging with rainbow colors)
+        skybox = Skybox.solid_color(self.ctx, color=(1.0, 0.5, 0.5), name="Debug Skybox")
+        skybox.intensity = 1.0
+        self.scene.set_skybox(skybox)
 
         # Create lights
         self.lights = self._create_lights()

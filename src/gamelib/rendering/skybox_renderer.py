@@ -17,7 +17,7 @@ class SkyboxRenderer:
     def __init__(self, ctx: moderngl.Context, program: moderngl.Program):
         self.ctx = ctx
         self.program = program
-        self.cube = geometry.cube(size=2.0)
+        self.cube = geometry.cube(size=(2.0, 2.0, 2.0))
 
     def render(
         self,
