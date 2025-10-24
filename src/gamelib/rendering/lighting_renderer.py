@@ -98,7 +98,8 @@ class LightingRenderer:
         gbuffer: GBuffer,
         camera: Camera,
         viewport: tuple,
-        ssao_texture: moderngl.Texture = None
+        ssao_texture: moderngl.Texture = None,
+        apply_post_lighting=None,
     ):
         """
         Render all lighting to the screen.
@@ -109,8 +110,18 @@ class LightingRenderer:
             camera: Camera for view position
             viewport: Viewport tuple (x, y, width, height)
             ssao_texture: Optional SSAO texture
+            apply_post_lighting: Optional callback executed after emissive pass
+                while additive blending is still enabled (used for bloom)
         """
-        self.render_to_target(lights, gbuffer, camera, viewport, self.ctx.screen, ssao_texture)
+        self.render_to_target(
+            lights,
+            gbuffer,
+            camera,
+            viewport,
+            self.ctx.screen,
+            ssao_texture,
+            apply_post_lighting=apply_post_lighting,
+        )
 
     def render_to_target(
         self,
@@ -119,7 +130,8 @@ class LightingRenderer:
         camera: Camera,
         viewport: tuple,
         target: moderngl.Framebuffer,
-        ssao_texture: moderngl.Texture = None
+        ssao_texture: moderngl.Texture = None,
+        apply_post_lighting=None,
     ):
         """
         Render all lighting to a specific target.
@@ -131,6 +143,8 @@ class LightingRenderer:
             viewport: Viewport tuple (x, y, width, height)
             target: Target framebuffer
             ssao_texture: Optional SSAO texture
+            apply_post_lighting: Optional callback executed after emissive pass
+                while additive blending is still enabled (used for bloom)
         """
         # Use target framebuffer
         target.use()
@@ -163,6 +177,9 @@ class LightingRenderer:
 
         # Step 4: Add emissive contribution (additive blending still enabled)
         self._render_emissive(gbuffer)
+
+        if apply_post_lighting is not None:
+            apply_post_lighting()
 
         # Restore blending state
         self.ctx.disable(moderngl.BLEND)

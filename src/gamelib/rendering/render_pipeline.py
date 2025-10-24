@@ -19,6 +19,7 @@ from .transparent_renderer import TransparentRenderer
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
+from .bloom_renderer import BloomRenderer
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
@@ -30,7 +31,8 @@ from ..config.settings import (
     UI_FONT_PATH,
     UI_FONT_SIZE,
     DEBUG_OVERLAY_ENABLED,
-    PROJECT_ROOT
+    PROJECT_ROOT,
+    BLOOM_ENABLED,
 )
 
 
@@ -131,6 +133,21 @@ class RenderPipeline:
             self.shader_manager.get("ssao"),
             self.shader_manager.get("ssao_blur")
         ) if SSAO_ENABLED else None
+
+        # Bloom (emissive glow) post-process
+        if BLOOM_ENABLED:
+            self.shader_manager.load_program("bloom_downsample", "deferred_lighting.vert", "bloom_downsample.frag")
+            self.shader_manager.load_program("bloom_upsample", "deferred_lighting.vert", "bloom_upsample.frag")
+            self.shader_manager.load_program("bloom_composite", "deferred_lighting.vert", "bloom_composite.frag")
+            self.bloom_renderer = BloomRenderer(
+                ctx,
+                WINDOW_SIZE,
+                self.shader_manager.get("bloom_downsample"),
+                self.shader_manager.get("bloom_upsample"),
+                self.shader_manager.get("bloom_composite"),
+            )
+        else:
+            self.bloom_renderer = None
 
         # Create transparent renderer (for alpha BLEND mode)
         self.transparent_renderer = TransparentRenderer(
@@ -269,12 +286,26 @@ class RenderPipeline:
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
         if render_target == self.ctx.screen:
             # No AA - render directly to screen (original behavior)
+            apply_post_lighting = None
+            if self.bloom_renderer:
+                target_fbo = self.ctx.screen
+
+                def _apply_post_lighting():
+                    self.bloom_renderer.apply(
+                        self.gbuffer.emissive_texture,
+                        self.window.viewport,
+                        target_fbo,
+                    )
+
+                apply_post_lighting = _apply_post_lighting
+
             self.lighting_renderer.render(
                 lights,
                 self.gbuffer,
                 camera,
                 self.window.viewport,
-                ssao_texture=ssao_texture
+                ssao_texture=ssao_texture,
+                apply_post_lighting=apply_post_lighting,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
@@ -290,13 +321,27 @@ class RenderPipeline:
                 )
         else:
             # AA enabled - render to AA framebuffer then resolve
+            apply_post_lighting = None
+            if self.bloom_renderer:
+                target_fbo = render_target
+
+                def _apply_post_lighting():
+                    self.bloom_renderer.apply(
+                        self.gbuffer.emissive_texture,
+                        self.window.viewport,
+                        target_fbo,
+                    )
+
+                apply_post_lighting = _apply_post_lighting
+
             self.lighting_renderer.render_to_target(
                 lights,
                 self.gbuffer,
                 camera,
                 self.window.viewport,
                 render_target,
-                ssao_texture=ssao_texture
+                ssao_texture=ssao_texture,
+                apply_post_lighting=apply_post_lighting,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
