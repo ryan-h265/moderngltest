@@ -179,10 +179,22 @@ class Light:
             raise ValueError(f"Unknown light type: {self.light_type}")
 
         # Light view matrix
+        # Calculate forward direction to detect degenerate case
+        forward = self.target - self.position
+        forward_normalized = forward / max(np.linalg.norm(forward), 1e-5)
+
+        # Choose up vector - avoid parallel to forward direction
+        # If forward is parallel to Y-axis (pointing up/down), use X-axis as up
+        default_up = Vector3([0.0, 1.0, 0.0])
+        if abs(forward_normalized.y) > 0.99:  # Nearly vertical (parallel to Y-axis)
+            up_vector = Vector3([1.0, 0.0, 0.0])  # Use X-axis instead
+        else:
+            up_vector = default_up
+
         light_view = Matrix44.look_at(
             self.position,
             self.target,
-            Vector3([0.0, 1.0, 0.0])  # Up vector
+            up_vector
         )
 
         return light_projection * light_view

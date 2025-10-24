@@ -214,7 +214,7 @@ DEFAULT_LIGHT_COLOR = (1.0, 1.0, 1.0)  # White
 # Photometric lighting support
 PHOTOMETRIC_UNITS_ENABLED = True
 LUMINOUS_FLUX_TO_INTENSITY = 0.0795774715  # 1 / (4π)
-ILLUMINANCE_TO_INTENSITY = 0.0072          # Approx Lux -> normalized intensity scale
+ILLUMINANCE_TO_INTENSITY = 0.0001          # Lux -> HDR intensity (calibrated for ACES tone mapping)
 
 # HDR / Tonemapping
 HDR_RENDERING_ENABLED = True
