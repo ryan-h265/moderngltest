@@ -11,11 +11,15 @@ from PIL import Image
 import pygltflib
 import moderngl
 from moderngl_window.opengl.vao import VAO
-from pyrr import Matrix44
+from pyrr import Matrix44, Vector3, Quaternion
 
 from .material import Material
 from .model import Model, Mesh
 from .texture_transform import TextureTransform
+from ..animation import (
+    Skeleton, Joint, Skin, Animation, AnimationChannel,
+    AnimationController, Keyframe, AnimationTarget, InterpolationType
+)
 
 
 class GltfLoader:
@@ -51,8 +55,26 @@ class GltfLoader:
         # Parse materials first (needed for meshes)
         materials = self._parse_materials(gltf, filepath.parent)
 
+        # Load skeleton if present (needed for skins)
+        skeleton = None
+        if gltf.skins:
+            skeleton = self._load_skeleton(gltf)
+            print(f"  Loaded skeleton with {len(skeleton.joints)} joints")
+
         # Parse node hierarchy and extract meshes with transforms
         meshes = self._parse_scene_hierarchy(gltf, materials)
+
+        # Load skins if present
+        skins = []
+        if gltf.skins and skeleton:
+            skins = self._load_skins(gltf, skeleton, meshes)
+            print(f"  Loaded {len(skins)} skins")
+
+        # Load animations if present
+        animations = {}
+        if gltf.animations:
+            animations = self._load_animations(gltf, skeleton if skeleton else None)
+            print(f"  Loaded {len(animations)} animations")
 
         # Calculate bounding sphere
         bounding_radius = self._calculate_bounding_radius(gltf)
@@ -63,6 +85,13 @@ class GltfLoader:
             name=filepath.stem,
         )
         model.bounding_radius = bounding_radius
+        model.skeleton = skeleton
+        model.skins = skins
+        model.animations = animations
+
+        # Create animation controller if there are animations
+        if animations and skeleton:
+            model.animation_controller = AnimationController(skeleton)
 
         print(f"  Loaded {len(meshes)} meshes, bounding radius: {bounding_radius:.2f}")
 
@@ -115,7 +144,7 @@ class GltfLoader:
         local_transform = self._get_node_transform(node)
 
         # Accumulate with parent transform
-        world_transform = parent_transform @ local_transform
+        world_transform = local_transform @ parent_transform
 
         # If this node has a mesh, create Mesh objects for each primitive
         if node.mesh is not None:
@@ -139,9 +168,32 @@ class GltfLoader:
                 vao = self._create_vao(vertex_data)
 
                 # Create mesh with world transform from node hierarchy
-                mesh = Mesh(vao=vao, material=material, name=mesh_name,
-                           local_transform=world_transform)
+                node_name = node.name if node.name else f"Node_{node_idx}"
+                mesh = Mesh(
+                    vao=vao,
+                    material=material,
+                    local_transform=local_transform,
+                    node_name=node_name,
+                    parent_transform=parent_transform
+                )
                 mesh.vertex_count = vertex_data['count']
+                mesh.mesh_index = node.mesh
+                mesh.node_index = node_idx
+                local_array = np.array(local_transform)
+
+                # Store base TRS components for node animations
+                if node.translation is not None:
+                    mesh.base_translation = Vector3(node.translation)
+                else:
+                    mesh.base_translation = Vector3(local_array[3, :3])
+
+                if node.rotation is not None:
+                    q = node.rotation  # (x, y, z, w)
+                    mesh.base_rotation = Quaternion([q[3], q[0], q[1], q[2]])
+
+                if node.scale is not None:
+                    mesh.base_scale = Vector3(node.scale)
+
                 meshes.append(mesh)
 
                 print(f"  Mesh: {mesh_name}, vertices: {mesh.vertex_count}")
@@ -303,6 +355,16 @@ class GltfLoader:
                     print(f"    Warning: Unexpected color format, ignoring")
                     colors = None
 
+        # Get joint indices (for skinned meshes)
+        joints = None
+        if hasattr(primitive.attributes, 'JOINTS_0') and primitive.attributes.JOINTS_0 is not None:
+            joints = self._get_accessor_data(gltf, primitive.attributes.JOINTS_0)
+
+        # Get joint weights (for skinned meshes)
+        weights = None
+        if hasattr(primitive.attributes, 'WEIGHTS_0') and primitive.attributes.WEIGHTS_0 is not None:
+            weights = self._get_accessor_data(gltf, primitive.attributes.WEIGHTS_0)
+
         # Get indices (optional)
         indices = None
         if primitive.indices is not None:
@@ -314,6 +376,8 @@ class GltfLoader:
             'texcoords': texcoords,
             'tangents': tangents,
             'colors': colors,
+            'joints': joints,
+            'weights': weights,
             'indices': indices,
             'count': vertex_count,
         }
@@ -537,6 +601,8 @@ class GltfLoader:
         texcoords = vertex_data['texcoords']
         tangents = vertex_data['tangents']
         colors = vertex_data.get('colors', None)
+        joints = vertex_data.get('joints', None)
+        weights = vertex_data.get('weights', None)
         indices = vertex_data['indices']
 
         # If we have indices, expand vertex data first
@@ -548,6 +614,8 @@ class GltfLoader:
             expanded_texcoords = [] if texcoords is not None else None
             expanded_tangents = [] if tangents is not None else None
             expanded_colors = [] if colors is not None else None
+            expanded_joints = [] if joints is not None else None
+            expanded_weights = [] if weights is not None else None
 
             # Expand vertices according to indices
             for idx in indices_int:
@@ -564,6 +632,12 @@ class GltfLoader:
                 # Colors (vec3)
                 if colors is not None:
                     expanded_colors.extend(colors[idx * 3:(idx + 1) * 3])
+                # Joints (vec4 - 4 joint indices)
+                if joints is not None:
+                    expanded_joints.extend(joints[idx * 4:(idx + 1) * 4])
+                # Weights (vec4 - 4 weights)
+                if weights is not None:
+                    expanded_weights.extend(weights[idx * 4:(idx + 1) * 4])
 
             positions = np.array(expanded_positions, dtype='f4')
             normals = np.array(expanded_normals, dtype='f4')
@@ -573,6 +647,10 @@ class GltfLoader:
                 tangents = np.array(expanded_tangents, dtype='f4')
             if colors is not None:
                 colors = np.array(expanded_colors, dtype='f4')
+            if joints is not None:
+                joints = np.array(expanded_joints, dtype='f4')
+            if weights is not None:
+                weights = np.array(expanded_weights, dtype='f4')
 
         # Build interleaved vertex buffer
         vertex_count = len(positions) // 3
@@ -587,18 +665,26 @@ class GltfLoader:
         if colors is None:
             colors = np.tile([1.0, 1.0, 1.0], vertex_count).astype('f4')
 
-        # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f), color (3f) = 15 floats per vertex
-        interleaved = np.zeros(vertex_count * 15, dtype='f4')
+        # If joints/weights are missing, generate dummy ones (for non-skinned meshes)
+        if joints is None:
+            joints = np.tile([0.0, 0.0, 0.0, 0.0], vertex_count).astype('f4')
+        if weights is None:
+            weights = np.tile([1.0, 0.0, 0.0, 0.0], vertex_count).astype('f4')
+
+        # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f), color (3f), joints (4f), weights (4f) = 23 floats per vertex
+        interleaved = np.zeros(vertex_count * 23, dtype='f4')
         for i in range(vertex_count):
-            base = i * 15
+            base = i * 23
             interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
             interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
             interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
             interleaved[base + 8:base + 12] = tangents[i * 4:(i + 1) * 4]
             interleaved[base + 12:base + 15] = colors[i * 3:(i + 1) * 3]
+            interleaved[base + 15:base + 19] = joints[i * 4:(i + 1) * 4]
+            interleaved[base + 19:base + 23] = weights[i * 4:(i + 1) * 4]
 
-        format_str = '3f 3f 2f 4f 3f'
-        attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent', 'in_color']
+        format_str = '3f 3f 2f 4f 3f 4f 4f'
+        attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent', 'in_color', 'in_joints', 'in_weights']
 
         # Create VAO
         vao = VAO(name="gltf_mesh", mode=moderngl.TRIANGLES)
@@ -921,3 +1007,233 @@ class GltfLoader:
                     max_radius = max(max_radius, radius)
 
         return float(max_radius) if max_radius > 0 else 1.0
+
+    def _load_skeleton(self, gltf: pygltflib.GLTF2) -> Skeleton:
+        """
+        Load skeleton from GLTF skins and nodes.
+
+        Args:
+            gltf: GLTF data
+
+        Returns:
+            Skeleton with joint hierarchy
+        """
+        skeleton = Skeleton()
+
+        # GLTF stores joints as indices into the nodes array
+        # We need to build the skeleton from all joints referenced by skins
+        joint_indices = set()
+        for skin in gltf.skins:
+            joint_indices.update(skin.joints)
+
+        # Create Joint objects for each joint node
+        joint_map: Dict[int, Joint] = {}
+        for joint_idx in sorted(joint_indices):
+            node = gltf.nodes[joint_idx]
+            joint = Joint(
+                name=node.name if node.name else f"Joint_{joint_idx}",
+                index=joint_idx,
+                parent=None  # Set later
+            )
+
+            # Set local transform from node
+            joint.local_transform = self._get_node_transform(node)
+            local_array = np.array(joint.local_transform)
+            joint.base_translation = Vector3(node.translation) if node.translation is not None else Vector3(local_array[3, :3])
+            if node.rotation is not None:
+                quat = node.rotation
+                joint.base_rotation = Quaternion([quat[3], quat[0], quat[1], quat[2]])
+            if node.scale is not None:
+                joint.base_scale = Vector3(node.scale)
+
+            joint_map[joint_idx] = joint
+            skeleton.add_joint(joint)
+
+        # Build parent-child relationships
+        for joint_idx, joint in joint_map.items():
+            node = gltf.nodes[joint_idx]
+
+            # Check if this node has children that are also joints
+            if node.children:
+                for child_idx in node.children:
+                    if child_idx in joint_map:
+                        child_joint = joint_map[child_idx]
+                        joint.add_child(child_joint)
+                        child_joint.parent = joint
+
+        # Rebuild root joints list now that hierarchy is set up
+        skeleton.root_joints = [j for j in skeleton.joints if j.parent is None]
+        
+        # Initialize world transforms from bind pose
+        skeleton.update_world_transforms()
+
+        return skeleton
+
+    def _load_skins(self, gltf: pygltflib.GLTF2, skeleton: Skeleton, meshes: List[Mesh]) -> List[Skin]:
+        """
+        Load skins from GLTF.
+
+        Args:
+            gltf: GLTF data
+            skeleton: Loaded skeleton
+            meshes: List of loaded meshes
+
+        Returns:
+            List of Skin objects
+        """
+        skins = []
+
+        for skin_idx, gltf_skin in enumerate(gltf.skins):
+            skin = Skin(name=gltf_skin.name if gltf_skin.name else f"Skin_{skin_idx}")
+
+            # Get inverse bind matrices
+            inv_bind_matrices = None
+            if gltf_skin.inverseBindMatrices is not None:
+                inv_bind_data = self._get_accessor_data(gltf, gltf_skin.inverseBindMatrices)
+                if inv_bind_data is not None:
+                    # Reshape to 4x4 matrices
+                    num_joints = len(gltf_skin.joints)
+                    inv_bind_matrices = inv_bind_data.reshape(num_joints, 4, 4)
+
+            # Add joints to skin
+            for i, joint_idx in enumerate(gltf_skin.joints):
+                # Find joint by index property (not list position)
+                joint = None
+                for j in skeleton.joints:
+                    if j.index == joint_idx:
+                        joint = j
+                        break
+
+                if joint is None:
+                    print(f"  Warning: Joint index {joint_idx} not found in skeleton")
+                    continue
+
+                # Get inverse bind matrix for this joint
+                if inv_bind_matrices is not None:
+                    inv_bind_matrix = Matrix44(inv_bind_matrices[i])
+                else:
+                    # Default to identity if not provided
+                    inv_bind_matrix = Matrix44.identity()
+
+                skin.add_joint(joint, inv_bind_matrix)
+
+            # Initialize joint matrices with bind pose
+            skin.update_joint_matrices()
+
+            skins.append(skin)
+
+            # Associate skin with meshes that use it
+            # Find which mesh nodes reference this skin
+            for node_idx, node in enumerate(gltf.nodes):
+                if getattr(node, 'skin', None) != skin_idx:
+                    continue
+
+                for mesh in meshes:
+                    if getattr(mesh, 'node_index', None) == node_idx:
+                        mesh.skin = skin
+                        mesh.is_skinned = True
+
+        return skins
+
+    def _load_animations(self, gltf: pygltflib.GLTF2, skeleton: Skeleton = None) -> Dict[str, Animation]:
+        """
+        Load animations from GLTF.
+
+        Args:
+            gltf: GLTF data
+            skeleton: Loaded skeleton (optional, for skeletal animations)
+
+        Returns:
+            Dictionary mapping animation name to Animation object
+        """
+        animations = {}
+
+        for anim_idx, gltf_anim in enumerate(gltf.animations):
+            anim_name = gltf_anim.name if gltf_anim.name else f"Animation_{anim_idx}"
+            animation = Animation(anim_name)
+
+            # Process each channel in the animation
+            for channel in gltf_anim.channels:
+                # Get the sampler for this channel
+                sampler = gltf_anim.samplers[channel.sampler]
+
+                # Get target node (joint)
+                target_node_idx = channel.target.node
+                target_node = gltf.nodes[target_node_idx]
+                target_node_name = target_node.name if target_node.name else f"Joint_{target_node_idx}"
+
+                # Get target property (translation, rotation, scale, weights)
+                target_path = channel.target.path
+                if target_path == "translation":
+                    target_property = AnimationTarget.TRANSLATION
+                elif target_path == "rotation":
+                    target_property = AnimationTarget.ROTATION
+                elif target_path == "scale":
+                    target_property = AnimationTarget.SCALE
+                elif target_path == "weights":
+                    target_property = AnimationTarget.WEIGHTS
+                else:
+                    print(f"  Warning: Unknown animation target path: {target_path}")
+                    continue
+
+                # Get interpolation type
+                interp_str = sampler.interpolation if sampler.interpolation else "LINEAR"
+                if interp_str == "LINEAR":
+                    interpolation = InterpolationType.LINEAR
+                elif interp_str == "STEP":
+                    interpolation = InterpolationType.STEP
+                elif interp_str == "CUBICSPLINE":
+                    interpolation = InterpolationType.CUBICSPLINE
+                else:
+                    interpolation = InterpolationType.LINEAR
+
+                # Create animation channel
+                anim_channel = AnimationChannel(
+                    target_node_name=target_node_name,
+                    target_property=target_property,
+                    interpolation=interpolation
+                )
+
+                # Load keyframe data
+                times = self._get_accessor_data(gltf, sampler.input)
+                values = self._get_accessor_data(gltf, sampler.output)
+
+                if times is None or values is None:
+                    print(f"  Warning: Missing keyframe data for channel {target_node_name}.{target_path}")
+                    continue
+
+                # Determine value size based on property type
+                if target_property == AnimationTarget.TRANSLATION:
+                    value_size = 3  # Vector3
+                elif target_property == AnimationTarget.ROTATION:
+                    value_size = 4  # Quaternion (x, y, z, w)
+                elif target_property == AnimationTarget.SCALE:
+                    value_size = 3  # Vector3
+                elif target_property == AnimationTarget.WEIGHTS:
+                    # Morph target weights - variable size
+                    value_size = len(values) // len(times)
+                else:
+                    value_size = 1
+
+                # Reshape values
+                values = values.reshape(-1, value_size)
+
+                # Add keyframes
+                for i, time in enumerate(times):
+                    value = values[i]
+
+                    # Convert to appropriate type
+                    if target_property == AnimationTarget.ROTATION:
+                        # GLTF quaternions are (x, y, z, w)
+                        value = Quaternion([value[3], value[0], value[1], value[2]])  # pyrr uses (w, x, y, z)
+                    elif target_property in (AnimationTarget.TRANSLATION, AnimationTarget.SCALE):
+                        value = Vector3(value)
+
+                    anim_channel.add_keyframe(float(time), value)
+
+                # Add channel to animation
+                animation.add_channel(anim_channel)
+
+            animations[anim_name] = animation
+
+        return animations

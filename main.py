@@ -159,6 +159,18 @@ class Game(mglw.WindowConfig):
         # Update camera target after position changes
         self.camera.update_vectors()
 
+        # Update animations for all models in the scene
+        animated_this_frame = False
+        for obj in self.scene.objects:
+            # Check if this is a Model with animations
+            if hasattr(obj, 'is_model') and obj.is_model:
+                animated_this_frame |= obj.update(frametime)
+
+        if animated_this_frame:
+            for light in self.lights:
+                if light.cast_shadows:
+                    light.mark_shadow_dirty()
+
         # Update debug overlay
         if self.debug_overlay:
             fps = 1.0 / frametime if frametime > 0 else 0

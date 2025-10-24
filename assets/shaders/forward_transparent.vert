@@ -14,6 +14,8 @@ in vec3 in_normal;
 in vec2 in_texcoord;
 in vec4 in_tangent;// xyz = tangent, w = handedness
 in vec3 in_color;// Vertex color (COLOR_0 from GLTF)
+in vec4 in_joints;// Joint indices for skinning (unused in base shader)
+in vec4 in_weights;// Joint weights for skinning (unused in base shader)
 
 // Outputs to fragment shader
 out vec3 v_world_position;// World space position

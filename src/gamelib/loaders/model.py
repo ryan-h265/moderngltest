@@ -4,36 +4,52 @@ Model
 Represents a loaded GLTF/GLB model with meshes and materials.
 """
 
-from typing import List, Tuple, Optional
-from pyrr import Matrix44, Vector3
+from typing import List, Tuple, Optional, Dict
+from pyrr import Matrix44, Vector3, Quaternion
 from .material import Material
 
 
 class Mesh:
     """
-    Represents a single mesh within a model.
+    Single mesh with geometry and material.
 
-    Each mesh has its own VAO, material, and local transform.
+    Each mesh represents a renderable piece of geometry with:
+    - VAO (Vertex Array Object) for rendering
+    - Material for shading
+    - Local transform (relative to parent model)
     """
 
-    def __init__(self, vao, material: Material, name: str = "Mesh",
-                 local_transform: Matrix44 = None):
+    def __init__(self, vao, material: Material, local_transform: Matrix44 = None, node_name: str = None, parent_transform: Matrix44 = None):
         """
         Initialize mesh.
 
         Args:
-            vao: ModernGL VAO object
+            vao: Vertex Array Object
             material: Material for this mesh
-            name: Mesh name for debugging
-            local_transform: Local transformation matrix (from GLTF node)
+            local_transform: Local transformation matrix (relative to parent)
+            node_name: Name of the GLTF node this mesh came from (for animations)
+            parent_transform: Accumulated transform from parent nodes (for animations)
         """
         self.vao = vao
         self.material = material
-        self.name = name
-        self.vertex_count = 0  # Set by loader
-
-        # Local transform (from GLTF node hierarchy)
-        self.local_transform = local_transform if local_transform is not None else Matrix44.identity()
+        self.local_transform = Matrix44(local_transform) if local_transform is not None else Matrix44.identity()
+        self.node_name = node_name
+        
+        # For node animations: track parent hierarchy transform and base local matrix
+        if parent_transform is not None:
+            self.parent_transform = Matrix44(parent_transform)
+        else:
+            self.parent_transform = Matrix44.identity()
+        self.base_local_transform = Matrix44(self.local_transform)
+        self.mesh_index = None
+        self.node_index = None
+        self.base_translation = Vector3([0.0, 0.0, 0.0])
+        self.base_rotation = Quaternion([1.0, 0.0, 0.0, 0.0])
+        self.base_scale = Vector3([1.0, 1.0, 1.0])
+        
+        # Skinning data (set by loader if this is a skinned mesh)
+        self.is_skinned = False
+        self.skin = None
 
     def render(self, program, parent_transform: Matrix44 = None, ctx=None):
         """
@@ -53,16 +69,13 @@ class Mesh:
                 ctx.disable(moderngl.CULL_FACE)
                 restore_culling = True
 
-        # Calculate final transform
+        # Calculate final transform (row-major matrices; GPU treats transpose as column-major)
+        final_transform = self.local_transform @ self.parent_transform
         if parent_transform is not None:
-            # Combine parent transform with local transform
-            final_transform = parent_transform @ self.local_transform
-            if 'model' in program:
-                program['model'].write(final_transform.astype('f4').tobytes())
-        elif self.local_transform is not None:
-            # Use local transform only
-            if 'model' in program:
-                program['model'].write(self.local_transform.astype('f4').tobytes())
+            final_transform = final_transform @ parent_transform
+
+        if 'model' in program:
+            program['model'].write(final_transform.astype('f4').tobytes())
 
         # Bind material textures
         self.material.bind_textures(program)
@@ -107,6 +120,18 @@ class Model:
 
         # Flag to identify this as a Model (not a primitive SceneObject)
         self.is_model = True
+
+        # Animation data (set by loader)
+        self.skeleton = None  # Skeleton instance
+        self.skins = []  # List of Skin instances
+        self.animations: Dict[str, 'Animation'] = {}  # Animation name -> Animation
+        self.animation_controller = None  # AnimationController instance (for skeletal animations)
+        
+        # Node animation data (for non-skeletal animations)
+        self.current_node_animation = None
+        self.node_animation_time = 0.0
+        self.node_animation_playing = False
+        self.node_animation_loop = True
 
     def get_model_matrix(self) -> Matrix44:
         """
@@ -158,6 +183,146 @@ class Model:
         # Render each mesh with its local transform
         for mesh in self.meshes:
             mesh.render(program, parent_transform=parent_matrix, ctx=ctx)
+
+    def update(self, delta_time: float) -> bool:
+        """
+        Update model animations.
+
+        Args:
+            delta_time: Time elapsed since last frame (seconds)
+
+        Returns:
+            True if the model applied animation updates this frame
+        """
+        animated = False
+
+        # Update skeletal animations
+        if self.animation_controller:
+            was_playing = bool(self.animation_controller.current_animation and self.animation_controller.is_playing)
+            self.animation_controller.update(delta_time)
+            if was_playing:
+                animated = True
+
+            # Update skin joint matrices
+            for skin in self.skins:
+                skin.update_joint_matrices()
+        
+        # Reset mesh local transforms to bind pose before applying node animations
+        for mesh in self.meshes:
+            mesh.local_transform = Matrix44(mesh.base_local_transform)
+        
+        # Update node animations (for non-skeletal animations)
+        if self.node_animation_playing and self.current_node_animation:
+            from pyrr import Quaternion
+            
+            # Advance time
+            self.node_animation_time += delta_time
+            
+            # Handle looping
+            if self.node_animation_time >= self.current_node_animation.duration:
+                if self.node_animation_loop:
+                    self.node_animation_time = self.node_animation_time % self.current_node_animation.duration
+                else:
+                    self.node_animation_time = self.current_node_animation.duration
+                    self.node_animation_playing = False
+            
+            # Sample animation at current time
+            sampled_data = self.current_node_animation.sample_all(self.node_animation_time)
+            
+            # Apply to meshes by node name
+            for mesh in self.meshes:
+                if mesh.node_name is None:
+                    continue
+                
+                # Check if this node has any animation data
+                has_animation_for_node = False
+                for (node_name, property_type), value in sampled_data.items():
+                    if node_name == mesh.node_name:
+                        has_animation_for_node = True
+                        break
+                
+                if not has_animation_for_node:
+                    # No animation for this node, keep base transform
+                    continue
+                
+                # Gather transforms for this node
+                translation = None
+                rotation = None
+                scale = None
+                
+                from ..animation.animation import AnimationTarget
+                for (node_name, property_type), value in sampled_data.items():
+                    if node_name != mesh.node_name:
+                        continue
+                    
+                    if property_type == AnimationTarget.TRANSLATION:
+                        translation = value
+                    elif property_type == AnimationTarget.ROTATION:
+                        rotation = value
+                    elif property_type == AnimationTarget.SCALE:
+                        scale = value
+                
+                # Fallback to bind pose components when animation omits them
+                translation = translation if translation is not None else mesh.base_translation
+                rotation = rotation if rotation is not None else mesh.base_rotation
+                scale = scale if scale is not None else mesh.base_scale
+
+                # Build transformation matrix from T/R/S
+                mat = Matrix44.identity()
+
+                # Apply scale first (match loader order)
+                if scale is not None:
+                    scale_vec = scale if isinstance(scale, Vector3) else Vector3(scale)
+                    mat = mat @ Matrix44.from_scale(scale_vec)
+
+                # Apply rotation
+                if rotation is not None:
+                    if isinstance(rotation, (list, tuple)):
+                        rot_quat = Quaternion(rotation)
+                    elif isinstance(rotation, Quaternion):
+                        rot_quat = rotation
+                    else:
+                        rot_quat = Quaternion(rotation)
+                    mat = mat @ rot_quat.matrix44
+
+                # Apply translation last
+                if translation is not None:
+                    trans_vec = translation if isinstance(translation, Vector3) else Vector3(translation)
+                    mat = mat @ Matrix44.from_translation(trans_vec)
+                
+                # Update the local transform for this mesh (parent applied during render)
+                mesh.local_transform = mat
+
+            animated = True
+
+        return animated
+
+    def play_animation(self, name: str, loop: bool = True):
+        """
+        Play an animation by name.
+
+        Args:
+            name: Animation name
+            loop: Whether to loop the animation
+        """
+        if name not in self.animations:
+            return
+        
+        # Check if this is a skeletal animation or node animation
+        if self.animation_controller:
+            # Try skeletal animation first
+            self.animation_controller.play(self.animations[name], loop)
+        else:
+            # Use node animation system
+            self.current_node_animation = self.animations[name]
+            self.node_animation_time = 0.0
+            self.node_animation_playing = True
+            self.node_animation_loop = loop
+
+    def stop_animation(self):
+        """Stop current animation."""
+        if self.animation_controller:
+            self.animation_controller.stop()
 
     def release(self):
         """Release GPU resources"""

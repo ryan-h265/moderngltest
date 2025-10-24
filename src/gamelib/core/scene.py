@@ -114,9 +114,14 @@ class Scene:
                 if lantern_path.exists():
                     print(f"Loading GLTF model: {lantern_path}")
                     lantern = loader.load(str(lantern_path))
-                    lantern.position = Vector3([-9.0, 0.0, 0.0])
-                    lantern.scale = Vector3([0.02, 0.02, 0.02])
+                    lantern.position = Vector3([0.0, 2.0, 0.0])  # Center, slightly elevated
+                    lantern.scale = Vector3([0.05, 0.05, 0.05])  # Make it bigger so we can see it
                     lantern.rotation = Vector3([0.0, 0.0, 0.0])
+                    # Play first animation if available
+                    if lantern.animations:
+                        first_anim_name = list(lantern.animations.keys())[0]
+                        lantern.play_animation(first_anim_name, loop=True)
+                        print(f"  Playing animation: {first_anim_name}")
                     self.add_object(lantern)
                     models_loaded += 1
 
@@ -128,6 +133,36 @@ class Scene:
                     emissive_test.scale = Vector3([1.0, 1.0, 1.0])
                     emissive_test.rotation = Vector3([0.0, 0.0, 0.0])
                     self.add_object(emissive_test)
+                    models_loaded += 1
+
+                # rigged_simple_path = PROJECT_ROOT / "assets/models/props/RiggedSimple.glb"
+                # if rigged_simple_path.exists():
+                #     print(f"Loading GLTF model: {rigged_simple_path}")
+                #     rigged_simple = loader.load(str(rigged_simple_path))
+                #     rigged_simple.position = Vector3([5.0, 0.0, 0.0])
+                #     rigged_simple.scale = Vector3([1.0, 1.0, 1.0])
+                #     rigged_simple.rotation = Vector3([0.0, 0.0, 0.0])
+                #     # Play first animation if available
+                #     if rigged_simple.animations:
+                #         first_anim_name = list(rigged_simple.animations.keys())[0]
+                #         rigged_simple.play_animation(first_anim_name, loop=True)
+                #         print(f"  Playing animation: {first_anim_name}")
+                #     self.add_object(rigged_simple)
+                #     models_loaded += 1
+
+                animated_cube_path = PROJECT_ROOT / "assets/models/props/animatedcube/AnimatedCube.gltf"
+                if animated_cube_path.exists():
+                    print(f"Loading GLTF model: {animated_cube_path}")
+                    animated_cube = loader.load(str(animated_cube_path))
+                    animated_cube.position = Vector3([2.0, 3.0, 2.0])
+                    animated_cube.scale = Vector3([1.0, 1.0, 1.0])
+                    animated_cube.rotation = Vector3([0.0, 0.0, 0.0])
+                    # Play first animation if available
+                    if animated_cube.animations:
+                        first_anim_name = list(animated_cube.animations.keys())[0]
+                        animated_cube.play_animation(first_anim_name, loop=True)
+                        print(f"  Playing animation: {first_anim_name}")
+                    self.add_object(animated_cube)
                     models_loaded += 1
 
                 # glasses_path = PROJECT_ROOT / "assets/models/props/glasses/scene.gltf"
@@ -276,7 +311,7 @@ class Scene:
 
 
     def render_all(self, program, frustum: Optional[Frustum] = None, debug_label: str = "",
-                   textured_program=None, unlit_program=None):
+                   textured_program=None, unlit_program=None, textured_skinned_program=None):
         """
         Render all objects in the scene.
 
@@ -286,6 +321,7 @@ class Scene:
             debug_label: Label for debug output (e.g., "Main", "Shadow Light 0")
             textured_program: Optional shader program for textured models
             unlit_program: Optional shader program for unlit materials (KHR_materials_unlit)
+            textured_skinned_program: Optional shader program for skinned meshes
         """
         from ..config.settings import DEBUG_FRUSTUM_CULLING, DEBUG_SHOW_CULLED_OBJECTS
 
@@ -320,7 +356,23 @@ class Scene:
                             continue
 
                         # Determine which shader to use for this mesh
-                        if mesh.material.unlit and unlit_program is not None:
+                        if mesh.is_skinned and textured_skinned_program is not None:
+                            # Use skinned shader for skinned meshes
+                            active_program = textured_skinned_program
+
+                            # Upload joint matrices for skinning
+                            if mesh.skin is not None:
+                                joint_matrices = mesh.skin.get_joint_matrices_array()
+                                if len(joint_matrices) > 0:
+                                    # Upload each joint matrix individually
+                                    # ModernGL requires array uniforms to be uploaded element by element
+                                    for i, matrix in enumerate(joint_matrices):
+                                        if i >= 128:
+                                            break
+                                        uniform_name = f'jointMatrices[{i}]'
+                                        if uniform_name in active_program:
+                                            active_program[uniform_name].write(matrix.astype('f4').tobytes())
+                        elif mesh.material.unlit and unlit_program is not None:
                             # Use unlit shader for materials marked as unlit (KHR_materials_unlit)
                             active_program = unlit_program
                         elif textured_program is not None:
@@ -424,8 +476,8 @@ class Scene:
                 # Check each mesh in the model
                 for mesh in obj.meshes:
                     if mesh.material.alpha_mode == "BLEND":
-                        # Calculate full transform (parent * local)
-                        full_transform = parent_matrix @ mesh.local_transform
+                        # Calculate full transform (local -> parent hierarchy -> model)
+                        full_transform = mesh.local_transform @ mesh.parent_transform @ parent_matrix
                         transparent_meshes.append((mesh, full_transform))
 
         return transparent_meshes

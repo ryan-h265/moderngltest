@@ -219,3 +219,5 @@ __marimo__/
 keybindings.json  # User's custom key bindings
 
 .DS_Store
+
+glTF-Sample-Assets/
