@@ -1,0 +1,236 @@
+#version 410
+
+// Forward Rendering - Transparent Objects Fragment Shader
+// Computes PBR lighting directly for alpha-blended materials
+
+// Texture samplers
+uniform sampler2D baseColorTexture;
+uniform sampler2D normalTexture;
+uniform sampler2D metallicRoughnessTexture;
+uniform sampler2D emissiveTexture;
+uniform sampler2D occlusionTexture;
+
+// Shadow maps (one per light, max 4 lights)
+uniform sampler2D shadowMap0;
+uniform sampler2D shadowMap1;
+uniform sampler2D shadowMap2;
+uniform sampler2D shadowMap3;
+
+// Texture flags
+uniform bool hasBaseColorTexture;
+uniform bool hasNormalTexture;
+uniform bool hasMetallicRoughnessTexture;
+uniform bool hasEmissiveTexture;
+uniform bool hasOcclusionTexture;
+
+// Texture transforms (KHR_texture_transform)
+uniform mat3 baseColorTransform;
+uniform mat3 normalTransform;
+uniform mat3 metallicRoughnessTransform;
+uniform mat3 emissiveTransform;
+uniform mat3 occlusionTransform;
+
+// Material properties
+uniform vec4 baseColorFactor;
+uniform vec3 emissiveFactor;
+uniform float occlusionStrength;
+uniform float normalScale;
+
+// Camera position (world space)
+uniform vec3 cameraPos;
+
+// Lighting uniforms (max 4 lights)
+uniform int numLights;
+uniform vec3 lightPositions[4];   // World space
+uniform vec3 lightColors[4];
+uniform float lightIntensities[4];
+uniform mat4 lightMatrices[4];    // Light view-projection matrices for shadow mapping
+
+// Shadow parameters
+uniform float shadowBias;
+
+// Ambient lighting
+uniform float ambientStrength;
+
+// Inputs from vertex shader
+in vec3 v_world_position;
+in vec3 v_world_normal;
+in vec2 v_texcoord;
+in mat3 v_TBN;
+
+// Output color (with alpha)
+out vec4 fragColor;
+
+const float PI = 3.14159265359;
+
+// PBR Functions
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return a2 / max(denom, 0.0001);
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float denom = NdotV * (1.0 - k) + k;
+
+    return NdotV / max(denom, 0.0001);
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
+
+// PCF Shadow calculation (same as deferred lighting)
+float calculateShadow(sampler2D shadowMap, vec4 fragPosLightSpace, float bias) {
+    // Perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    // Transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Outside shadow map bounds = no shadow
+    if (projCoords.z > 1.0 || projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) {
+        return 0.0;
+    }
+
+    // PCF (Percentage Closer Filtering) for soft shadows
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += (projCoords.z - bias) > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+
+    return shadow;
+}
+
+void main() {
+    // Sample base color with transform
+    vec4 albedo;
+    if (hasBaseColorTexture) {
+        vec2 transformed_uv = (baseColorTransform * vec3(v_texcoord, 1.0)).xy;
+        albedo = texture(baseColorTexture, transformed_uv) * baseColorFactor;
+    } else {
+        albedo = baseColorFactor;
+    }
+
+    // Early discard for fully transparent pixels (optimization)
+    if (albedo.a < 0.01) {
+        discard;
+    }
+
+    // Calculate normal with optional normal mapping
+    vec3 N;
+    if (hasNormalTexture) {
+        vec2 transformed_uv = (normalTransform * vec3(v_texcoord, 1.0)).xy;
+        vec3 normal_sample = texture(normalTexture, transformed_uv).rgb;
+        normal_sample = normal_sample * 2.0 - 1.0;
+        normal_sample.xy *= normalScale;
+        N = normalize(v_TBN * normal_sample);
+    } else {
+        N = normalize(v_world_normal);
+    }
+
+    // Sample metallic/roughness with transform
+    float metallic = 0.0;
+    float roughness = 0.5;
+    if (hasMetallicRoughnessTexture) {
+        vec2 transformed_uv = (metallicRoughnessTransform * vec3(v_texcoord, 1.0)).xy;
+        vec3 mr = texture(metallicRoughnessTexture, transformed_uv).rgb;
+        metallic = mr.b;
+        roughness = mr.g;
+    }
+
+    // Sample occlusion with transform
+    float occlusion = 1.0;
+    if (hasOcclusionTexture) {
+        vec2 transformed_uv = (occlusionTransform * vec3(v_texcoord, 1.0)).xy;
+        float ao_sample = texture(occlusionTexture, transformed_uv).r;
+        occlusion = mix(1.0, ao_sample, occlusionStrength);
+    }
+
+    // Sample emissive with transform
+    vec3 emissive = emissiveFactor;
+    if (hasEmissiveTexture) {
+        vec2 transformed_uv = (emissiveTransform * vec3(v_texcoord, 1.0)).xy;
+        emissive *= texture(emissiveTexture, transformed_uv).rgb;
+    }
+
+    // PBR Lighting calculation
+    vec3 V = normalize(cameraPos - v_world_position);
+
+    // Calculate F0 (surface reflection at zero incidence)
+    vec3 F0 = vec3(0.04);  // Dielectric base reflectivity
+    F0 = mix(F0, albedo.rgb, metallic);
+
+    // Accumulate lighting from all lights
+    vec3 Lo = vec3(0.0);
+
+    for (int i = 0; i < numLights && i < 4; ++i) {
+        // Light direction and distance
+        vec3 L = normalize(lightPositions[i] - v_world_position);
+        vec3 H = normalize(V + L);
+        float distance = length(lightPositions[i] - v_world_position);
+        float attenuation = 1.0 / (distance * distance);
+        vec3 radiance = lightColors[i] * lightIntensities[i] * attenuation;
+
+        // Cook-Torrance BRDF
+        float NDF = DistributionGGX(N, H, roughness);
+        float G = GeometrySmith(N, V, L, roughness);
+        vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - metallic;
+
+        vec3 numerator = NDF * G * F;
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+        vec3 specular = numerator / max(denominator, 0.001);
+
+        float NdotL = max(dot(N, L), 0.0);
+
+        // Shadow calculation
+        float shadow = 0.0;
+        vec4 fragPosLightSpace = lightMatrices[i] * vec4(v_world_position, 1.0);
+
+        if (i == 0) shadow = calculateShadow(shadowMap0, fragPosLightSpace, shadowBias);
+        else if (i == 1) shadow = calculateShadow(shadowMap1, fragPosLightSpace, shadowBias);
+        else if (i == 2) shadow = calculateShadow(shadowMap2, fragPosLightSpace, shadowBias);
+        else if (i == 3) shadow = calculateShadow(shadowMap3, fragPosLightSpace, shadowBias);
+
+        // Add to outgoing radiance
+        Lo += (kD * albedo.rgb / PI + specular) * radiance * NdotL * (1.0 - shadow) * occlusion;
+    }
+
+    // Ambient lighting (simple approximation)
+    vec3 ambient = ambientStrength * albedo.rgb * occlusion;
+
+    // Final color
+    vec3 color = ambient + Lo + emissive;
+
+    // Output with alpha for blending
+    fragColor = vec4(color, albedo.a);
+}

@@ -132,7 +132,7 @@ class Game(mglw.WindowConfig):
             List of Light objects
         """
         lights = []
-        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=1.5, angle=90.0, height=10.0))
+        lights.append(self._create_light(Vector3([1.0, 1.0, 1.0]), intensity=3.5, angle=90.0, height=10.0))
         # lights.append(self._create_light(Vector3([1.0, 0.0, 0.0]), intensity=1.5, angle=0.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 1.0, 0.0]), intensity=1.5, angle=135.0, height=10.0))
         # lights.append(self._create_light(Vector3([0.0, 0.0, 1.0]), intensity=1.5, angle=270.0, height=10.0))

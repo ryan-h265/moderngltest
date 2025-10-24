@@ -305,6 +305,10 @@ class Scene:
 
                     # Render each mesh with appropriate shader based on material properties
                     for mesh in obj.meshes:
+                        # Skip transparent meshes in geometry pass (they use forward rendering)
+                        if mesh.material.alpha_mode == "BLEND":
+                            continue
+
                         # Determine which shader to use for this mesh
                         if mesh.material.unlit and unlit_program is not None:
                             # Use unlit shader for materials marked as unlit (KHR_materials_unlit)
@@ -392,6 +396,43 @@ class Scene:
     def get_object_count(self) -> int:
         """Get number of objects in scene"""
         return len(self.objects)
+
+    def get_transparent_meshes(self) -> List[Tuple]:
+        """
+        Get all transparent meshes (alpha_mode == "BLEND") for forward rendering.
+
+        Returns:
+            List of (mesh, parent_transform) tuples for transparent meshes
+        """
+        transparent_meshes = []
+
+        for obj in self.objects:
+            # Only check Model objects (have meshes)
+            if hasattr(obj, 'is_model') and obj.is_model:
+                parent_matrix = obj.get_model_matrix()
+
+                # Check each mesh in the model
+                for mesh in obj.meshes:
+                    if mesh.material.alpha_mode == "BLEND":
+                        # Calculate full transform (parent * local)
+                        full_transform = parent_matrix @ mesh.local_transform
+                        transparent_meshes.append((mesh, full_transform))
+
+        return transparent_meshes
+
+    def has_transparent_objects(self) -> bool:
+        """
+        Check if scene contains any transparent objects.
+
+        Returns:
+            True if any mesh has alpha_mode == "BLEND"
+        """
+        for obj in self.objects:
+            if hasattr(obj, 'is_model') and obj.is_model:
+                for mesh in obj.meshes:
+                    if mesh.material.alpha_mode == "BLEND":
+                        return True
+        return False
 
     def get_visible_objects(self, frustum: Frustum) -> List['SceneObject']:
         """

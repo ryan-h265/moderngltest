@@ -15,6 +15,7 @@ from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
 from .ssao_renderer import SSAORenderer
+from .transparent_renderer import TransparentRenderer
 from .text_manager import TextManager
 from .ui_renderer import UIRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
@@ -76,6 +77,9 @@ class RenderPipeline:
         self.shader_manager.load_program("ambient", "deferred_lighting.vert", "deferred_ambient.frag")
         self.shader_manager.load_program("emissive", "deferred_lighting.vert", "deferred_emissive.frag")
 
+        # Forward transparent shader (for alpha BLEND mode)
+        self.shader_manager.load_program("transparent", "forward_transparent.vert", "forward_transparent.frag")
+
         # SSAO shaders
         self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
         self.shader_manager.load_program("ssao_blur", "ssao_blur.vert", "ssao_blur.frag")
@@ -125,6 +129,12 @@ class RenderPipeline:
             self.shader_manager.get("ssao"),
             self.shader_manager.get("ssao_blur")
         ) if SSAO_ENABLED else None
+
+        # Create transparent renderer (for alpha BLEND mode)
+        self.transparent_renderer = TransparentRenderer(
+            ctx,
+            self.shader_manager.get("transparent")
+        )
 
         # Create anti-aliasing renderer with optional SMAA support
         smaa_edge = None
@@ -264,6 +274,18 @@ class RenderPipeline:
                 self.window.viewport,
                 ssao_texture=ssao_texture
             )
+
+            # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
+            if scene.has_transparent_objects():
+                shadow_maps = [light.shadow_map for light in lights]
+                self.transparent_renderer.render(
+                    scene,
+                    camera,
+                    lights,
+                    self.ctx.screen,
+                    shadow_maps,
+                    self.window.size
+                )
         else:
             # AA enabled - render to AA framebuffer then resolve
             self.lighting_renderer.render_to_target(
@@ -274,6 +296,20 @@ class RenderPipeline:
                 render_target,
                 ssao_texture=ssao_texture
             )
+
+            # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
+            # Render into AA buffer before resolving
+            if scene.has_transparent_objects():
+                shadow_maps = [light.shadow_map for light in lights]
+                self.transparent_renderer.render(
+                    scene,
+                    camera,
+                    lights,
+                    render_target,
+                    shadow_maps,
+                    self.window.size
+                )
+
             self.aa_renderer.resolve_and_present()
 
     def get_shader(self, name: str) -> moderngl.Program:
