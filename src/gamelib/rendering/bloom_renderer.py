@@ -184,6 +184,9 @@ class BloomRenderer:
         self.resize((width, height))
 
         self.ctx.disable(moderngl.DEPTH_TEST)
+        # Ensure intermediate passes overwrite previous frame data instead of
+        # accumulating with whatever blend state the caller left active.
+        self.ctx.disable(moderngl.BLEND)
 
         # ------------------------------------------------------------------
         # Downsample chain: progressively shrink emissive texture while
@@ -231,6 +234,10 @@ class BloomRenderer:
         # ------------------------------------------------------------------
         target.use()
         self.ctx.viewport = viewport
+        # Reactivate additive blending so the bloom contribution adds onto the
+        # lighting buffer like the main light accumulation pass.
+        self.ctx.enable(moderngl.BLEND)
+        self.ctx.blend_func = moderngl.ONE, moderngl.ONE
 
         if next_texture is None:
             return
@@ -241,4 +248,3 @@ class BloomRenderer:
         self.composite_program["tint"].value = self.tint
 
         self._composite_vao.render(moderngl.TRIANGLES)
-

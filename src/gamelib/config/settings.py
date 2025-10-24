@@ -59,7 +59,7 @@ PCF_SAMPLES = 3         # 3x3 grid = 9 samples (use 5 for 25 samples, 1 for no P
 BLOOM_ENABLED = True
 BLOOM_THRESHOLD = 1.0        # Brightness threshold for bloom extraction (in HDR units)
 BLOOM_SOFT_KNEE = 0.5        # Soft thresholding transition [0-1]
-BLOOM_INTENSITY = 1.2        # Intensity multiplier when compositing bloom
+BLOOM_INTENSITY = 1.0        # Intensity multiplier when compositing bloom
 BLOOM_FILTER_RADIUS = 1.5    # Upsample filter radius (higher = softer bloom)
 BLOOM_MAX_LEVELS = 5         # Number of downsample/upsample levels (more = softer, slower)
 BLOOM_TINT = (1.0, 1.0, 1.0) # Optional bloom tint (RGB)
