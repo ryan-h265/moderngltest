@@ -35,6 +35,20 @@ in vec2 v_texcoord;
 // Output
 out vec4 f_color;
 
+// Fog parameters
+uniform bool fog_enabled;
+uniform vec3 fog_color;
+uniform float fog_density;
+uniform float fog_start_distance;
+uniform float fog_end_distance;
+uniform float fog_base_height;
+uniform float fog_height_falloff;
+uniform float fog_noise_scale;
+uniform float fog_noise_strength;
+uniform float fog_noise_speed;
+uniform vec3 fog_wind_direction;
+uniform float fog_time;
+
 /**
 * Calculate shadow factor for the light
 * Returns: 0.0 = no shadow, 1.0 = full shadow
@@ -239,7 +253,26 @@ void main(){
 
     // Apply shadow, light intensity, and baked AO to BRDF result
     // Note: Baked AO affects direct lighting (darkens crevices for all lights)
-    vec3 lighting = light_intensity * attenuation * (1.0 - shadow) * brdf * ao;
+    float fog_factor = 0.0;
+    if (fog_enabled) {
+        float fog_range = max(fog_end_distance - fog_start_distance, 0.001);
+        float distance_to_camera = length(camera_pos - position);
+        float distance_factor = clamp((distance_to_camera - fog_start_distance) / fog_range, 0.0, 1.0);
+
+        float height_offset = max(position.y - fog_base_height, 0.0);
+        float height_factor = exp(-height_offset * fog_height_falloff);
+
+        vec3 animated_pos = position * fog_noise_scale + fog_wind_direction * (fog_time * fog_noise_speed);
+        float trig_noise = sin(animated_pos.x) + sin(animated_pos.y * 1.3 + animated_pos.z * 0.7) + sin(animated_pos.z * 1.7 - animated_pos.x * 0.5);
+        trig_noise = trig_noise / 3.0;
+        float noise_normalized = trig_noise * 0.5 + 0.5;
+        float variation = mix(1.0 - fog_noise_strength, 1.0 + fog_noise_strength, noise_normalized);
+
+        float fog_density_world = fog_density * variation * height_factor;
+        fog_factor = clamp((1.0 - exp(-distance_to_camera * fog_density_world)) * distance_factor, 0.0, 1.0);
+    }
+
+    vec3 lighting = light_intensity * attenuation * (1.0 - shadow) * brdf * ao * (1.0 - fog_factor);
 
     // Output this light's contribution (will be additively blended)
     f_color = vec4(lighting, 1.0);

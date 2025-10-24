@@ -101,7 +101,7 @@ class SimpleSceneDemo(mglw.WindowConfig):
 
     def on_render(self, time, frametime):
         self.on_update(time, frametime)
-        self.render_pipeline.render_frame(self.scene, self.camera, self.lights)
+        self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
 
     def on_mouse_position_event(self, _x, _y, dx, dy):
         self.input_manager.on_mouse_move(dx, dy)
