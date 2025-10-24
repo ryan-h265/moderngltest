@@ -200,6 +200,11 @@ class Game(mglw.WindowConfig):
         """
         self.input_manager.on_mouse_move(dx, dy)
 
+    def resize(self, width: int, height: int):
+        """Handle window resize events by updating render targets."""
+        super().resize(width, height)
+        self.render_pipeline.resize((width, height))
+
     def on_key_event(self, key, action, modifiers):
         """
         Handle keyboard events.

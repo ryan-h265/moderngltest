@@ -163,6 +163,10 @@ class TextManager:
     def get_line_height(self) -> int:
         return self._line_height
 
+    def refresh_layout_metrics(self) -> None:
+        """Mark all layers dirty so cached geometry is rebuilt after layout changes."""
+        self._dirty_layers.update(self._layer_geometry.keys())
+
     def release(self) -> None:
         self._geometry_cache.clear()
         self._layer_geometry.clear()

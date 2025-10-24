@@ -88,7 +88,8 @@ class UIRenderer:
         )
 
     def resize(self, screen_size: Tuple[int, int]):
-        raise NotImplementedError("at some point we need to resize.")
+        # Drop cached VAOs/VBOs so they can be recreated for the new viewport.
+        self.release()
 
     def release(self):
         for vao in self._vao_cache.values():
