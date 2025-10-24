@@ -124,7 +124,7 @@ class Scene:
                 if emissive_strength_test_path.exists():
                     print(f"Loading GLTF model: {emissive_strength_test_path}")
                     emissive_test = loader.load(str(emissive_strength_test_path))
-                    emissive_test.position = Vector3([0.0, 0.0, -5.0])
+                    emissive_test.position = Vector3([0.0, 5.0, -12.0])
                     emissive_test.scale = Vector3([1.0, 1.0, 1.0])
                     emissive_test.rotation = Vector3([0.0, 0.0, 0.0])
                     self.add_object(emissive_test)

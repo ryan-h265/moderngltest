@@ -23,6 +23,7 @@ uniform float alphaCutoff;  // Threshold for MASK mode
 in vec3 v_view_position;
 in vec3 v_view_normal;
 in vec2 v_texcoord;
+in vec3 v_color;  // Vertex color
 
 // G-Buffer outputs (Multiple Render Targets)
 layout(location = 0) out vec3 gPosition;  // View space position (for SSAO)
@@ -42,6 +43,9 @@ void main() {
     } else {
         albedo = baseColorFactor;
     }
+
+    // Multiply by vertex color (GLTF COLOR_0 attribute)
+    albedo.rgb *= v_color;
 
     // Alpha testing for MASK mode
     if (alphaMode == 1) {  // MASK mode

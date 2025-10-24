@@ -27,6 +27,7 @@ uniform mat3 occlusionTransform;
 // Material fallback properties
 uniform vec4 baseColorFactor;
 uniform vec3 emissiveFactor;
+uniform float emissiveStrength;   // KHR_materials_emissive_strength (multiplier for HDR emissive)
 uniform float occlusionStrength;  // Strength of baked AO (0.0 = none, 1.0 = full)
 uniform float normalScale;        // Normal map intensity
 
@@ -41,6 +42,7 @@ in vec3 v_world_normal;    // World space normal
 in vec3 v_view_normal;     // View space normal
 in vec2 v_texcoord;        // Texture coordinates
 in mat3 v_TBN;             // Tangent-Bitangent-Normal matrix (view space)
+in vec3 v_color;           // Vertex color
 
 // G-Buffer outputs (Multiple Render Targets)
 layout(location = 0) out vec3 gPosition;  // View space position (for SSAO)
@@ -88,6 +90,9 @@ void main() {
         albedo = baseColorFactor;
     }
 
+    // Multiply by vertex color (GLTF COLOR_0 attribute)
+    albedo.rgb *= v_color;
+
     // Alpha testing for MASK mode (cutout transparency)
     if (alphaMode == 1) {  // MASK mode
         if (albedo.a < alphaCutoff) {
@@ -102,6 +107,8 @@ void main() {
         vec2 transformed_uv = (emissiveTransform * vec3(v_texcoord, 1.0)).xy;
         emissive *= texture(emissiveTexture, transformed_uv).rgb;
     }
+    // Apply emissive strength (KHR_materials_emissive_strength - allows HDR glow > 1.0)
+    emissive *= emissiveStrength;
 
     // Sample occlusion (baked AO from GLTF, stored in RED channel per spec)
     float occlusion = 1.0;

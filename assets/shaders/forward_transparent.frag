@@ -33,6 +33,7 @@ uniform mat3 occlusionTransform;
 // Material properties
 uniform vec4 baseColorFactor;
 uniform vec3 emissiveFactor;
+uniform float emissiveStrength;  // KHR_materials_emissive_strength
 uniform float occlusionStrength;
 uniform float normalScale;
 
@@ -57,6 +58,7 @@ in vec3 v_world_position;
 in vec3 v_world_normal;
 in vec2 v_texcoord;
 in mat3 v_TBN;
+in vec3 v_color;  // Vertex color
 
 // Output color (with alpha)
 out vec4 fragColor;
@@ -137,6 +139,9 @@ void main() {
         albedo = baseColorFactor;
     }
 
+    // Multiply by vertex color (GLTF COLOR_0 attribute)
+    albedo.rgb *= v_color;
+
     // Early discard for fully transparent pixels (optimization)
     if (albedo.a < 0.01) {
         discard;
@@ -178,6 +183,8 @@ void main() {
         vec2 transformed_uv = (emissiveTransform * vec3(v_texcoord, 1.0)).xy;
         emissive *= texture(emissiveTexture, transformed_uv).rgb;
     }
+    // Apply emissive strength (KHR_materials_emissive_strength)
+    emissive *= emissiveStrength;
 
     // PBR Lighting calculation
     vec3 V = normalize(cameraPos - v_world_position);

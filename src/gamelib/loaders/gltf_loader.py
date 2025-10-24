@@ -285,6 +285,24 @@ class GltfLoader:
             print("    Generating tangents for normal mapping...")
             tangents = self._generate_tangents(positions, normals, texcoords)
 
+        # Get vertex colors (optional, COLOR_0 attribute)
+        colors = None
+        if hasattr(primitive.attributes, 'COLOR_0') and primitive.attributes.COLOR_0 is not None:
+            colors = self._get_accessor_data(gltf, primitive.attributes.COLOR_0)
+            print("    Found vertex colors (COLOR_0)")
+
+            # Ensure colors are in RGB format (convert RGBA to RGB if needed)
+            # GLTF allows VEC3 or VEC4, we'll use VEC3 in shaders
+            if colors is not None:
+                # Reshape to per-vertex format
+                colors_per_vertex = len(colors) // vertex_count
+                if colors_per_vertex == 4:
+                    # RGBA -> RGB (discard alpha)
+                    colors = colors.reshape(-1, 4)[:, :3].flatten()
+                elif colors_per_vertex != 3:
+                    print(f"    Warning: Unexpected color format, ignoring")
+                    colors = None
+
         # Get indices (optional)
         indices = None
         if primitive.indices is not None:
@@ -295,6 +313,7 @@ class GltfLoader:
             'normals': normals,
             'texcoords': texcoords,
             'tangents': tangents,
+            'colors': colors,
             'indices': indices,
             'count': vertex_count,
         }
@@ -517,6 +536,7 @@ class GltfLoader:
         normals = vertex_data['normals']
         texcoords = vertex_data['texcoords']
         tangents = vertex_data['tangents']
+        colors = vertex_data.get('colors', None)
         indices = vertex_data['indices']
 
         # If we have indices, expand vertex data first
@@ -527,6 +547,7 @@ class GltfLoader:
             expanded_normals = []
             expanded_texcoords = [] if texcoords is not None else None
             expanded_tangents = [] if tangents is not None else None
+            expanded_colors = [] if colors is not None else None
 
             # Expand vertices according to indices
             for idx in indices_int:
@@ -540,6 +561,9 @@ class GltfLoader:
                 # Tangents (vec4)
                 if tangents is not None:
                     expanded_tangents.extend(tangents[idx * 4:(idx + 1) * 4])
+                # Colors (vec3)
+                if colors is not None:
+                    expanded_colors.extend(colors[idx * 3:(idx + 1) * 3])
 
             positions = np.array(expanded_positions, dtype='f4')
             normals = np.array(expanded_normals, dtype='f4')
@@ -547,6 +571,8 @@ class GltfLoader:
                 texcoords = np.array(expanded_texcoords, dtype='f4')
             if tangents is not None:
                 tangents = np.array(expanded_tangents, dtype='f4')
+            if colors is not None:
+                colors = np.array(expanded_colors, dtype='f4')
 
         # Build interleaved vertex buffer
         vertex_count = len(positions) // 3
@@ -557,17 +583,22 @@ class GltfLoader:
             print("    Generating default tangents...")
             tangents = np.tile([1.0, 0.0, 0.0, 1.0], vertex_count).astype('f4')
 
-        # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f) = 12 floats per vertex
-        interleaved = np.zeros(vertex_count * 12, dtype='f4')
+        # If colors are missing, generate default white
+        if colors is None:
+            colors = np.tile([1.0, 1.0, 1.0], vertex_count).astype('f4')
+
+        # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f), color (3f) = 15 floats per vertex
+        interleaved = np.zeros(vertex_count * 15, dtype='f4')
         for i in range(vertex_count):
-            base = i * 12
+            base = i * 15
             interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
             interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
             interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
             interleaved[base + 8:base + 12] = tangents[i * 4:(i + 1) * 4]
-        
-        format_str = '3f 3f 2f 4f'
-        attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent']
+            interleaved[base + 12:base + 15] = colors[i * 3:(i + 1) * 3]
+
+        format_str = '3f 3f 2f 4f 3f'
+        attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent', 'in_color']
 
         # Create VAO
         vao = VAO(name="gltf_mesh", mode=moderngl.TRIANGLES)
@@ -668,14 +699,23 @@ class GltfLoader:
             if hasattr(gltf_mat, 'doubleSided') and gltf_mat.doubleSided:
                 material.double_sided = True
 
-            # Check for KHR_materials_unlit extension
+            materials.append(material)
+            print(f"  Material: {mat_name}")
+
+            # Check for extensions (moved after material append for proper ordering)
             if hasattr(gltf_mat, 'extensions') and gltf_mat.extensions:
+                # KHR_materials_unlit
                 if 'KHR_materials_unlit' in gltf_mat.extensions:
                     material.unlit = True
                     print(f"    Unlit: True (KHR_materials_unlit)")
 
-            materials.append(material)
-            print(f"  Material: {mat_name}")
+                # KHR_materials_emissive_strength
+                if 'KHR_materials_emissive_strength' in gltf_mat.extensions:
+                    emissive_ext = gltf_mat.extensions['KHR_materials_emissive_strength']
+                    # Extension data is a dict, not an object
+                    if isinstance(emissive_ext, dict) and 'emissiveStrength' in emissive_ext:
+                        material.emissive_strength = emissive_ext['emissiveStrength']
+                        print(f"    Emissive Strength: {material.emissive_strength} (KHR_materials_emissive_strength)")
             if material.emissive_texture or material.emissive_factor != (0.0, 0.0, 0.0):
                 print(f"    Emissive: factor={material.emissive_factor}, texture={material.emissive_texture is not None}")
 

@@ -55,6 +55,7 @@ class Material:
 
         # Extensions
         self.unlit = False  # KHR_materials_unlit extension
+        self.emissive_strength = 1.0  # KHR_materials_emissive_strength (allows HDR emissive > 1.0)
 
         # Texture transforms (KHR_texture_transform extension)
         # Each texture can have its own transform for offset/scale/rotation
@@ -134,6 +135,10 @@ class Material:
         # Set emissive factor
         if 'emissiveFactor' in program:
             program['emissiveFactor'].value = self.emissive_factor
+
+        # Set emissive strength (KHR_materials_emissive_strength)
+        if 'emissiveStrength' in program:
+            program['emissiveStrength'].value = self.emissive_strength
 
         # Bind occlusion texture to texture unit 7
         if self.occlusion_texture:

@@ -13,6 +13,7 @@ in vec3 in_position;
 in vec3 in_normal;
 in vec2 in_texcoord;
 in vec4 in_tangent;// xyz = tangent, w = handedness
+in vec3 in_color;// Vertex color (COLOR_0 from GLTF)
 
 // Outputs to fragment shader
 out vec3 v_world_position;// World space position
@@ -21,6 +22,7 @@ out vec3 v_world_normal;// World space normal
 out vec3 v_view_normal;// View space normal
 out vec2 v_texcoord;// Texture coordinates
 out mat3 v_TBN;// Tangent-Bitangent-Normal matrix (view space)
+out vec3 v_color;// Vertex color
 
 void main(){
     // Transform to world space
@@ -49,7 +51,10 @@ void main(){
     
     // Pass through texture coordinates
     v_texcoord=in_texcoord;
-    
+
+    // Pass through vertex color
+    v_color=in_color;
+
     // Transform to clip space for rendering
     gl_Position=projection*view_pos;
 }

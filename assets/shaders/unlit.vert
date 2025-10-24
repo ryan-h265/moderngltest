@@ -11,6 +11,7 @@ in vec3 in_position;
 in vec3 in_normal;
 in vec2 in_texcoord;
 in vec4 in_tangent;
+in vec3 in_color;  // Vertex color (COLOR_0 from GLTF)
 
 out vec3 v_world_position;
 out vec3 v_view_position;
@@ -18,6 +19,7 @@ out vec3 v_world_normal;
 out vec3 v_view_normal;
 out vec2 v_texcoord;
 out mat3 v_TBN;
+out vec3 v_color;  // Vertex color
 
 void main(){
     // Transform position to world space
@@ -44,7 +46,10 @@ void main(){
     
     // Pass through texture coordinates
     v_texcoord=in_texcoord;
-    
+
+    // Pass through vertex color
+    v_color=in_color;
+
     // Final position in clip space
     gl_Position=projection*view_pos;
 }
