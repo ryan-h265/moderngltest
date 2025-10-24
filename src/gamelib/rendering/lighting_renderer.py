@@ -5,12 +5,13 @@ Renders lighting in the deferred rendering pipeline.
 Each light is rendered as a full-screen quad that reads from the G-Buffer.
 """
 
-from typing import List
+from typing import List, Optional
 import numpy as np
 import moderngl
 
 from ..core.camera import Camera
 from ..core.light import Light
+from ..core.skybox import Skybox
 from .gbuffer import GBuffer
 from ..config.settings import (
     AMBIENT_STRENGTH,
@@ -99,6 +100,7 @@ class LightingRenderer:
         camera: Camera,
         viewport: tuple,
         ssao_texture: moderngl.Texture = None,
+        skybox: Optional[Skybox] = None,
         apply_post_lighting=None,
     ):
         """
@@ -110,6 +112,7 @@ class LightingRenderer:
             camera: Camera for view position
             viewport: Viewport tuple (x, y, width, height)
             ssao_texture: Optional SSAO texture
+            skybox: Optional skybox for background rendering
             apply_post_lighting: Optional callback executed after emissive pass
                 while additive blending is still enabled (used for bloom)
         """
@@ -120,6 +123,7 @@ class LightingRenderer:
             viewport,
             self.ctx.screen,
             ssao_texture,
+            skybox=skybox,
             apply_post_lighting=apply_post_lighting,
         )
 
@@ -131,6 +135,7 @@ class LightingRenderer:
         viewport: tuple,
         target: moderngl.Framebuffer,
         ssao_texture: moderngl.Texture = None,
+        skybox: Optional[Skybox] = None,
         apply_post_lighting=None,
     ):
         """
@@ -143,6 +148,7 @@ class LightingRenderer:
             viewport: Viewport tuple (x, y, width, height)
             target: Target framebuffer
             ssao_texture: Optional SSAO texture
+            skybox: Optional skybox for background rendering
             apply_post_lighting: Optional callback executed after emissive pass
                 while additive blending is still enabled (used for bloom)
         """
@@ -158,9 +164,23 @@ class LightingRenderer:
         # Bind G-Buffer textures (locations 0-3)
         gbuffer.bind_textures(start_location=0)
 
+        # Prepare matrices for screen-space reconstruction
+        _, _, width, height = viewport
+        aspect_ratio = width / height if height > 0 else 1.0
+        view_matrix = camera.get_view_matrix()
+        projection_matrix = camera.get_projection_matrix(aspect_ratio)
+        inverse_view = np.linalg.inv(view_matrix)
+        inverse_projection = np.linalg.inv(projection_matrix)
+
         # Step 1: Render ambient lighting (no blending)
         self.ctx.disable(moderngl.BLEND)
-        self._render_ambient(gbuffer, ssao_texture)
+        self._render_ambient(
+            gbuffer,
+            ssao_texture,
+            inverse_view=inverse_view,
+            inverse_projection=inverse_projection,
+            skybox=skybox,
+        )
 
         # Step 2: Sort and limit lights if enabled
         lights_to_render = self._prepare_lights_for_rendering(lights, camera)
@@ -169,8 +189,7 @@ class LightingRenderer:
         self.ctx.enable(moderngl.BLEND)
         self.ctx.blend_func = moderngl.ONE, moderngl.ONE  # Additive blending
 
-        # Get inverse view matrix for world-space reconstruction
-        inverse_view = np.linalg.inv(camera.get_view_matrix())
+        # Get inverse view matrix for world-space reconstruction (already computed above)
 
         for light_index, light in enumerate(lights_to_render):
             self._render_light(light, light_index, camera, inverse_view)
@@ -224,13 +243,23 @@ class LightingRenderer:
         # Return just the lights (drop importance scores)
         return [light for light, _ in lights_with_importance]
 
-    def _render_ambient(self, gbuffer: GBuffer, ssao_texture: moderngl.Texture = None):
+    def _render_ambient(
+        self,
+        gbuffer: GBuffer,
+        ssao_texture: moderngl.Texture = None,
+        inverse_view: np.ndarray | None = None,
+        inverse_projection: np.ndarray | None = None,
+        skybox: Optional[Skybox] = None,
+    ):
         """
         Render ambient lighting pass.
 
         Args:
             gbuffer: G-Buffer (for texture binding reference)
             ssao_texture: Optional SSAO texture
+            inverse_view: Optional inverse view matrix for world reconstruction
+            inverse_projection: Optional inverse projection matrix
+            skybox: Optional skybox configuration for background rendering
         """
         # Set G-Buffer samplers (check if uniforms exist first)
         if 'gPosition' in self.ambient_program:
@@ -257,6 +286,25 @@ class LightingRenderer:
         else:
             if 'ssaoEnabled' in self.ambient_program:
                 self.ambient_program['ssaoEnabled'].value = False
+
+        if inverse_view is not None and 'inverse_view' in self.ambient_program:
+            self.ambient_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
+        if inverse_projection is not None and 'inverse_projection' in self.ambient_program:
+            self.ambient_program['inverse_projection'].write(inverse_projection.astype('f4').tobytes())
+
+        if skybox is not None and getattr(skybox, 'texture', None) is not None:
+            if 'skybox_enabled' in self.ambient_program:
+                self.ambient_program['skybox_enabled'].value = True
+            if 'skybox_texture' in self.ambient_program:
+                self.ambient_program['skybox_texture'].value = 7
+            skybox.texture.use(location=7)
+            if 'skybox_intensity' in self.ambient_program:
+                self.ambient_program['skybox_intensity'].value = skybox.intensity
+            if 'skybox_rotation' in self.ambient_program:
+                self.ambient_program['skybox_rotation'].write(skybox.rotation_matrix().astype('f4').tobytes())
+        else:
+            if 'skybox_enabled' in self.ambient_program:
+                self.ambient_program['skybox_enabled'].value = False
 
         # Render full-screen quad
         self.quad_vao_ambient.render(moderngl.TRIANGLES)

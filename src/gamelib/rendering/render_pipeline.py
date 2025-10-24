@@ -11,6 +11,7 @@ import moderngl
 from .shader_manager import ShaderManager
 from .shadow_renderer import ShadowRenderer
 from .main_renderer import MainRenderer
+from .skybox_renderer import SkyboxRenderer
 from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
@@ -70,6 +71,7 @@ class RenderPipeline:
 
         # Forward rendering shaders
         self.shader_manager.load_program("main", "main_lighting.vert", "main_lighting.frag")
+        self.shader_manager.load_program("skybox", "skybox.vert", "skybox.frag")
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
@@ -106,9 +108,14 @@ class RenderPipeline:
         self.shadow_renderer.set_screen_viewport((0, 0, WINDOW_SIZE[0], WINDOW_SIZE[1]))
 
         # Create forward rendering pipeline
+        self.skybox_renderer = SkyboxRenderer(
+            ctx,
+            self.shader_manager.get("skybox")
+        )
         self.main_renderer = MainRenderer(
             ctx,
-            self.shader_manager.get("main")
+            self.shader_manager.get("main"),
+            skybox_renderer=self.skybox_renderer
         )
 
         # Create deferred rendering pipeline
@@ -315,6 +322,7 @@ class RenderPipeline:
 
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
 
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
         if render_target == self.ctx.screen:
@@ -338,6 +346,7 @@ class RenderPipeline:
                 camera,
                 self.window.viewport,
                 ssao_texture=ssao_texture,
+                skybox=skybox,
                 apply_post_lighting=apply_post_lighting,
             )
 
@@ -374,6 +383,7 @@ class RenderPipeline:
                 self.window.viewport,
                 render_target,
                 ssao_texture=ssao_texture,
+                skybox=skybox,
                 apply_post_lighting=apply_post_lighting,
             )
 

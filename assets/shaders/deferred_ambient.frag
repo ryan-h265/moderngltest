@@ -16,6 +16,14 @@ uniform float ssaoIntensity;
 // Ambient strength
 uniform float ambient_strength;
 
+// Skybox uniforms
+uniform bool skybox_enabled;
+uniform samplerCube skybox_texture;
+uniform mat4 inverse_view;
+uniform mat4 inverse_projection;
+uniform float skybox_intensity;
+uniform mat4 skybox_rotation;
+
 // Input from vertex shader
 in vec2 v_texcoord;
 
@@ -31,8 +39,18 @@ void main() {
 
     // Early exit for background pixels (no geometry)
     if (length(normal) < 0.1) {
-        // Background color (dark blue)
-        f_color = vec4(0.1, 0.1, 0.15, 1.0);
+        if (skybox_enabled) {
+            vec2 ndc = v_texcoord * 2.0 - 1.0;
+            vec4 clip = vec4(ndc, 1.0, 1.0);
+            vec4 view_dir = inverse_projection * clip;
+            vec3 dir = normalize(view_dir.xyz / view_dir.w);
+            vec3 world_dir = mat3(inverse_view) * dir;
+            vec3 rotated_dir = mat3(skybox_rotation) * world_dir;
+            vec3 sky_color = texture(skybox_texture, rotated_dir).rgb * skybox_intensity;
+            f_color = vec4(sky_color, 1.0);
+        } else {
+            f_color = vec4(0.1, 0.1, 0.15, 1.0);
+        }
         return;
     }
 
