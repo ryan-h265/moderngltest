@@ -270,6 +270,10 @@ class GltfLoader:
         texcoords = None
         if hasattr(primitive.attributes, 'TEXCOORD_0') and primitive.attributes.TEXCOORD_0 is not None:
             texcoords = self._get_accessor_data(gltf, primitive.attributes.TEXCOORD_0)
+        else:
+            # Generate default UVs (all zeros)
+            print("    No texture coordinates found, using default UVs...")
+            texcoords = np.zeros(vertex_count * 2, dtype='f4')
 
         # Get tangents (optional, for normal mapping)
         tangents = None
@@ -547,37 +551,23 @@ class GltfLoader:
         # Build interleaved vertex buffer
         vertex_count = len(positions) // 3
 
-        # Create interleaved array based on available attributes
-        if texcoords is not None and tangents is not None:
-            # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f) = 12 floats per vertex
-            interleaved = np.zeros(vertex_count * 12, dtype='f4')
-            for i in range(vertex_count):
-                base = i * 12
-                interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
-                interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
-                interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
-                interleaved[base + 8:base + 12] = tangents[i * 4:(i + 1) * 4]
-            format_str = '3f 3f 2f 4f'
-            attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent']
-        elif texcoords is not None:
-            # Interleave: pos, norm, uv (no tangents)
-            interleaved = np.zeros(vertex_count * 8, dtype='f4')
-            for i in range(vertex_count):
-                base = i * 8
-                interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
-                interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
-                interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
-            format_str = '3f 3f 2f'
-            attributes = ['in_position', 'in_normal', 'in_texcoord']
-        else:
-            # Interleave: pos, norm (no UVs, no tangents)
-            interleaved = np.zeros(vertex_count * 6, dtype='f4')
-            for i in range(vertex_count):
-                base = i * 6
-                interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
-                interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
-            format_str = '3f 3f'
-            attributes = ['in_position', 'in_normal']
+        # Always create full interleaved array with all attributes
+        # If tangents are missing, generate dummy ones
+        if tangents is None:
+            print("    Generating default tangents...")
+            tangents = np.tile([1.0, 0.0, 0.0, 1.0], vertex_count).astype('f4')
+
+        # Interleave: pos (3f), norm (3f), uv (2f), tangent (4f) = 12 floats per vertex
+        interleaved = np.zeros(vertex_count * 12, dtype='f4')
+        for i in range(vertex_count):
+            base = i * 12
+            interleaved[base:base + 3] = positions[i * 3:(i + 1) * 3]
+            interleaved[base + 3:base + 6] = normals[i * 3:(i + 1) * 3]
+            interleaved[base + 6:base + 8] = texcoords[i * 2:(i + 1) * 2]
+            interleaved[base + 8:base + 12] = tangents[i * 4:(i + 1) * 4]
+        
+        format_str = '3f 3f 2f 4f'
+        attributes = ['in_position', 'in_normal', 'in_texcoord', 'in_tangent']
 
         # Create VAO
         vao = VAO(name="gltf_mesh", mode=moderngl.TRIANGLES)

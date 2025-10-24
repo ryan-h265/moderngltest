@@ -120,15 +120,25 @@ class Scene:
                     self.add_object(lantern)
                     models_loaded += 1
 
-                glasses_path = PROJECT_ROOT / "assets/models/props/glasses/scene.gltf"
-                if glasses_path.exists():
-                    print(f"Loading GLTF model: {glasses_path}")
-                    glasses = loader.load(str(glasses_path))
-                    glasses.position = Vector3([8.0, 0.0, -1.0])
-                    glasses.scale = Vector3([1.0, 1.0, 1.0])
-                    glasses.rotation = Vector3([0.0, 0.0, 0.0])
-                    self.add_object(glasses)
+                emissive_strength_test_path = PROJECT_ROOT / "assets/models/props/EmissiveStrengthTest.glb"
+                if emissive_strength_test_path.exists():
+                    print(f"Loading GLTF model: {emissive_strength_test_path}")
+                    emissive_test = loader.load(str(emissive_strength_test_path))
+                    emissive_test.position = Vector3([0.0, 0.0, -5.0])
+                    emissive_test.scale = Vector3([1.0, 1.0, 1.0])
+                    emissive_test.rotation = Vector3([0.0, 0.0, 0.0])
+                    self.add_object(emissive_test)
                     models_loaded += 1
+
+                # glasses_path = PROJECT_ROOT / "assets/models/props/glasses/scene.gltf"
+                # if glasses_path.exists():
+                #     print(f"Loading GLTF model: {glasses_path}")
+                #     glasses = loader.load(str(glasses_path))
+                #     glasses.position = Vector3([8.0, 0.0, -1.0])
+                #     glasses.scale = Vector3([1.0, 1.0, 1.0])
+                #     glasses.rotation = Vector3([0.0, 0.0, 0.0])
+                #     self.add_object(glasses)
+                #     models_loaded += 1
 
                 # 2. Tent - Place to the right
                 # tent_path = PROJECT_ROOT / "assets/models/props/tent/scene.gltf"
