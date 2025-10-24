@@ -218,7 +218,7 @@ class RenderPipeline:
 
     def resize(self, size: Tuple[int, int]):
         """Resize internal render targets and update cached viewport size."""
-        if not size or size == getattr(self, "viewport_size", None):
+        if not size or size == self.viewport_size:
             return
 
         width, height = size
