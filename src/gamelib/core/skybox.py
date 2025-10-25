@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 import moderngl
 import numpy as np
@@ -18,6 +18,8 @@ class Skybox:
     name: str = "Skybox"
     intensity: float = 1.0
     rotation: Matrix44 = field(default_factory=Matrix44.identity)
+    shader_variant: str = "cubemap"
+    uniforms: Dict[str, Any] = field(default_factory=dict)
 
     def set_rotation_from_euler(self, yaw: float = 0.0, pitch: float = 0.0, roll: float = 0.0) -> None:
         """Update the rotation matrix from Euler angles (degrees)."""
@@ -34,6 +36,14 @@ class Skybox:
     def rotation_matrix(self) -> Matrix44:
         """Return the current rotation matrix as numpy array."""
         return self.rotation
+
+    def set_uniform(self, name: str, value: Any) -> None:
+        """Store a custom uniform value."""
+        self.uniforms[name] = value
+
+    def get_uniform(self, name: str, default: Any = None) -> Any:
+        """Retrieve a previously stored uniform value."""
+        return self.uniforms.get(name, default)
 
     @classmethod
     def solid_color(
@@ -55,3 +65,27 @@ class Skybox:
         texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
         texture.build_mipmaps()
         return cls(texture=texture, name=name)
+
+    @classmethod
+    def aurora(
+        cls,
+        ctx: moderngl.Context,
+        name: str = "Aurora Sky",
+        aurora_direction: Tuple[float, float, float] = (-0.5, -0.6, 0.9),
+    ) -> "Skybox":
+        """Create an aurora procedural skybox configuration."""
+        # We still allocate a cubemap to keep the rendering pipeline uniform.
+        base = cls.solid_color(ctx, (0.0, 0.0, 0.0), name=name)
+        base.shader_variant = "aurora"
+        base.uniforms.update(
+            {
+                "u_transitionAlpha": 1.0,
+                "u_auroraDir": aurora_direction,
+                "fogEnabled": 1,
+                "fogColor": (0.05, 0.1, 0.2),
+                "fogStrength": 0.35,
+                "fogStart": 0.0,
+                "fogEnd": 1.0,
+            }
+        )
+        return base

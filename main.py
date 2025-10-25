@@ -75,8 +75,8 @@ class Game(mglw.WindowConfig):
         self.scene = Scene(ctx=self.ctx)
         self.scene.create_default_scene()
 
-        # Create and set skybox (for debugging with rainbow colors)
-        skybox = Skybox.solid_color(self.ctx, color=(1.0, 0.5, 0.5), name="Debug Skybox")
+        # Create and set procedural aurora skybox
+        skybox = Skybox.aurora(self.ctx, name="Aurora Skybox")
         skybox.intensity = 1.0
         self.scene.set_skybox(skybox)
 
@@ -194,7 +194,7 @@ class Game(mglw.WindowConfig):
         self.on_update(time, frametime)
 
         # Render frame
-        self.render_pipeline.render_frame(self.scene, self.camera, self.lights)
+        self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """

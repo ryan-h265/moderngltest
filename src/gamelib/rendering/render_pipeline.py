@@ -71,7 +71,7 @@ class RenderPipeline:
 
         # Forward rendering shaders
         self.shader_manager.load_program("main", "main_lighting.vert", "main_lighting.frag")
-        self.shader_manager.load_program("skybox", "skybox.vert", "skybox.frag")
+        self.shader_manager.load_program("skybox", "skybox.vert", "aurora_skybox.frag")
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
@@ -207,7 +207,13 @@ class RenderPipeline:
         camera_pos = camera.position if camera else None
         self.shadow_renderer.initialize_light_shadow_maps(lights, camera_pos)
 
-    def render_frame(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def render_frame(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render a complete frame.
 
@@ -232,9 +238,9 @@ class RenderPipeline:
 
         # Pass 2+: Render scene (mode-dependent)
         if self.rendering_mode == "deferred":
-            self._render_deferred(scene, camera, lights)
+            self._render_deferred(scene, camera, lights, time=time)
         else:
-            self._render_forward(scene, camera, lights)
+            self._render_forward(scene, camera, lights, time=time)
 
         # Final pass: Render UI overlay
         if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
@@ -271,7 +277,13 @@ class RenderPipeline:
         if hasattr(self.text_manager, "refresh_layout_metrics"):
             self.text_manager.refresh_layout_metrics()
 
-    def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def _render_forward(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using forward rendering.
 
@@ -282,17 +294,39 @@ class RenderPipeline:
         """
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
-        
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
+
         # Check if AA is enabled
         if render_target == self.ctx.screen:
             # No AA - render directly to screen (original behavior)
-            self.main_renderer.render(scene, camera, lights, self.window.viewport)
+            self.main_renderer.render(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                skybox=skybox,
+                time=time,
+            )
         else:
             # AA enabled - render to AA framebuffer then resolve
-            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target)
+            self.main_renderer.render_to_target(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                render_target,
+                skybox=skybox,
+                time=time,
+            )
             self.aa_renderer.resolve_and_present()
 
-    def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def _render_deferred(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using deferred rendering.
 
@@ -347,6 +381,7 @@ class RenderPipeline:
                 self.window.viewport,
                 ssao_texture=ssao_texture,
                 skybox=skybox,
+                time=time,
                 apply_post_lighting=apply_post_lighting,
             )
 
@@ -384,6 +419,7 @@ class RenderPipeline:
                 render_target,
                 ssao_texture=ssao_texture,
                 skybox=skybox,
+                time=time,
                 apply_post_lighting=apply_post_lighting,
             )
 

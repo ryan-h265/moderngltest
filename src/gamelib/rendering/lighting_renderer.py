@@ -101,6 +101,7 @@ class LightingRenderer:
         viewport: tuple,
         ssao_texture: moderngl.Texture = None,
         skybox: Optional[Skybox] = None,
+        time: float | None = None,
         apply_post_lighting=None,
     ):
         """
@@ -124,6 +125,7 @@ class LightingRenderer:
             self.ctx.screen,
             ssao_texture,
             skybox=skybox,
+            time=time,
             apply_post_lighting=apply_post_lighting,
         )
 
@@ -136,6 +138,7 @@ class LightingRenderer:
         target: moderngl.Framebuffer,
         ssao_texture: moderngl.Texture = None,
         skybox: Optional[Skybox] = None,
+        time: float | None = None,
         apply_post_lighting=None,
     ):
         """
@@ -180,6 +183,9 @@ class LightingRenderer:
             inverse_view=inverse_view,
             inverse_projection=inverse_projection,
             skybox=skybox,
+            camera=camera,
+            viewport=viewport,
+            time=time,
         )
 
         # Step 2: Sort and limit lights if enabled
@@ -250,6 +256,9 @@ class LightingRenderer:
         inverse_view: np.ndarray | None = None,
         inverse_projection: np.ndarray | None = None,
         skybox: Optional[Skybox] = None,
+        camera: Camera | None = None,
+        viewport: tuple | None = None,
+        time: float | None = None,
     ):
         """
         Render ambient lighting pass.
@@ -260,6 +269,9 @@ class LightingRenderer:
             inverse_view: Optional inverse view matrix for world reconstruction
             inverse_projection: Optional inverse projection matrix
             skybox: Optional skybox configuration for background rendering
+            camera: Camera for world-space position (procedural sky)
+            viewport: Current viewport (for resolution uniform)
+            time: Current time in seconds
         """
         # Set G-Buffer samplers (check if uniforms exist first)
         if 'gPosition' in self.ambient_program:
@@ -291,6 +303,57 @@ class LightingRenderer:
             self.ambient_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
         if inverse_projection is not None and 'inverse_projection' in self.ambient_program:
             self.ambient_program['inverse_projection'].write(inverse_projection.astype('f4').tobytes())
+
+        time_value = float(time) if time is not None else 0.0
+        if 'u_time' in self.ambient_program:
+            self.ambient_program['u_time'].value = time_value
+
+        if viewport is not None and 'u_resolution' in self.ambient_program:
+            _, _, width, height = viewport
+            width = max(width, 1)
+            height = max(height, 1)
+            self.ambient_program['u_resolution'].value = (float(width), float(height))
+
+        if camera is not None and 'u_cameraPos' in self.ambient_program:
+            pos = tuple(float(v) for v in camera.position)
+            self.ambient_program['u_cameraPos'].value = pos
+
+        procedural_mode = 1 if (skybox is not None and skybox.shader_variant == "aurora") else 0
+        if 'u_useProceduralSky' in self.ambient_program:
+            self.ambient_program['u_useProceduralSky'].value = procedural_mode
+
+        aurora_dir = (-0.5, -0.6, 0.9)
+        transition_alpha = 1.0
+        fog_enabled = 0
+        fog_color = (0.0, 0.0, 0.0)
+        fog_start = 0.0
+        fog_end = 1.0
+        fog_strength = 0.0
+
+        if skybox is not None:
+            aurora_dir = skybox.get_uniform("u_auroraDir", aurora_dir)
+            transition_alpha = float(skybox.get_uniform("u_transitionAlpha", transition_alpha))
+            if procedural_mode == 1:
+                fog_enabled = int(skybox.get_uniform("fogEnabled", 0))
+                fog_color = skybox.get_uniform("fogColor", fog_color)
+                fog_start = float(skybox.get_uniform("fogStart", fog_start))
+                fog_end = float(skybox.get_uniform("fogEnd", fog_end))
+                fog_strength = float(skybox.get_uniform("fogStrength", fog_strength))
+
+        if 'u_auroraDir' in self.ambient_program:
+            self.ambient_program['u_auroraDir'].value = tuple(float(v) for v in aurora_dir)
+        if 'u_transitionAlpha' in self.ambient_program:
+            self.ambient_program['u_transitionAlpha'].value = transition_alpha
+        if 'fogEnabled' in self.ambient_program:
+            self.ambient_program['fogEnabled'].value = fog_enabled
+        if 'fogColor' in self.ambient_program:
+            self.ambient_program['fogColor'].value = tuple(float(v) for v in fog_color)
+        if 'fogStart' in self.ambient_program:
+            self.ambient_program['fogStart'].value = fog_start
+        if 'fogEnd' in self.ambient_program:
+            self.ambient_program['fogEnd'].value = fog_end
+        if 'fogStrength' in self.ambient_program:
+            self.ambient_program['fogStrength'].value = fog_strength
 
         if skybox is not None and getattr(skybox, 'texture', None) is not None:
             if 'skybox_enabled' in self.ambient_program:

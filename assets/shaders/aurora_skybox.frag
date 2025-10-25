@@ -1,44 +1,22 @@
 #version 410
 
-// Deferred Rendering - Ambient Lighting Fragment Shader
-// Adds base ambient lighting with optional SSAO
+in vec3 v_texcoord;
 
-// G-Buffer textures
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
-uniform sampler2D gAlbedo;
-
-// SSAO texture (optional)
-uniform sampler2D ssaoTexture;
-uniform bool ssaoEnabled;
-uniform float ssaoIntensity;
-
-// Ambient strength
-uniform float ambient_strength;
-
-// Skybox uniforms
-uniform bool skybox_enabled;
 uniform samplerCube skybox_texture;
-uniform mat4 inverse_view;
-uniform mat4 inverse_projection;
-uniform float skybox_intensity;
-uniform mat4 skybox_rotation;
+uniform float intensity;
+
 uniform float u_time;
 uniform vec2 u_resolution;
-uniform vec3 u_cameraPos;
 uniform vec3 u_auroraDir;
 uniform float u_transitionAlpha;
 uniform int u_useProceduralSky;
+
 uniform int fogEnabled;
 uniform vec3 fogColor;
 uniform float fogStart;
 uniform float fogEnd;
 uniform float fogStrength;
 
-// Input from vertex shader
-in vec2 v_texcoord;
-
-// Output
 out vec4 f_color;
 
 mat2 mm2(float a) {
@@ -120,9 +98,9 @@ vec3 background_color(vec3 rd) {
 }
 
 vec3 compute_aurora_sky(vec3 dir) {
-    vec3 rd = dir.xzy;
-    rd = vec3(rd.x, rd.z, -rd.y);
-    vec3 ro = vec3(0.0);
+    vec3 rd = dir.xzy;  // align with original Shadertoy axes
+    rd = vec3(rd.x, rd.z, -rd.y);  // rotate +90° around the X axis so sky is above and ground below
+    vec3 ro = vec3(0.0);  // keep procedural sky anchored while camera moves
 
     float fade = smoothstep(0.0, 0.01, abs(rd.y)) * 0.1 + 0.9;
     vec3 col = background_color(rd) * fade;
@@ -152,50 +130,13 @@ vec3 compute_aurora_sky(vec3 dir) {
 }
 
 void main() {
-    // Sample albedo + baked AO from G-Buffer
-    vec4 albedo_ao = texture(gAlbedo, v_texcoord);
-    vec3 base_color = albedo_ao.rgb;
-    float baked_ao = albedo_ao.a;  // Baked occlusion from GLTF texture (1.0 if none)
-    vec3 normal = texture(gNormal, v_texcoord).rgb;
+    vec3 dir = normalize(v_texcoord);
+    vec3 color = texture(skybox_texture, dir).rgb;
 
-    // Early exit for background pixels (no geometry)
-    if (length(normal) < 0.1) {
-        if (skybox_enabled) {
-            vec2 ndc = v_texcoord * 2.0 - 1.0;
-            vec4 clip = vec4(ndc, 1.0, 1.0);
-            vec4 view_dir = inverse_projection * clip;
-            vec3 dir = normalize(view_dir.xyz / view_dir.w);
-            vec3 world_dir = mat3(inverse_view) * dir;
-            vec3 rotated_dir = mat3(skybox_rotation) * world_dir;
-
-            if (u_useProceduralSky == 1) {
-                vec3 aurora_color = compute_aurora_sky(rotated_dir);
-                f_color = vec4(aurora_color * skybox_intensity, u_transitionAlpha);
-            } else {
-                vec3 sky_color = texture(skybox_texture, rotated_dir).rgb * skybox_intensity;
-                f_color = vec4(sky_color, 1.0);
-            }
-        } else {
-            f_color = vec4(0.1, 0.1, 0.15, 1.0);
-        }
-        return;
+    if (u_useProceduralSky == 1) {
+        color = compute_aurora_sky(dir);
     }
 
-    // Get SSAO occlusion factor (screen-space, dynamic)
-    float ssao = 1.0;
-    if (ssaoEnabled) {
-        float ssao_sample = texture(ssaoTexture, v_texcoord).r;
-        // Mix between full occlusion and no occlusion
-        ssao = mix(1.0 - ssaoIntensity, 1.0, ssao_sample);
-    }
-
-    // Combine baked AO and SSAO (multiply for best results)
-    // - Baked AO: High-quality, fine detail (crevices, seams)
-    // - SSAO: Dynamic, large-scale occlusion (nearby geometry)
-    float combined_ao = baked_ao * ssao;
-
-    // Ambient lighting modulated by combined AO
-    vec3 ambient = ambient_strength * base_color * combined_ao;
-
-    f_color = vec4(ambient, 1.0);
+    color *= intensity;
+    f_color = vec4(color, u_transitionAlpha);
 }

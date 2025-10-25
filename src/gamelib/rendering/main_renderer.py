@@ -48,6 +48,7 @@ class MainRenderer:
         lights: List[Light],
         viewport: Tuple[int, int, int, int],
         skybox: Optional[Skybox] = None,
+        time: float | None = None,
     ):
         """
         Render the main scene with frustum culling.
@@ -59,7 +60,15 @@ class MainRenderer:
             viewport: Viewport tuple (x, y, width, height)
             skybox: Optional skybox to render before scene geometry
         """
-        self.render_to_target(scene, camera, lights, viewport, self.ctx.screen, skybox=skybox)
+        self.render_to_target(
+            scene,
+            camera,
+            lights,
+            viewport,
+            self.ctx.screen,
+            skybox=skybox,
+            time=time,
+        )
 
     def render_to_target(
         self,
@@ -68,7 +77,8 @@ class MainRenderer:
         lights: List[Light],
         viewport: Tuple[int, int, int, int],
         target: moderngl.Framebuffer,
-        skybox: Optional[Skybox] = None
+        skybox: Optional[Skybox] = None,
+        time: float | None = None,
     ):
         """
         Render the main scene to a specific framebuffer.
@@ -92,7 +102,7 @@ class MainRenderer:
 
         # Render skybox first if available
         if self.skybox_renderer is not None and skybox is not None:
-            self.skybox_renderer.render(camera, skybox, viewport)
+            self.skybox_renderer.render(camera, skybox, viewport, time=time)
 
         # Bind shadow maps
         self._bind_shadow_maps(lights)
