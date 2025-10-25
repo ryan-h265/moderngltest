@@ -346,7 +346,7 @@ class PhysicsWorld:
         """Create a PyBullet collision shape based on the provided config."""
 
         shape = (config.shape or "box").lower()
-        kwargs = {"physicsClientId": self._client, "collisionMargin": config.margin}
+        kwargs = {"physicsClientId": self._client}
 
         if shape == "box":
             if config.half_extents is None:
@@ -379,11 +379,14 @@ class PhysicsWorld:
             if not config.mesh_path:
                 raise ValueError("Mesh collider requires 'mesh_path'")
             mesh_scale = config.mesh_scale or (1.0, 1.0, 1.0)
+            mesh_kwargs = dict(kwargs)
+            if config.margin is not None:
+                mesh_kwargs["collisionMargin"] = config.margin
             return _pb.createCollisionShape(
                 _pb.GEOM_MESH,
                 fileName=str(config.mesh_path),
                 meshScale=mesh_scale,
-                **kwargs,
+                **mesh_kwargs,
             )
         if shape == "heightfield":
             raise NotImplementedError("Heightfield colliders are not yet supported")
