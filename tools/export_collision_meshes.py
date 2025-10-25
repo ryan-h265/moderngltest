@@ -9,18 +9,24 @@ Creates OBJ files under ``assets/collision`` for:
 
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import math
 import struct
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+import sys
+from typing import Dict, Iterable, Iterator, List, Sequence, Tuple
 
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "assets"
 COLLISION_DIR = ASSETS / "collision"
+
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 # GLTF helpers -----------------------------------------------------------------
 
@@ -273,20 +279,96 @@ def export_gltf_collision(source: Path, destination: Path) -> None:
 
 # Entry point -------------------------------------------------------------------
 
-def main() -> None:
-    _ensure_collision_dir()
 
-    export_donut_collision(COLLISION_DIR / "donut_terrain_collision.obj")
+def _collect_scene_paths(paths: Sequence[str] | None) -> List[Path]:
+    if not paths:
+        return sorted((ASSETS / "scenes").glob("*.json"))
+    results: List[Path] = []
+    for item in paths:
+        path = Path(item)
+        if not path.is_absolute():
+            path = (ROOT / item).resolve()
+        if path.is_dir():
+            results.extend(sorted(path.glob("*.json")))
+        else:
+            results.append(path)
+    return results
 
-    export_gltf_collision(
-        ASSETS / "models" / "props" / "dark_lantern_rigged" / "scene.gltf",
-        COLLISION_DIR / "lantern_collision.obj",
+
+def _iter_collision_definitions(scene_path: Path) -> Iterator[Tuple[Path, Dict, str]]:
+    payload = json.loads(scene_path.read_text(encoding="utf-8"))
+    objects = payload.get("objects", [])
+    base_path = scene_path.parent
+    for obj in objects:
+        if not isinstance(obj, dict):
+            continue
+        physics = obj.get("physics")
+        if not isinstance(physics, dict):
+            continue
+        collision = physics.get("collision_mesh")
+        if not isinstance(collision, dict):
+            continue
+        yield base_path, collision, obj.get("name", "Unnamed")
+
+
+def cli(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Generate collision meshes referenced by scene physics definitions.",
     )
-    export_gltf_collision(
-        ASSETS / "models" / "props" / "EmissiveStrengthTest.glb",
-        COLLISION_DIR / "emissive_collision.obj",
+    parser.add_argument(
+        "--scene",
+        action="append",
+        help="Specific scene file or directory to process (defaults to all scenes).",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Rebuild collision meshes even when outputs appear up-to-date.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress logs for meshes that are already up-to-date.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        from gamelib.physics.collision_meshes import resolve_collision_mesh
+    except ImportError as exc:  # pragma: no cover - handled at runtime
+        parser.error(f"Unable to import collision resolver: {exc}")
+        return 2
+
+    scenes = _collect_scene_paths(args.scene)
+    if not scenes:
+        if not args.quiet:
+            print("No scenes found.")
+        return 0
+
+    processed = 0
+    rebuilt = 0
+    up_to_date = 0
+    for scene_path in scenes:
+        for base_path, definition, obj_name in _iter_collision_definitions(scene_path):
+            result = resolve_collision_mesh(definition, base_path=base_path, force_rebuild=args.force)
+            processed += 1
+            relative_output = result.path.relative_to(ROOT)
+            if result.rebuilt:
+                rebuilt += 1
+                print(f"[rebuilt] {relative_output}  <- {scene_path.name}:{obj_name}")
+            elif not args.quiet:
+                up_to_date += 1
+                print(f"[ok]      {relative_output}")
+
+    if not args.quiet:
+        print(f"Processed {processed} collision mesh request(s); rebuilt {rebuilt}, up-to-date {up_to_date}.")
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI-compatible entry point."""
+
+    return cli(argv)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(cli())

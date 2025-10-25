@@ -40,7 +40,19 @@
       "physics": {
         "type": "static",
         "shape": "mesh",
-        "mesh_path": "../collision/donut_terrain_collision.obj",
+        "collision_mesh": {
+          "type": "generator",
+          "name": "donut_terrain_collision",
+          "generator": "tools.export_collision_meshes:export_donut_collision",
+          "params": {
+            "resolution": 128,
+            "outer_radius": 200.0,
+            "inner_radius": 80.0,
+            "height": 50.0,
+            "rim_width": 40.0,
+            "seed": 42
+          }
+        },
         "friction": 0.25,
         "restitution": 0.3
       }

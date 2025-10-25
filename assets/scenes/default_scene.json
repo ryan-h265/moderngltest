@@ -414,7 +414,11 @@
       "physics": {
         "type": "static",
         "shape": "mesh",
-        "mesh_path": "../collision/lantern_collision.obj",
+        "collision_mesh": {
+          "type": "gltf",
+          "name": "lantern_collision",
+          "source": "assets/models/props/dark_lantern_rigged/scene.gltf"
+        },
         "friction": 0.5,
         "restitution": 0.2
       }
@@ -441,7 +445,11 @@
       "physics": {
         "type": "static",
         "shape": "mesh",
-        "mesh_path": "../collision/emissive_collision.obj",
+        "collision_mesh": {
+          "type": "gltf",
+          "name": "emissive_collision",
+          "source": "assets/models/props/EmissiveStrengthTest.glb"
+        },
         "friction": 0.6,
         "restitution": 0.2
       }

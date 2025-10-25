@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pyrr import Quaternion, Vector3
 
+from .collision_meshes import resolve_collision_mesh, CollisionMeshError
+
 try:  # pragma: no cover - exercised indirectly when PyBullet is available
     import pybullet as _pb
 except ImportError as exc:  # pragma: no cover - handled gracefully at runtime
@@ -21,7 +23,11 @@ except ImportError:  # pragma: no cover - optional dependency
     pybullet_data = None
 
 
-_CONE_COLLISION_MESH = Path(__file__).resolve().parents[3] / "assets" / "collision" / "cone_collision.obj"
+_CONE_COLLISION_DEFINITION = {
+    "type": "generator",
+    "generator": "gamelib.physics.collision_primitives:export_cone_collision",
+    "name": "cone_collision",
+}
 
 def _vec3(value: Iterable[float] | None) -> Optional[Tuple[float, float, float]]:
     """Convert an iterable to a tuple of three floats."""
@@ -90,6 +96,7 @@ class PhysicsBodyConfig:
     orientation: Optional[Tuple[float, float, float, float]] = None
     position: Optional[Tuple[float, float, float]] = None
     user_data: Dict[str, Any] = field(default_factory=dict)
+    collision_mesh: Optional[Dict[str, Any]] = None
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "PhysicsBodyConfig":
@@ -154,6 +161,11 @@ class PhysicsBodyConfig:
             if not isinstance(data["user_data"], dict):
                 raise TypeError("physics.user_data must be a dictionary")
             config.user_data = dict(data["user_data"])
+        if "collision_mesh" in data:
+            mesh_def = data["collision_mesh"]
+            if not isinstance(mesh_def, dict):
+                raise TypeError("physics.collision_mesh must be a dictionary")
+            config.collision_mesh = dict(mesh_def)
         return config
 
     @property
@@ -315,6 +327,15 @@ class PhysicsWorld:
             scale = getattr(scene_object, "scale")
             if isinstance(scale, Vector3):
                 config.mesh_scale = (float(scale.x), float(scale.y), float(scale.z))
+        if config.mesh_path is None and config.collision_mesh is not None:
+            mesh_result = resolve_collision_mesh(config.collision_mesh, base_path=resource_base)
+            config.mesh_path = str(mesh_result.path)
+        if config.shape == "cone" and config.mesh_path is None:
+            try:
+                mesh_result = resolve_collision_mesh(_CONE_COLLISION_DEFINITION, base_path=resource_base)
+            except CollisionMeshError as exc:
+                raise FileNotFoundError(f"Cone collision mesh could not be generated: {exc}") from exc
+            config.mesh_path = str(mesh_result.path)
 
     def _extract_scene_transform(self, scene_object: Any, config: PhysicsBodyConfig) -> Tuple[Tuple[float, float, float], Tuple[float, float, float, float]]:
         """Return the position and orientation of the scene object."""
@@ -370,11 +391,11 @@ class PhysicsWorld:
         if shape == "cone":
             if config.radius is None or config.height is None:
                 raise ValueError("Cone collider requires 'radius' and 'height'")
-            if not _CONE_COLLISION_MESH.is_file():
-                raise FileNotFoundError(f"Cone collision mesh not found: {_CONE_COLLISION_MESH}")
+            if not config.mesh_path:
+                raise FileNotFoundError("Cone collider requires generated mesh_path")
             return _pb.createCollisionShape(
                 _pb.GEOM_MESH,
-                fileName=str(_CONE_COLLISION_MESH),
+                fileName=str(config.mesh_path),
                 meshScale=[
                     float(config.radius),
                     float(config.height),
