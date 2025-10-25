@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pyrr import Quaternion, Vector3
 
 try:  # pragma: no cover - exercised indirectly when PyBullet is available
@@ -20,6 +20,8 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     pybullet_data = None
 
+
+_CONE_COLLISION_MESH = Path(__file__).resolve().parents[3] / "assets" / "collision" / "cone_collision.obj"
 
 def _vec3(value: Iterable[float] | None) -> Optional[Tuple[float, float, float]]:
     """Convert an iterable to a tuple of three floats."""
@@ -368,7 +370,18 @@ class PhysicsWorld:
         if shape == "cone":
             if config.radius is None or config.height is None:
                 raise ValueError("Cone collider requires 'radius' and 'height'")
-            return _pb.createCollisionShape(_pb.GEOM_CONE, radius=config.radius, height=config.height, **kwargs)
+            if not _CONE_COLLISION_MESH.is_file():
+                raise FileNotFoundError(f"Cone collision mesh not found: {_CONE_COLLISION_MESH}")
+            return _pb.createCollisionShape(
+                _pb.GEOM_MESH,
+                fileName=str(_CONE_COLLISION_MESH),
+                meshScale=[
+                    float(config.radius),
+                    float(config.height),
+                    float(config.radius),
+                ],
+                **kwargs,
+            )
         if shape == "plane":
             return _pb.createCollisionShape(
                 _pb.GEOM_PLANE,
@@ -380,14 +393,11 @@ class PhysicsWorld:
             if not config.mesh_path:
                 raise ValueError("Mesh collider requires 'mesh_path'")
             mesh_scale = config.mesh_scale or (1.0, 1.0, 1.0)
-            mesh_kwargs = dict(kwargs)
-            if config.margin is not None:
-                mesh_kwargs["collisionMargin"] = config.margin
             return _pb.createCollisionShape(
                 _pb.GEOM_MESH,
                 fileName=str(config.mesh_path),
                 meshScale=mesh_scale,
-                **mesh_kwargs,
+                **kwargs,
             )
         if shape == "heightfield":
             raise NotImplementedError("Heightfield colliders are not yet supported")
@@ -464,37 +474,31 @@ class PhysicsWorld:
         position, orientation = self._extract_scene_transform(scene_object, config)
         collision_shape = self._create_collision_shape(config)
         mass = config.resolved_mass()
-        base_inertia = (0.0, 0.0, 0.0)
-        if config.is_dynamic:
-            base_inertia = _pb.calculateLocalInertia(
-                collision_shape,
-                mass,
-                physicsClientId=self._client,
-            )
         body_id = _pb.createMultiBody(
             baseMass=mass,
             baseCollisionShapeIndex=collision_shape,
             baseVisualShapeIndex=-1,
             basePosition=position,
             baseOrientation=orientation,
-            baseInertiaDiag=base_inertia,
-            useMaximalCoordinates=1 if config.is_static else 0,
             physicsClientId=self._client,
         )
 
-        _pb.changeDynamics(
-            body_id,
-            -1,
-            lateralFriction=config.friction,
-            rollingFriction=config.rolling_friction,
-            spinningFriction=config.spinning_friction,
-            restitution=config.restitution,
-            linearDamping=config.linear_damping,
-            angularDamping=config.angular_damping,
-            contactStiffness=config.contact_stiffness if config.contact_stiffness is not None else 0.0,
-            contactDamping=config.contact_damping if config.contact_damping is not None else 0.0,
-            physicsClientId=self._client,
-        )
+        dynamics_kwargs = {
+            "lateralFriction": config.friction,
+            "rollingFriction": config.rolling_friction,
+            "spinningFriction": config.spinning_friction,
+            "restitution": config.restitution,
+            "linearDamping": config.linear_damping,
+            "angularDamping": config.angular_damping,
+            "physicsClientId": self._client,
+        }
+
+        if config.contact_stiffness is not None:
+            dynamics_kwargs["contactStiffness"] = config.contact_stiffness
+        if config.contact_damping is not None:
+            dynamics_kwargs["contactDamping"] = config.contact_damping
+
+        _pb.changeDynamics(body_id, -1, **dynamics_kwargs)
 
         if config.enable_sleeping is not None and not config.enable_sleeping:
             if hasattr(_pb, "ACTIVATION_STATE_DISABLE_SLEEPING"):
@@ -543,3 +547,83 @@ class PhysicsWorld:
     def get_body(self, body_id: int) -> Optional[PhysicsBodyHandle]:
         return self._bodies.get(body_id)
 
+    # ------------------------------------------------------------------
+    # Debug helpers
+    # ------------------------------------------------------------------
+    def get_contacts(
+        self,
+        body_id: Optional[int] = None,
+        other_body_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return contact information for the current simulation step."""
+
+        if self._client is None:
+            return []
+
+        contacts = _pb.getContactPoints(physicsClientId=self._client)
+        results: List[Dict[str, Any]] = []
+        for contact in contacts:
+            body_a = contact[1]
+            body_b = contact[2]
+
+            if body_id is not None and body_a != body_id and body_b != body_id:
+                continue
+            if other_body_id is not None:
+                if body_id is not None:
+                    if not (
+                        (body_a == body_id and body_b == other_body_id)
+                        or (body_a == other_body_id and body_b == body_id)
+                    ):
+                        continue
+                else:
+                    if body_a != other_body_id and body_b != other_body_id:
+                        continue
+
+            results.append(
+                {
+                    "body_a": body_a,
+                    "body_b": body_b,
+                    "link_a": contact[3],
+                    "link_b": contact[4],
+                    "position_on_a": contact[5],
+                    "position_on_b": contact[6],
+                    "normal_on_b": contact[7],
+                    "distance": contact[8],
+                    "normal_force": contact[9],
+                    "lateral_friction_1": contact[10],
+                    "lateral_dir_1": contact[11],
+                    "lateral_friction_2": contact[12],
+                    "lateral_dir_2": contact[13],
+                }
+            )
+        return results
+
+    def debug_snapshot(self) -> Dict[str, Any]:
+        """Return a snapshot of body transforms and active contacts for diagnostics."""
+
+        if self._client is None:
+            return {"bodies": [], "contacts": []}
+
+        bodies: List[Dict[str, Any]] = []
+        for body_id, handle in self._bodies.items():
+            position, orientation = _pb.getBasePositionAndOrientation(
+                body_id,
+                physicsClientId=self._client,
+            )
+            linear_velocity, angular_velocity = _pb.getBaseVelocity(
+                body_id,
+                physicsClientId=self._client,
+            )
+            bodies.append(
+                {
+                    "body_id": body_id,
+                    "name": getattr(handle.scene_object, "name", None),
+                    "type": handle.config.body_type,
+                    "position": position,
+                    "orientation": orientation,
+                    "linear_velocity": linear_velocity,
+                    "angular_velocity": angular_velocity,
+                }
+            )
+
+        return {"bodies": bodies, "contacts": self.get_contacts()}

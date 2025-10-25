@@ -7,11 +7,11 @@
     "position": [
       0.0,
       5.0,
-      0.0
+      10.0
     ],
     "target": [
       0.0,
-      4.0,
+      0.0,
       0.0
     ]
   },
@@ -36,7 +36,14 @@
       "height": 50.0,
       "rim_width": 40.0,
       "seed": 42,
-      "bounding_radius": 320.0
+      "bounding_radius": 320.0,
+      "physics": {
+        "type": "static",
+        "shape": "mesh",
+        "mesh_path": "../collision/donut_terrain_collision.obj",
+        "friction": 0.8,
+        "restitution": 0.3
+      }
     },
     {
       "name": "CenterMarker",
@@ -122,6 +129,494 @@
         0.9
       ],
       "bounding_radius": 3.0
+    },
+    {
+      "name": "RimSphere_East",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        175.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.85,
+        0.6,
+        0.25
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          -2.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_NorthEast",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        123.744,
+        52.0,
+        123.744
+      ],
+      "color": [
+        0.25,
+        0.7,
+        0.85
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          -1.414,
+          0.0,
+          -1.414
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_North",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        175.0
+      ],
+      "color": [
+        0.9,
+        0.5,
+        0.2
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          -2.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_NorthWest",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -123.744,
+        52.0,
+        123.744
+      ],
+      "color": [
+        0.2,
+        0.85,
+        0.6
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          1.414,
+          0.0,
+          -1.414
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_West",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -49.0,
+        48.0,
+        -85.0
+      ],
+      "color": [
+        0.75,
+        0.3,
+        0.85
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          2.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_2",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        46.0,
+        45.0,
+        83.0
+      ],
+      "color": [
+        0.6,
+        0.85,
+        0.25
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          1.414,
+          0.0,
+          1.414
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_3",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -86.0,
+        47.0,
+        43.0
+      ],
+      "color": [
+        0.85,
+        0.4,
+        0.35
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_SouthEast",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        123.744,
+        52.0,
+        -123.744
+      ],
+      "color": [
+        0.35,
+        0.5,
+        0.9
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.4,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          -1.414,
+          0.0,
+          1.414
+        ]
+      }
+    },
+    {
+      "name": "RimCube_center",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        0.0,
+        100.0,
+        0.0
+      ],
+      "color": [
+        0.6,
+        0.4,
+        0.9
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          -1.559,
+          0.0,
+          -0.9
+        ]
+      }
+    },
+    {
+      "name": "RimCube_North",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        0.0,
+        50.0,
+        165.0
+      ],
+      "color": [
+        0.35,
+        0.65,
+        0.85
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          -1.8
+        ]
+      }
+    },
+    {
+      "name": "RimCube_NW",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        -142.894,
+        50.0,
+        82.5
+      ],
+      "color": [
+        0.85,
+        0.55,
+        0.25
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          1.559,
+          0.0,
+          -0.9
+        ]
+      }
+    },
+    {
+      "name": "RimCube_SW",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        -142.894,
+        50.0,
+        -82.5
+      ],
+      "color": [
+        0.25,
+        0.85,
+        0.45
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          1.559,
+          0.0,
+          0.9
+        ]
+      }
+    },
+    {
+      "name": "RimCube_South",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        0.0,
+        50.0,
+        -165.0
+      ],
+      "color": [
+        0.8,
+        0.4,
+        0.3
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          1.8
+        ]
+      }
+    },
+    {
+      "name": "RimCube_SE",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        142.894,
+        50.0,
+        -82.5
+      ],
+      "color": [
+        0.45,
+        0.3,
+        0.85
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.45,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "linear_velocity": [
+          -1.559,
+          0.0,
+          0.9
+        ]
+      }
     }
   ],
   "lights": [
