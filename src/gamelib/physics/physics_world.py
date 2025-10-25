@@ -393,11 +393,18 @@ class PhysicsWorld:
             if not config.mesh_path:
                 raise ValueError("Mesh collider requires 'mesh_path'")
             mesh_scale = config.mesh_scale or (1.0, 1.0, 1.0)
+            mesh_kwargs = dict(kwargs)
+            flags = mesh_kwargs.pop("flags", 0)
+            concave_flag = getattr(_pb, "GEOM_FORCE_CONCAVE_TRIMESH", None)
+            if concave_flag is not None and config.body_type == "static":
+                flags |= concave_flag
+            if flags:
+                mesh_kwargs["flags"] = flags
             return _pb.createCollisionShape(
                 _pb.GEOM_MESH,
                 fileName=str(config.mesh_path),
                 meshScale=mesh_scale,
-                **kwargs,
+                **mesh_kwargs,
             )
         if shape == "heightfield":
             raise NotImplementedError("Heightfield colliders are not yet supported")

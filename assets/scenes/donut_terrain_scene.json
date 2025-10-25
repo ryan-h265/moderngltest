@@ -41,7 +41,7 @@
         "type": "static",
         "shape": "mesh",
         "mesh_path": "../collision/donut_terrain_collision.obj",
-        "friction": 0.8,
+        "friction": 0.25,
         "restitution": 0.3
       }
     },
@@ -151,11 +151,12 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          -2.0,
+          -5.0,
           0.0,
           0.0
         ]
@@ -182,13 +183,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          -1.414,
+          -3.535,
           0.0,
-          -1.414
+          -3.535
         ]
       }
     },
@@ -213,13 +215,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
           0.0,
           0.0,
-          -2.0
+          -5.0
         ]
       }
     },
@@ -244,13 +247,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          1.414,
+          3.535,
           0.0,
-          -1.414
+          -3.535
         ]
       }
     },
@@ -275,11 +279,12 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          2.0,
+          5.0,
           0.0,
           0.0
         ]
@@ -306,13 +311,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          1.414,
+          3.535,
           0.0,
-          1.414
+          3.535
         ]
       }
     },
@@ -337,13 +343,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
           0.0,
           0.0,
-          2.0
+          5.0
         ]
       }
     },
@@ -368,53 +375,14 @@
         "shape": "sphere",
         "mass": 20.0,
         "restitution": 0.45,
-        "friction": 0.4,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          -1.414,
+          -3.535,
           0.0,
-          1.414
-        ]
-      }
-    },
-    {
-      "name": "RimCube_center",
-      "type": "primitive",
-      "primitive": "cube",
-      "size": [
-        6.0,
-        6.0,
-        6.0
-      ],
-      "position": [
-        0.0,
-        100.0,
-        0.0
-      ],
-      "color": [
-        0.6,
-        0.4,
-        0.9
-      ],
-      "bounding_radius": 5.2,
-      "physics": {
-        "type": "dynamic",
-        "shape": "box",
-        "mass": 20.5,
-        "half_extents": [
-          3.0,
-          3.0,
-          3.0
-        ],
-        "restitution": 0.4,
-        "friction": 0.45,
-        "linear_damping": 0.0,
-        "angular_damping": 0.0,
-        "linear_velocity": [
-          -1.559,
-          0.0,
-          -0.9
+          3.535
         ]
       }
     },
@@ -448,13 +416,14 @@
           3.0
         ],
         "restitution": 0.4,
-        "friction": 0.45,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
           0.0,
           0.0,
-          -1.8
+          -4.0
         ]
       }
     },
@@ -488,13 +457,14 @@
           3.0
         ],
         "restitution": 0.4,
-        "friction": 0.45,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          1.559,
+          3.464,
           0.0,
-          -0.9
+          -2.0
         ]
       }
     },
@@ -528,13 +498,14 @@
           3.0
         ],
         "restitution": 0.4,
-        "friction": 0.45,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          1.559,
+          3.464,
           0.0,
-          0.9
+          2.0
         ]
       }
     },
@@ -568,13 +539,14 @@
           3.0
         ],
         "restitution": 0.4,
-        "friction": 0.45,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
           0.0,
           0.0,
-          1.8
+          4.0
         ]
       }
     },
@@ -608,13 +580,14 @@
           3.0
         ],
         "restitution": 0.4,
-        "friction": 0.45,
+        "friction": 0.05,
         "linear_damping": 0.0,
         "angular_damping": 0.0,
+        "enable_sleeping": false,
         "linear_velocity": [
-          -1.559,
+          -3.464,
           0.0,
-          0.9
+          2.0
         ]
       }
     }
