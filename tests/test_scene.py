@@ -1,7 +1,8 @@
 """Tests for Scene classes"""
 
 import pytest
-from pyrr import Vector3
+import numpy as np
+from pyrr import Quaternion, Vector3
 
 from src.gamelib.core.scene import Scene, SceneObject
 
@@ -58,7 +59,7 @@ def test_scene_object_model_matrix():
         color=(1.0, 0.0, 0.0)
     )
 
-    matrix = obj.get_model_matrix()
+    matrix = np.array(obj.get_model_matrix())
 
     # Should return 4x4 matrix
     assert matrix.shape == (4, 4)
@@ -67,3 +68,25 @@ def test_scene_object_model_matrix():
     assert matrix[3, 0] == 1.0
     assert matrix[3, 1] == 2.0
     assert matrix[3, 2] == 3.0
+
+
+def test_scene_object_apply_physics_transform():
+    """SceneObject should apply quaternion transforms correctly."""
+
+    obj = SceneObject(
+        geom=None,
+        position=Vector3([0.0, 0.0, 0.0]),
+        color=(1.0, 1.0, 1.0),
+    )
+
+    rotation = Quaternion.from_z_rotation(np.pi / 2)
+    obj.apply_physics_transform((1.0, 2.0, 3.0), tuple(rotation))
+
+    matrix = np.array(obj.get_model_matrix())
+
+    # Translation moved by physics
+    assert np.allclose(matrix[3, :3], (1.0, 2.0, 3.0))
+
+    # 90 degree rotation around Z swaps X and Y axes
+    assert np.isclose(matrix[0, 1], -1.0, atol=1e-6)
+    assert np.isclose(matrix[1, 0], 1.0, atol=1e-6)

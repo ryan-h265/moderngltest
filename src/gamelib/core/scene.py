@@ -7,7 +7,7 @@ Handles scene objects, rendering, and data-driven scene descriptors.
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Any, TYPE_CHECKING
 import numpy as np
-from pyrr import Matrix44, Vector3
+from pyrr import Matrix44, Vector3, Quaternion
 from moderngl_window import geometry
 from . import geometry_utils
 from .frustum import Frustum
@@ -136,8 +136,16 @@ class SceneObject:
     - Bounding sphere for frustum culling
     """
 
-    def __init__(self, geom, position: Vector3, color: Tuple[float, float, float],
-                 bounding_radius: float = None, name: str = "Object"):
+    def __init__(
+        self,
+        geom,
+        position: Vector3,
+        color: Tuple[float, float, float],
+        bounding_radius: float = None,
+        name: str = "Object",
+        rotation: Tuple[float, float, float] | Quaternion | None = None,
+        scale: Tuple[float, float, float] | None = None,
+    ):
         """
         Initialize scene object.
 
@@ -149,10 +157,17 @@ class SceneObject:
             name: Debug name for this object
         """
         self.geometry = geom
-        self.position = position
+        self.position = Vector3(position)
         self.color = color
         self.bounding_radius = bounding_radius if bounding_radius is not None else 1.0
         self.name = name
+        if isinstance(rotation, Quaternion):
+            self.rotation = Quaternion(rotation)
+        elif rotation is not None:
+            self.rotation = Quaternion.from_eulers(rotation)
+        else:
+            self.rotation = Quaternion()
+        self.scale = Vector3(scale) if scale is not None else Vector3([1.0, 1.0, 1.0])
 
     def get_model_matrix(self) -> Matrix44:
         """
@@ -161,7 +176,22 @@ class SceneObject:
         Returns:
             4x4 transformation matrix (currently just translation)
         """
-        return Matrix44.from_translation(self.position)
+        matrix = Matrix44.from_translation(self.position)
+        matrix = matrix * Matrix44.from_quaternion(self.rotation)
+
+        if not np.allclose(np.asarray(self.scale, dtype=float), (1.0, 1.0, 1.0)):
+            matrix = matrix * Matrix44.from_scale(self.scale)
+        return matrix
+
+    def apply_physics_transform(
+        self,
+        position: Tuple[float, float, float],
+        orientation: Tuple[float, float, float, float],
+    ) -> None:
+        """Apply a transform received from the physics simulation."""
+
+        self.position = Vector3(position)
+        self.rotation = Quaternion(orientation).normalised
 
     def is_visible(self, frustum: Frustum) -> bool:
         """

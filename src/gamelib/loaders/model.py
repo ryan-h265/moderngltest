@@ -114,6 +114,7 @@ class Model:
         self.rotation = rotation if rotation is not None else Vector3([0.0, 0.0, 0.0])
         self.scale = scale if scale is not None else Vector3([1.0, 1.0, 1.0])
         self.name = name
+        self.orientation: Optional[Quaternion] = None
 
         # For frustum culling (SceneObject compatibility)
         self.bounding_radius = 2.0  # Default, should be calculated from model bounds
@@ -144,12 +145,15 @@ class Model:
         matrix = Matrix44.from_translation(self.position)
 
         # Apply rotation (yaw, pitch, roll)
-        if self.rotation.x != 0.0:
-            matrix = matrix * Matrix44.from_y_rotation(self.rotation.x)
-        if self.rotation.y != 0.0:
-            matrix = matrix * Matrix44.from_x_rotation(self.rotation.y)
-        if self.rotation.z != 0.0:
-            matrix = matrix * Matrix44.from_z_rotation(self.rotation.z)
+        if self.orientation is not None:
+            matrix = matrix * Matrix44.from_quaternion(self.orientation)
+        else:
+            if self.rotation.x != 0.0:
+                matrix = matrix * Matrix44.from_y_rotation(self.rotation.x)
+            if self.rotation.y != 0.0:
+                matrix = matrix * Matrix44.from_x_rotation(self.rotation.y)
+            if self.rotation.z != 0.0:
+                matrix = matrix * Matrix44.from_z_rotation(self.rotation.z)
 
         # Apply scale
         if self.scale != Vector3([1.0, 1.0, 1.0]):
@@ -168,6 +172,17 @@ class Model:
             True if model is visible
         """
         return frustum.contains_sphere(self.position, self.bounding_radius)
+
+    def apply_physics_transform(
+        self,
+        position,
+        orientation,
+    ) -> None:
+        """Apply a transform from the physics simulation to this model."""
+
+        self.position = Vector3(position)
+        self.orientation = Quaternion(orientation).normalised
+        self.rotation = Vector3([0.0, 0.0, 0.0])
 
     def render(self, program, ctx=None):
         """

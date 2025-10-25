@@ -1,7 +1,16 @@
 {
   "name": "default_scene",
   "metadata": {
-    "description": "Default demo scene with primitives and GLTF models"
+    "description": "Default demo scene with primitives and GLTF models",
+    "physics": {
+      "gravity": [
+        0.0,
+        -9.81,
+        0.0
+      ],
+      "fixed_time_step": 0.016666667,
+      "max_substeps": 2
+    }
   },
   "camera": {
     "position": [
@@ -35,7 +44,13 @@
         0.6,
         0.3
       ],
-      "bounding_radius": 14.15
+      "bounding_radius": 14.15,
+      "physics": {
+        "type": "static",
+        "shape": "box",
+        "friction": 0.9,
+        "restitution": 0.0
+      }
     },
     {
       "name": "Sphere_Red",
@@ -52,7 +67,14 @@
         0.3,
         0.3
       ],
-      "bounding_radius": 1.0
+      "bounding_radius": 1.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 1.5,
+        "restitution": 0.4,
+        "linear_damping": 0.05
+      }
     },
     {
       "name": "Lantern",
