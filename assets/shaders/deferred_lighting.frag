@@ -16,6 +16,11 @@ uniform mat4 inverse_view;
 uniform vec3 light_position;
 uniform vec3 light_color;
 uniform float light_intensity;
+uniform int light_type;          // 0=directional, 1=point, 2=spot
+uniform float light_range;       // Effective radius for point/spot (0 = infinite)
+uniform vec3 light_direction;    // Direction light is pointing (normalized)
+uniform float spot_inner_cos;    // Cosine of inner cone angle (spot)
+uniform float spot_outer_cos;    // Cosine of outer cone angle (spot)
 
 // Shadow map for this light
 uniform sampler2D shadow_map;
@@ -148,7 +153,50 @@ void main(){
     // Lighting calculations
     vec3 N = normal;
     vec3 V = normalize(camera_pos - position);
-    vec3 L = normalize(light_position - position);
+
+    // Evaluate light direction and attenuation by type
+    vec3 L;                // Direction from fragment to light
+    float attenuation = 1.0;
+    float distance = 0.0;
+
+    if (light_type == 0) {
+        // Directional light: direction is constant, no attenuation
+        vec3 dir = normalize(light_direction);
+        L = -dir;
+    } else {
+        vec3 to_light = light_position - position;
+        distance = length(to_light);
+        if (distance < 1e-4) {
+            f_color=vec4(0.,0.,0.,0.);
+            return;
+        }
+        L = to_light / distance;
+
+        // Inverse-square attenuation
+        attenuation = 1.0 / max(distance * distance, 1e-4);
+
+        if (light_range > 0.0) {
+            float normalized = clamp(distance / light_range, 0.0, 1.0);
+            float smooth_factor = 1.0 - normalized * normalized;
+            attenuation *= smooth_factor * smooth_factor;
+            if (normalized >= 1.0) {
+                f_color=vec4(0.,0.,0.,0.);
+                return;
+            }
+        }
+
+        if (light_type == 2) {
+            vec3 spot_dir = normalize(light_direction);
+            float cos_angle = dot(-L, spot_dir);
+            float spot_factor = clamp((cos_angle - spot_outer_cos) / max(spot_inner_cos - spot_outer_cos, 1e-4), 0.0, 1.0);
+            attenuation *= spot_factor;
+            if (attenuation <= 0.0) {
+                f_color=vec4(0.,0.,0.,0.);
+                return;
+            }
+        }
+    }
+
     vec3 H = normalize(V + L);
 
     // Calculate base reflectivity (f0)
@@ -191,7 +239,7 @@ void main(){
 
     // Apply shadow, light intensity, and baked AO to BRDF result
     // Note: Baked AO affects direct lighting (darkens crevices for all lights)
-    vec3 lighting = light_intensity * (1.0 - shadow) * brdf * ao;
+    vec3 lighting = light_intensity * attenuation * (1.0 - shadow) * brdf * ao;
 
     // Output this light's contribution (will be additively blended)
     f_color = vec4(lighting, 1.0);
