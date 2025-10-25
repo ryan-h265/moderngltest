@@ -5,12 +5,13 @@ Renders lighting in the deferred rendering pipeline.
 Each light is rendered as a full-screen quad that reads from the G-Buffer.
 """
 
-from typing import List
+from typing import List, Optional
 import numpy as np
 import moderngl
 
 from ..core.camera import Camera
 from ..core.light import Light
+from ..core.skybox import Skybox
 from .gbuffer import GBuffer
 from ..config.settings import (
     AMBIENT_STRENGTH,
@@ -99,8 +100,9 @@ class LightingRenderer:
         camera: Camera,
         viewport: tuple,
         ssao_texture: moderngl.Texture = None,
+        skybox: Optional[Skybox] = None,
+        time: float | None = None,
         apply_post_lighting=None,
-        time: float = 0.0,
     ):
         """
         Render all lighting to the screen.
@@ -111,6 +113,7 @@ class LightingRenderer:
             camera: Camera for view position
             viewport: Viewport tuple (x, y, width, height)
             ssao_texture: Optional SSAO texture
+            skybox: Optional skybox for background rendering
             apply_post_lighting: Optional callback executed after emissive pass
                 while additive blending is still enabled (used for bloom)
             time: Elapsed time in seconds for animated effects
@@ -122,8 +125,9 @@ class LightingRenderer:
             viewport,
             self.ctx.screen,
             ssao_texture,
-            apply_post_lighting=apply_post_lighting,
+            skybox=skybox,
             time=time,
+            apply_post_lighting=apply_post_lighting,
         )
 
     def render_to_target(
@@ -134,8 +138,9 @@ class LightingRenderer:
         viewport: tuple,
         target: moderngl.Framebuffer,
         ssao_texture: moderngl.Texture = None,
+        skybox: Optional[Skybox] = None,
+        time: float | None = None,
         apply_post_lighting=None,
-        time: float = 0.0,
     ):
         """
         Render all lighting to a specific target.
@@ -147,6 +152,7 @@ class LightingRenderer:
             viewport: Viewport tuple (x, y, width, height)
             target: Target framebuffer
             ssao_texture: Optional SSAO texture
+            skybox: Optional skybox for background rendering
             apply_post_lighting: Optional callback executed after emissive pass
                 while additive blending is still enabled (used for bloom)
         """
@@ -162,11 +168,26 @@ class LightingRenderer:
         # Bind G-Buffer textures (locations 0-3)
         gbuffer.bind_textures(start_location=0)
 
-        inverse_view = np.linalg.inv(camera.get_view_matrix())
+        # Prepare matrices for screen-space reconstruction
+        _, _, width, height = viewport
+        aspect_ratio = width / height if height > 0 else 1.0
+        view_matrix = camera.get_view_matrix()
+        projection_matrix = camera.get_projection_matrix(aspect_ratio)
+        inverse_view = np.linalg.inv(view_matrix)
+        inverse_projection = np.linalg.inv(projection_matrix)
 
         # Step 1: Render ambient lighting (no blending)
         self.ctx.disable(moderngl.BLEND)
-        self._render_ambient(gbuffer, ssao_texture, camera, inverse_view, time)
+        self._render_ambient(
+            gbuffer,
+            ssao_texture,
+            inverse_view=inverse_view,
+            inverse_projection=inverse_projection,
+            skybox=skybox,
+            camera=camera,
+            viewport=viewport,
+            time=time,
+        )
 
         # Step 2: Sort and limit lights if enabled
         lights_to_render = self._prepare_lights_for_rendering(lights, camera)
@@ -231,9 +252,12 @@ class LightingRenderer:
         self,
         gbuffer: GBuffer,
         ssao_texture: moderngl.Texture = None,
-        camera: Camera = None,
-        inverse_view: np.ndarray = None,
-        time: float = 0.0,
+        inverse_view: np.ndarray | None = None,
+        inverse_projection: np.ndarray | None = None,
+        skybox: Optional[Skybox] = None,
+        camera: Camera | None = None,
+        viewport: tuple | None = None,
+        time: float | None = None,
     ):
         """
         Render ambient lighting pass.
@@ -241,6 +265,12 @@ class LightingRenderer:
         Args:
             gbuffer: G-Buffer (for texture binding reference)
             ssao_texture: Optional SSAO texture
+            inverse_view: Optional inverse view matrix for world reconstruction
+            inverse_projection: Optional inverse projection matrix
+            skybox: Optional skybox configuration for background rendering
+            camera: Camera for world-space position (procedural sky)
+            viewport: Current viewport (for resolution uniform)
+            time: Current time in seconds
         """
         # Set G-Buffer samplers (check if uniforms exist first)
         if 'gPosition' in self.ambient_program:
@@ -275,6 +305,76 @@ class LightingRenderer:
         else:
             if 'ssaoEnabled' in self.ambient_program:
                 self.ambient_program['ssaoEnabled'].value = False
+
+        if inverse_view is not None and 'inverse_view' in self.ambient_program:
+            self.ambient_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
+        if inverse_projection is not None and 'inverse_projection' in self.ambient_program:
+            self.ambient_program['inverse_projection'].write(inverse_projection.astype('f4').tobytes())
+
+        time_value = float(time) if time is not None else 0.0
+        if 'u_time' in self.ambient_program:
+            self.ambient_program['u_time'].value = time_value
+
+        if viewport is not None and 'u_resolution' in self.ambient_program:
+            _, _, width, height = viewport
+            width = max(width, 1)
+            height = max(height, 1)
+            self.ambient_program['u_resolution'].value = (float(width), float(height))
+
+        if camera is not None and 'u_cameraPos' in self.ambient_program:
+            pos = tuple(float(v) for v in camera.position)
+            self.ambient_program['u_cameraPos'].value = pos
+
+        procedural_mode = 1 if (skybox is not None and skybox.shader_variant == "aurora") else 0
+        if 'u_useProceduralSky' in self.ambient_program:
+            self.ambient_program['u_useProceduralSky'].value = procedural_mode
+
+        aurora_dir = (-0.5, -0.6, 0.9)
+        transition_alpha = 1.0
+        fog_enabled = 0
+        fog_color = (0.0, 0.0, 0.0)
+        fog_start = 0.0
+        fog_end = 1.0
+        fog_strength = 0.0
+
+        if skybox is not None:
+            aurora_dir = skybox.get_uniform("u_auroraDir", aurora_dir)
+            transition_alpha = float(skybox.get_uniform("u_transitionAlpha", transition_alpha))
+            if procedural_mode == 1:
+                fog_enabled = int(skybox.get_uniform("fogEnabled", 0))
+                fog_color = skybox.get_uniform("fogColor", fog_color)
+                fog_start = float(skybox.get_uniform("fogStart", fog_start))
+                fog_end = float(skybox.get_uniform("fogEnd", fog_end))
+                fog_strength = float(skybox.get_uniform("fogStrength", fog_strength))
+
+        if 'u_auroraDir' in self.ambient_program:
+            self.ambient_program['u_auroraDir'].value = tuple(float(v) for v in aurora_dir)
+        if 'u_transitionAlpha' in self.ambient_program:
+            self.ambient_program['u_transitionAlpha'].value = transition_alpha
+        if 'fogEnabled' in self.ambient_program:
+            self.ambient_program['fogEnabled'].value = fog_enabled
+        if 'fogColor' in self.ambient_program:
+            self.ambient_program['fogColor'].value = tuple(float(v) for v in fog_color)
+        if 'fogStart' in self.ambient_program:
+            self.ambient_program['fogStart'].value = fog_start
+        if 'fogEnd' in self.ambient_program:
+            self.ambient_program['fogEnd'].value = fog_end
+        if 'fogStrength' in self.ambient_program:
+            self.ambient_program['fogStrength'].value = fog_strength
+
+        if skybox is not None and getattr(skybox, 'texture', None) is not None:
+            if 'skybox_enabled' in self.ambient_program:
+                self.ambient_program['skybox_enabled'].value = True
+            if 'skybox_texture' in self.ambient_program:
+                self.ambient_program['skybox_texture'].value = 7
+            skybox.texture.use(location=7)
+            if 'skybox_intensity' in self.ambient_program:
+                self.ambient_program['skybox_intensity'].value = skybox.intensity
+            if 'skybox_rotation' in self.ambient_program:
+                self.ambient_program['skybox_rotation'].write(skybox.rotation_matrix().astype('f4').tobytes())
+        else:
+            if 'skybox_enabled' in self.ambient_program:
+                self.ambient_program['skybox_enabled'].value = False
 
         # Render full-screen quad
         self.quad_vao_ambient.render(moderngl.TRIANGLES)
