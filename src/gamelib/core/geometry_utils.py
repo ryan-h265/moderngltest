@@ -7,6 +7,7 @@ Provides additional geometry primitives not available in moderngl_window.geometr
 import numpy as np
 from moderngl_window.opengl.vao import VAO
 from moderngl_window.meta import ProgramDescription
+from .terrain_generation import generate_donut_height_data
 
 
 def pyramid(base_size=1.0, height=1.0):
@@ -162,5 +163,130 @@ def cone(radius=1.0, height=1.0, segments=32):
     # Create VAO
     vao = VAO(name="cone")
     vao.buffer(vertex_data, '3f 3f', ['in_position', 'in_normal'])
+
+    return vao
+
+
+def donut_terrain(resolution=128, outer_radius=200.0, inner_radius=80.0, height=50.0, rim_width=40.0, seed=42):
+    """
+    Create a donut-shaped terrain mesh with procedurally generated heights.
+
+    Generates a ring-shaped terrain feature with:
+    - Flat walkable surface on the top rim
+    - Smooth slopes on inner and outer edges
+    - Procedural noise for natural variation
+    - Proper normals for lighting
+
+    Args:
+        resolution: Grid resolution (higher = more detail, default 128)
+        outer_radius: Outer radius of the donut in world units (default 200.0)
+        inner_radius: Inner radius/hole size in world units (default 80.0)
+        height: Maximum height of the rim in world units (default 50.0)
+        rim_width: Width parameter for the flat top surface (default 40.0, currently unused in height gen)
+        seed: Random seed for procedural noise (default 42)
+
+    Returns:
+        VAO object compatible with moderngl_window rendering
+    """
+    # Generate height data using terrain generation
+    heights = generate_donut_height_data(
+        resolution=resolution,
+        outer_radius=outer_radius,
+        inner_radius=inner_radius,
+        height=height,
+        rim_width=rim_width,
+        seed=seed
+    )
+
+    # Calculate world size and spacing
+    world_size = outer_radius * 2.2
+    spacing = world_size / (resolution - 1)
+    offset = world_size / 2
+
+    # Generate vertices and calculate normals
+    vertices = []
+    normals = []
+    indices = []
+
+    # Create vertex grid with positions and calculate normals
+    for x in range(resolution):
+        for z in range(resolution):
+            # World position
+            world_x = (x * spacing) - offset
+            world_z = (z * spacing) - offset
+            world_y = heights[x][z]
+
+            vertices.append([world_x, world_y, world_z])
+
+            # Calculate normal using finite differences (central differences when possible)
+            # Get neighboring heights for normal calculation
+            dx = 0.0
+            dz = 0.0
+
+            if x > 0 and x < resolution - 1:
+                dx = (heights[x + 1][z] - heights[x - 1][z]) / (2 * spacing)
+            elif x > 0:
+                dx = (heights[x][z] - heights[x - 1][z]) / spacing
+            elif x < resolution - 1:
+                dx = (heights[x + 1][z] - heights[x][z]) / spacing
+
+            if z > 0 and z < resolution - 1:
+                dz = (heights[x][z + 1] - heights[x][z - 1]) / (2 * spacing)
+            elif z > 0:
+                dz = (heights[x][z] - heights[x][z - 1]) / spacing
+            elif z < resolution - 1:
+                dz = (heights[x][z + 1] - heights[x][z]) / spacing
+
+            # Normal is perpendicular to the tangent plane
+            # Tangent vectors: (1, dx, 0) and (0, dz, 1)
+            # Normal = cross product = (-dx, 1, -dz)
+            normal = np.array([-dx, 1.0, -dz], dtype='f4')
+            norm = np.linalg.norm(normal)
+            if norm > 0:
+                normal = normal / norm
+            else:
+                normal = np.array([0.0, 1.0, 0.0], dtype='f4')
+
+            normals.append(normal)
+
+    # Generate indices for triangles (two triangles per quad)
+    # Grid layout: each quad is defined by 4 vertices
+    # Triangle winding: counter-clockwise from above
+    for x in range(resolution - 1):
+        for z in range(resolution - 1):
+            # Vertex indices for this quad
+            top_left = x * resolution + z
+            top_right = (x + 1) * resolution + z
+            bottom_left = x * resolution + (z + 1)
+            bottom_right = (x + 1) * resolution + (z + 1)
+
+            # First triangle: top-left, bottom-left, top-right
+            indices.append(top_left)
+            indices.append(bottom_left)
+            indices.append(top_right)
+
+            # Second triangle: top-right, bottom-left, bottom-right
+            indices.append(top_right)
+            indices.append(bottom_left)
+            indices.append(bottom_right)
+
+    # Convert to numpy arrays
+    vertices = np.array(vertices, dtype='f4')
+    normals = np.array(normals, dtype='f4')
+    indices = np.array(indices, dtype='i4')
+
+    # Interleave vertex positions and normals
+    vertex_data = np.zeros(len(vertices) * 6, dtype='f4')
+    vertex_data[0::6] = vertices[:, 0]  # x
+    vertex_data[1::6] = vertices[:, 1]  # y
+    vertex_data[2::6] = vertices[:, 2]  # z
+    vertex_data[3::6] = normals[:, 0]   # nx
+    vertex_data[4::6] = normals[:, 1]   # ny
+    vertex_data[5::6] = normals[:, 2]   # nz
+
+    # Create VAO with indexed rendering
+    vao = VAO(name="donut_terrain")
+    vao.buffer(vertex_data, '3f 3f', ['in_position', 'in_normal'])
+    vao.index_buffer(indices)
 
     return vao

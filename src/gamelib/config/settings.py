@@ -180,7 +180,7 @@ MAX_FOV = 90.0
 
 # Clipping planes
 NEAR_PLANE = 0.1
-FAR_PLANE = 100.0
+FAR_PLANE = 1000.0  # Increased for large terrain (donut extends to ~220 units)
 
 # Pitch limits (prevents camera flipping)
 MIN_PITCH = -89.0

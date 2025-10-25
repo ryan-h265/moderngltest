@@ -1,0 +1,121 @@
+{
+  "name": "default_scene",
+  "metadata": {
+    "description": "Default demo scene with primitives and GLTF models"
+  },
+  "camera": {
+    "position": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "objects": [
+    {
+      "name": "Ground",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        20.0,
+        0.5,
+        20.0
+      ],
+      "position": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "color": [
+        0.3,
+        0.6,
+        0.3
+      ],
+      "bounding_radius": 14.15
+    },
+    {
+      "name": "Sphere_Red",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 1.0,
+      "position": [
+        -10.0,
+        1.0,
+        10.0
+      ],
+      "color": [
+        0.8,
+        0.3,
+        0.3
+      ],
+      "bounding_radius": 1.0
+    },
+    {
+      "name": "Lantern",
+      "type": "model",
+      "path": "assets/models/props/dark_lantern_rigged/scene.gltf",
+      "position": [
+        0.0,
+        2.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        0.05,
+        0.05,
+        0.05
+      ],
+      "play_first_animation": true
+    },
+    {
+      "name": "EmissiveTest",
+      "type": "model",
+      "path": "assets/models/props/EmissiveStrengthTest.glb",
+      "position": [
+        0.0,
+        5.0,
+        -12.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [
+        0.0,
+        20.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "intensity": 3.5,
+      "cast_shadows": true
+    }
+  ]
+}

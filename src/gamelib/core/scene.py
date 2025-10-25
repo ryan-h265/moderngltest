@@ -1,15 +1,128 @@
 """
 Scene Management
 
-Handles scene objects and rendering.
+Handles scene objects, rendering, and data-driven scene descriptors.
 """
 
-from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Tuple, Optional, Any, TYPE_CHECKING
 import numpy as np
 from pyrr import Matrix44, Vector3
 from moderngl_window import geometry
 from . import geometry_utils
 from .frustum import Frustum
+
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from .light import LightDefinition
+
+
+def _vec3(value, fallback: Tuple[float, float, float] = (0.0, 0.0, 0.0)) -> Tuple[float, float, float]:
+    """Convert a JSON vector to a tuple of floats."""
+
+    if value is None:
+        value = fallback
+    if len(value) != 3:
+        raise ValueError(f"Expected 3 components, got {value}")
+    return tuple(float(v) for v in value)
+
+
+def _opt_vec3(value: Optional[List[float]]) -> Optional[Tuple[float, float, float]]:
+    """Convert an optional JSON vector to a tuple of floats."""
+
+    if value is None:
+        return None
+    if len(value) != 3:
+        raise ValueError(f"Expected 3 components, got {value}")
+    return tuple(float(v) for v in value)
+
+
+@dataclass
+class SceneNodeDefinition:
+    """Data descriptor for a scene object loaded from JSON."""
+
+    name: str
+    node_type: str
+    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    scale: Tuple[float, float, float] = (1.0, 1.0, 1.0)
+    color: Optional[Tuple[float, float, float]] = None
+    primitive: Optional[str] = None
+    mesh_path: Optional[str] = None
+    bounding_radius: Optional[float] = None
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SceneNodeDefinition":
+        """Create a node definition from JSON data."""
+
+        if "type" not in data:
+            raise ValueError("Scene object is missing required 'type' field")
+
+        known_keys = {
+            "name",
+            "type",
+            "position",
+            "rotation",
+            "scale",
+            "color",
+            "primitive",
+            "path",
+            "bounding_radius",
+        }
+
+        extras = {k: v for k, v in data.items() if k not in known_keys}
+
+        return cls(
+            name=data.get("name", data.get("type", "Object")),
+            node_type=data["type"],
+            position=_vec3(data.get("position"), (0.0, 0.0, 0.0)),
+            rotation=_vec3(data.get("rotation"), (0.0, 0.0, 0.0)),
+            scale=_vec3(data.get("scale"), (1.0, 1.0, 1.0)),
+            color=_opt_vec3(data.get("color")),
+            primitive=data.get("primitive"),
+            mesh_path=data.get("path"),
+            bounding_radius=float(data["bounding_radius"]) if data.get("bounding_radius") is not None else None,
+            extras=extras,
+        )
+
+
+@dataclass
+class SceneDefinition:
+    """Container for scene-level metadata and node descriptors."""
+
+    name: str
+    nodes: List[SceneNodeDefinition] = field(default_factory=list)
+    light_definitions: List["LightDefinition"] = field(default_factory=list)
+    camera_position: Optional[Tuple[float, float, float]] = None
+    camera_target: Optional[Tuple[float, float, float]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SceneDefinition":
+        """Create a scene definition from JSON data."""
+
+        name = data.get("name", "Scene")
+        nodes = [SceneNodeDefinition.from_dict(obj) for obj in data.get("objects", [])]
+
+        camera = data.get("camera", {})
+        camera_position = _opt_vec3(camera.get("position")) if camera else None
+        camera_target = _opt_vec3(camera.get("target")) if camera else None
+
+        from .light import LightDefinition  # Local import to avoid circular dependency
+
+        light_definitions = [LightDefinition.from_dict(light) for light in data.get("lights", [])]
+
+        metadata = data.get("metadata", {})
+
+        return cls(
+            name=name,
+            nodes=nodes,
+            light_definitions=light_definitions,
+            camera_position=camera_position,
+            camera_target=camera_target,
+            metadata=metadata,
+        )
 
 
 class SceneObject:
