@@ -20,6 +20,14 @@ from .rendering.render_pipeline import RenderPipeline
 # Loaders
 from .loaders import SceneLoader, SceneLoadResult
 
+# Physics
+from .physics import (
+    PhysicsBodyConfig,
+    PhysicsBodyHandle,
+    PhysicsWorld,
+    PhysicsWorldSettings,
+)
+
 # Input (new Command Pattern system)
 from .input.input_manager import InputManager
 from .input.input_commands import InputCommand, InputType
@@ -41,6 +49,11 @@ __all__ = [
     "SceneManager",
     "SceneLoader",
     "SceneLoadResult",
+    # Physics
+    "PhysicsWorld",
+    "PhysicsWorldSettings",
+    "PhysicsBodyConfig",
+    "PhysicsBodyHandle",
     # Rendering
     "RenderPipeline",
     # Input

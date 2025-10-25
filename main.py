@@ -5,6 +5,8 @@ ModernGL 3D Engine - Main Entry Point
 A modular 3D game engine with multi-light shadow mapping.
 """
 
+import logging
+
 import moderngl
 import moderngl_window as mglw
 from pyrr import Vector3
@@ -23,9 +25,15 @@ from src.gamelib.core.skybox import Skybox
 from src.gamelib.input.input_manager import InputManager
 from src.gamelib.input.controllers import CameraController, RenderingController
 
+# Physics
+from src.gamelib.physics import PhysicsWorld
+
 # Debug overlay
 from src.gamelib.debug import DebugOverlay
 from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED
+
+
+logger = logging.getLogger(__name__)
 
 
 class Game(mglw.WindowConfig):
@@ -71,8 +79,19 @@ class Game(mglw.WindowConfig):
         # Setup rendering controller for SSAO toggle, etc.
         self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
+        # Setup physics world (PyBullet)
+        try:
+            self.physics_world = PhysicsWorld()
+        except RuntimeError as exc:  # pragma: no cover - only triggered without PyBullet
+            logger.warning("Physics world disabled: %s", exc)
+            self.physics_world = None
+
         # Scene management (JSON-driven scenes)
-        self.scene_manager = SceneManager(self.ctx, self.render_pipeline)
+        self.scene_manager = SceneManager(
+            self.ctx,
+            self.render_pipeline,
+            physics_world=self.physics_world,
+        )
         self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
         self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
 
@@ -104,6 +123,9 @@ class Game(mglw.WindowConfig):
             frametime: Time since last frame (seconds)
         """
         self.time = time
+
+        if self.physics_world is not None:
+            self.physics_world.step_simulation(frametime)
 
         # Animate lights (create a rotating light show!)
         # for i, light in enumerate(self.lights):

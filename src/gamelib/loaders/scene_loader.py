@@ -15,6 +15,7 @@ from ..config.settings import PROJECT_ROOT
 from ..core import geometry_utils
 from ..core.light import Light
 from ..core.scene import Scene, SceneDefinition, SceneNodeDefinition
+from ..physics import PhysicsBodyConfig, PhysicsBodyHandle, PhysicsWorld
 from .gltf_loader import GltfLoader
 
 
@@ -27,14 +28,16 @@ class SceneLoadResult:
     camera_position: Optional[Vector3] = None
     camera_target: Optional[Vector3] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    physics_bodies: List[PhysicsBodyHandle] = field(default_factory=list)
 
 
 class SceneLoader:
     """Load scenes from JSON descriptors."""
 
-    def __init__(self, ctx):
+    def __init__(self, ctx, physics_world: Optional[PhysicsWorld] = None):
         self.ctx = ctx
         self._gltf_loader: Optional[GltfLoader] = GltfLoader(ctx) if ctx is not None else None
+        self._physics_world: Optional[PhysicsWorld] = physics_world
 
     def load_scene(self, path: Path | str) -> SceneLoadResult:
         """Load a scene from disk."""
@@ -51,13 +54,24 @@ class SceneLoader:
             payload = json.load(handle)
 
         definition = SceneDefinition.from_dict(payload)
+
+        if self._physics_world is not None:
+            physics_metadata = definition.metadata.get("physics")
+            if isinstance(physics_metadata, dict):
+                self._physics_world.configure_from_metadata(physics_metadata)
+
         scene = Scene(ctx=self.ctx)
 
         base_path = scene_path.parent
+        physics_handles: List[PhysicsBodyHandle] = []
+
         for node in definition.nodes:
             instance = self._instantiate_node(node, base_path)
             if instance is not None:
                 scene.add_object(instance)
+                handle = self._attach_physics(instance, node, base_path)
+                if handle is not None:
+                    physics_handles.append(handle)
 
         lights = [definition_light.instantiate() for definition_light in definition.light_definitions]
 
@@ -70,6 +84,33 @@ class SceneLoader:
             camera_position=camera_position,
             camera_target=camera_target,
             metadata=definition.metadata,
+            physics_bodies=physics_handles,
+        )
+
+    def _attach_physics(
+        self,
+        instance,
+        node: SceneNodeDefinition,
+        base_path: Path,
+    ) -> Optional[PhysicsBodyHandle]:
+        if self._physics_world is None:
+            return None
+
+        physics_payload = node.extras.get("physics") if node.extras else None
+        if physics_payload is None:
+            return None
+
+        if not isinstance(physics_payload, dict):
+            raise TypeError(
+                f"Physics configuration for node '{node.name}' must be a dictionary"
+            )
+
+        config = PhysicsBodyConfig.from_dict(physics_payload)
+        return self._physics_world.create_body(
+            instance,
+            config,
+            node_definition=node,
+            resource_base=base_path,
         )
 
     def _instantiate_node(self, node: SceneNodeDefinition, base_path: Path):
@@ -88,6 +129,8 @@ class SceneLoader:
 
         primitive = node.primitive.lower()
         position = Vector3(node.position)
+        rotation = node.rotation
+        scale = node.scale
         color = tuple(node.color) if node.color else (1.0, 1.0, 1.0)
 
         geometry_obj = None
@@ -155,6 +198,8 @@ class SceneLoader:
             color,
             bounding_radius=bounding_radius if bounding_radius is not None else 1.0,
             name=node.name,
+            rotation=rotation,
+            scale=scale,
         )
 
     def _create_model(self, node: SceneNodeDefinition, base_path: Path):
