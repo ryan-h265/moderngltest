@@ -351,7 +351,8 @@ class PhysicsWorld:
         if shape == "box":
             if config.half_extents is None:
                 raise ValueError("Box collider requires 'half_extents'")
-            return _pb.createCollisionShape(_pb.GEOM_BOX, halfExtents=config.half_extents, **kwargs)
+            half_extents = tuple(float(v) for v in config.half_extents)
+            return _pb.createCollisionShape(_pb.GEOM_BOX, halfExtents=half_extents, **kwargs)
         if shape == "sphere":
             if config.radius is None:
                 raise ValueError("Sphere collider requires 'radius'")
@@ -428,7 +429,7 @@ class PhysicsWorld:
         """Write simulated transforms back to associated scene objects."""
 
         for handle in self._bodies.values():
-            if handle.config.is_kinematic:
+            if handle.config.is_kinematic or handle.config.is_static:
                 continue
             position, orientation = _pb.getBasePositionAndOrientation(
                 handle.body_id,
@@ -462,12 +463,22 @@ class PhysicsWorld:
 
         position, orientation = self._extract_scene_transform(scene_object, config)
         collision_shape = self._create_collision_shape(config)
+        mass = config.resolved_mass()
+        base_inertia = (0.0, 0.0, 0.0)
+        if config.is_dynamic:
+            base_inertia = _pb.calculateLocalInertia(
+                collision_shape,
+                mass,
+                physicsClientId=self._client,
+            )
         body_id = _pb.createMultiBody(
-            baseMass=config.resolved_mass(),
+            baseMass=mass,
             baseCollisionShapeIndex=collision_shape,
             baseVisualShapeIndex=-1,
             basePosition=position,
             baseOrientation=orientation,
+            baseInertiaDiag=base_inertia,
+            useMaximalCoordinates=1 if config.is_static else 0,
             physicsClientId=self._client,
         )
 
@@ -516,8 +527,9 @@ class PhysicsWorld:
         handle = PhysicsBodyHandle(body_id=body_id, scene_object=scene_object, config=config)
         self._bodies[body_id] = handle
 
-        if hasattr(scene_object, "apply_physics_transform"):
-            scene_object.apply_physics_transform(position, orientation)
+        if config.is_dynamic or config.is_kinematic:
+            if hasattr(scene_object, "apply_physics_transform"):
+                scene_object.apply_physics_transform(position, orientation)
 
         return handle
 
