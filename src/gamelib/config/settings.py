@@ -64,6 +64,22 @@ BLOOM_FILTER_RADIUS = 1.1    # Upsample filter radius (higher = softer bloom)
 BLOOM_MAX_LEVELS = 5         # Number of downsample/upsample levels (more = softer, slower)
 BLOOM_TINT = (1.0, 1.0, 1.0) # Optional bloom tint (RGB)
 
+# Fog (atmospheric scattering) settings
+FOG_ENABLED = True
+FOG_COLOR = (0.65, 0.70, 0.88)       # Fog color tint (RGB) - Subtle blue-gray haze
+FOG_DENSITY = 0.0085                  # Base exponential density (reduced for more transparency)
+FOG_START_DISTANCE = 34.0            # Distance from camera where fog begins
+FOG_END_DISTANCE = 125.0              # Distance where fog reaches full strength
+FOG_BASE_HEIGHT = 0.0                # World-space height where fog is densest
+FOG_HEIGHT_FALLOFF = 0.05            # Exponential falloff per unit height above base
+FOG_NOISE_SCALE = 0.18                # World-space scale of noise (lower = larger, less tiled features)
+FOG_NOISE_STRENGTH = 0.75            # Strength of noise modulation (higher for more variation)
+FOG_NOISE_SPEED = 0.8                 # Animation speed multiplier (slower for more natural drift)
+FOG_WIND_DIRECTION = (0.3, 0.0, 0.2) # Direction the fog drifts over time
+FOG_DETAIL_SCALE = 0.85               # Scale for high-frequency wispy details
+FOG_DETAIL_STRENGTH = 0.35           # Strength of fine detail layer
+FOG_WARP_STRENGTH = 0.4              # Domain warping intensity for organic flow
+
 # ============================================================================
 # Anti-Aliasing Settings
 # ============================================================================
@@ -180,7 +196,7 @@ MAX_FOV = 90.0
 
 # Clipping planes
 NEAR_PLANE = 0.1
-FAR_PLANE = 100.0
+FAR_PLANE = 1000.0  # Increased for large terrain (donut extends to ~220 units)
 
 # Pitch limits (prevents camera flipping)
 MIN_PITCH = -89.0

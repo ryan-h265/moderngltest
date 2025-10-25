@@ -10,11 +10,15 @@ from .config.settings import *
 
 # Core Engine
 from .core.camera import Camera
-from .core.light import Light
-from .core.scene import Scene, SceneObject
+from .core.light import Light, LightDefinition
+from .core.scene import Scene, SceneObject, SceneDefinition, SceneNodeDefinition
+from .core.scene_manager import SceneManager
 
 # Rendering
 from .rendering.render_pipeline import RenderPipeline
+
+# Loaders
+from .loaders import SceneLoader, SceneLoadResult
 
 # Input (new Command Pattern system)
 from .input.input_manager import InputManager
@@ -29,8 +33,14 @@ __all__ = [
     # Core
     "Camera",
     "Light",
+    "LightDefinition",
     "Scene",
     "SceneObject",
+    "SceneDefinition",
+    "SceneNodeDefinition",
+    "SceneManager",
+    "SceneLoader",
+    "SceneLoadResult",
     # Rendering
     "RenderPipeline",
     # Input

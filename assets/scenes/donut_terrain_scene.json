@@ -1,0 +1,169 @@
+{
+  "name": "donut_terrain_scene",
+  "metadata": {
+    "description": "Demonstration scene featuring procedurally generated donut terrain"
+  },
+  "camera": {
+    "position": [
+      0.0,
+      5.0,
+      0.0
+    ],
+    "target": [
+      0.0,
+      4.0,
+      0.0
+    ]
+  },
+  "objects": [
+    {
+      "name": "DonutTerrain",
+      "type": "primitive",
+      "primitive": "donut_terrain",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.4,
+        0.6,
+        0.3
+      ],
+      "resolution": 128,
+      "outer_radius": 200.0,
+      "inner_radius": 80.0,
+      "height": 50.0,
+      "rim_width": 40.0,
+      "seed": 42,
+      "bounding_radius": 320.0
+    },
+    {
+      "name": "CenterMarker",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 5.0,
+      "position": [
+        0.0,
+        2.5,
+        0.0
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.2
+      ],
+      "bounding_radius": 5.0
+    },
+    {
+      "name": "RimMarker1",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        140.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
+        0.9
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker2",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        140.0
+      ],
+      "color": [
+        0.9,
+        0.9,
+        0.2
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker3",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -140.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.9,
+        0.2
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker4",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        -140.0
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.9
+      ],
+      "bounding_radius": 3.0
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [
+        100.0,
+        200.0,
+        100.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.95,
+        0.9
+      ],
+      "intensity": 4.0,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        -100.0,
+        150.0,
+        -50.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.6,
+        0.7,
+        0.9
+      ],
+      "intensity": 2.0,
+      "cast_shadows": false
+    }
+  ]
+}

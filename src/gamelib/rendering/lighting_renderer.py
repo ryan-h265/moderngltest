@@ -15,10 +15,10 @@ from ..core.skybox import Skybox
 from .gbuffer import GBuffer
 from ..config.settings import (
     AMBIENT_STRENGTH,
-    CLEAR_COLOR,
     MAX_LIGHTS_PER_FRAME,
     ENABLE_LIGHT_SORTING
 )
+from ..config import settings
 
 
 class LightingRenderer:
@@ -116,6 +116,7 @@ class LightingRenderer:
             skybox: Optional skybox for background rendering
             apply_post_lighting: Optional callback executed after emissive pass
                 while additive blending is still enabled (used for bloom)
+            time: Elapsed time in seconds for animated effects
         """
         self.render_to_target(
             lights,
@@ -195,13 +196,11 @@ class LightingRenderer:
         self.ctx.enable(moderngl.BLEND)
         self.ctx.blend_func = moderngl.ONE, moderngl.ONE  # Additive blending
 
-        # Get inverse view matrix for world-space reconstruction (already computed above)
-
         for light_index, light in enumerate(lights_to_render):
-            self._render_light(light, light_index, camera, inverse_view)
+            self._render_light(light, light_index, camera, inverse_view, time)
 
         # Step 4: Add emissive contribution (additive blending still enabled)
-        self._render_emissive(gbuffer)
+        self._render_emissive(gbuffer, camera, inverse_view, time)
 
         if apply_post_lighting is not None:
             apply_post_lighting()
@@ -284,6 +283,14 @@ class LightingRenderer:
         # Set ambient strength
         if 'ambient_strength' in self.ambient_program:
             self.ambient_program['ambient_strength'].value = AMBIENT_STRENGTH
+
+        if camera is not None:
+            if 'camera_pos' in self.ambient_program:
+                self.ambient_program['camera_pos'].write(camera.position.astype('f4').tobytes())
+            if inverse_view is not None and 'inverse_view' in self.ambient_program:
+                self.ambient_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
+
+        self._set_fog_uniforms(self.ambient_program, time)
 
         # Set SSAO texture and parameters (use location 6 to avoid conflict with gEmissive at location 4)
         if ssao_texture is not None:
@@ -372,7 +379,7 @@ class LightingRenderer:
         # Render full-screen quad
         self.quad_vao_ambient.render(moderngl.TRIANGLES)
 
-    def _render_light(self, light: Light, light_index: int, camera: Camera, inverse_view: np.ndarray):
+    def _render_light(self, light: Light, light_index: int, camera: Camera, inverse_view: np.ndarray, time: float = 0.0):
         """
         Render a single light's contribution.
 
@@ -443,10 +450,12 @@ class LightingRenderer:
         if 'camera_pos' in self.lighting_program:
             self.lighting_program['camera_pos'].write(camera.position.astype('f4').tobytes())
 
+        self._set_fog_uniforms(self.lighting_program, time)
+
         # Render full-screen quad
         self.quad_vao_lighting.render(moderngl.TRIANGLES)
 
-    def _render_emissive(self, gbuffer: GBuffer):
+    def _render_emissive(self, gbuffer: GBuffer, camera: Camera, inverse_view: np.ndarray, time: float = 0.0):
         """
         Render emissive contribution pass.
 
@@ -459,6 +468,50 @@ class LightingRenderer:
         # Set gEmissive sampler (location 4)
         if 'gEmissive' in self.emissive_program:
             self.emissive_program['gEmissive'].value = 4
+        if 'gPosition' in self.emissive_program:
+            self.emissive_program['gPosition'].value = 0
+
+        if 'camera_pos' in self.emissive_program:
+            self.emissive_program['camera_pos'].write(camera.position.astype('f4').tobytes())
+        if 'inverse_view' in self.emissive_program:
+            self.emissive_program['inverse_view'].write(inverse_view.astype('f4').tobytes())
+
+        self._set_fog_uniforms(self.emissive_program, time)
 
         # Render full-screen quad with emissive shader
         self.quad_vao_emissive.render(moderngl.TRIANGLES)
+
+    def _set_fog_uniforms(self, program: moderngl.Program, time: float):
+        """Write fog parameters into the provided shader program if supported."""
+
+        if 'fog_enabled' in program:
+            program['fog_enabled'].value = int(settings.FOG_ENABLED)
+        if 'fog_color' in program:
+            program['fog_color'].write(np.array(settings.FOG_COLOR, dtype='f4').tobytes())
+        if 'fog_density' in program:
+            program['fog_density'].value = float(settings.FOG_DENSITY)
+        if 'fog_start_distance' in program:
+            program['fog_start_distance'].value = float(settings.FOG_START_DISTANCE)
+        if 'fog_end_distance' in program:
+            program['fog_end_distance'].value = float(settings.FOG_END_DISTANCE)
+        if 'fog_base_height' in program:
+            program['fog_base_height'].value = float(settings.FOG_BASE_HEIGHT)
+        if 'fog_height_falloff' in program:
+            program['fog_height_falloff'].value = float(settings.FOG_HEIGHT_FALLOFF)
+        if 'fog_noise_scale' in program:
+            program['fog_noise_scale'].value = float(settings.FOG_NOISE_SCALE)
+        if 'fog_noise_strength' in program:
+            program['fog_noise_strength'].value = float(settings.FOG_NOISE_STRENGTH)
+        if 'fog_noise_speed' in program:
+            program['fog_noise_speed'].value = float(settings.FOG_NOISE_SPEED)
+        if 'fog_wind_direction' in program:
+            program['fog_wind_direction'].write(np.array(settings.FOG_WIND_DIRECTION, dtype='f4').tobytes())
+        if 'fog_time' in program:
+            program['fog_time'].value = float(time)
+        if 'fog_detail_scale' in program:
+            program['fog_detail_scale'].value = float(settings.FOG_DETAIL_SCALE)
+        if 'fog_detail_strength' in program:
+            program['fog_detail_strength'].value = float(settings.FOG_DETAIL_STRENGTH)
+        if 'fog_warp_strength' in program:
+            program['fog_warp_strength'].value = float(settings.FOG_WARP_STRENGTH)
+

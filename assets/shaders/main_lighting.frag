@@ -17,6 +17,20 @@ uniform vec3 object_color;
 // Shadow maps
 uniform sampler2D shadow_maps[MAX_LIGHTS];
 
+// Fog parameters
+uniform bool fog_enabled;
+uniform vec3 fog_color;
+uniform float fog_density;
+uniform float fog_start_distance;
+uniform float fog_end_distance;
+uniform float fog_base_height;
+uniform float fog_height_falloff;
+uniform float fog_noise_scale;
+uniform float fog_noise_strength;
+uniform float fog_noise_speed;
+uniform vec3 fog_wind_direction;
+uniform float fog_time;
+
 // Inputs from vertex shader
 in vec3 v_position;
 in vec3 v_normal;
@@ -24,6 +38,29 @@ in vec4 v_light_space_pos[MAX_LIGHTS];
 
 // Output
 out vec4 f_color;
+
+float compute_fog_factor(vec3 world_pos) {
+    if (!fog_enabled) {
+        return 0.0;
+    }
+
+    float distance_to_camera = length(camera_pos - world_pos);
+    float range = max(fog_end_distance - fog_start_distance, 0.001);
+    float distance_factor = clamp((distance_to_camera - fog_start_distance) / range, 0.0, 1.0);
+
+    float height_offset = max(world_pos.y - fog_base_height, 0.0);
+    float height_factor = exp(-height_offset * fog_height_falloff);
+
+    vec3 animated_pos = world_pos * fog_noise_scale + fog_wind_direction * (fog_time * fog_noise_speed);
+    float trig_noise = sin(animated_pos.x) + sin(animated_pos.y * 1.3 + animated_pos.z * 0.7) + sin(animated_pos.z * 1.7 - animated_pos.x * 0.5);
+    trig_noise = trig_noise / 3.0; // [-1,1]
+    float noise_normalized = trig_noise * 0.5 + 0.5; // [0,1]
+    float variation = mix(1.0 - fog_noise_strength, 1.0 + fog_noise_strength, noise_normalized);
+
+    float density = fog_density * variation * height_factor;
+    float fog_amount = 1.0 - exp(-distance_to_camera * density);
+    return clamp(fog_amount * distance_factor, 0.0, 1.0);
+}
 
 /**
  * Calculate shadow factor for a given light
@@ -97,6 +134,9 @@ void main() {
 
     // Combine ambient + all light contributions
     vec3 final_color = ambient + total_lighting;
+
+    float fog_factor = compute_fog_factor(v_position);
+    final_color = mix(final_color, fog_color, fog_factor);
 
     f_color = vec4(final_color, 1.0);
 }

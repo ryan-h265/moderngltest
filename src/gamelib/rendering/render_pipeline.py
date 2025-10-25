@@ -232,6 +232,7 @@ class RenderPipeline:
             scene: Scene to render
             camera: Camera for view
             lights: List of lights
+            time: Elapsed time in seconds (used for animated effects)
         """
         # Pass 1: Render shadow maps for all lights (both modes)
         self.shadow_renderer.render_shadow_maps(lights, scene)
@@ -394,7 +395,8 @@ class RenderPipeline:
                     lights,
                     self.ctx.screen,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
         else:
             # AA enabled - render to AA framebuffer then resolve
@@ -433,7 +435,8 @@ class RenderPipeline:
                     lights,
                     render_target,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
 
             self.aa_renderer.resolve_and_present()
