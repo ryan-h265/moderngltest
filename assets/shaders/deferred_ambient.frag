@@ -16,6 +16,24 @@ uniform float ssaoIntensity;
 // Ambient strength
 uniform float ambient_strength;
 
+// Skybox uniforms
+uniform bool skybox_enabled;
+uniform samplerCube skybox_texture;
+uniform mat4 inverse_projection;
+uniform float skybox_intensity;
+uniform mat4 skybox_rotation;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec3 u_cameraPos;
+uniform vec3 u_auroraDir;
+uniform float u_transitionAlpha;
+uniform int u_useProceduralSky;
+uniform int fogEnabled;
+uniform vec3 fogColor;
+uniform float fogStart;
+uniform float fogEnd;
+uniform float fogStrength;
+
 // Camera + fog uniforms
 uniform mat4 inverse_view;
 uniform vec3 camera_pos;
@@ -40,6 +58,116 @@ in vec2 v_texcoord;
 
 // Output
 out vec4 f_color;
+
+mat2 mm2(float a){
+    float c=cos(a),s=sin(a);
+    return mat2(c,s,-s,c);
+}
+
+mat2 m2=mat2(.95534,.29552,-.29552,.95534);
+
+float tri(float x){return clamp(abs(fract(x)-.5),.01,.49);}
+
+vec2 tri2(vec2 p){return vec2(tri(p.x)+tri(p.y),tri(p.y+tri(p.x)));}
+
+float triNoise2d(vec2 p,float spd,float time){
+    float z=1.8;
+    float z2=2.5;
+    float rz=0.;
+    p*=mm2(p.x*.06);
+    vec2 bp=p;
+    for(float i=0.;i<5.;i++){
+        vec2 dg=tri2(bp*1.85)*.75;
+        dg*=mm2(time*spd);
+        p-=dg/z2;
+        bp*=1.3;
+        z2*=.45;
+        z*=.42;
+        p*=1.21+(rz-1.)*.02;
+        rz+=tri(p.x+tri(p.y))*z;
+        p*=-m2;
+    }
+    return clamp(1./pow(rz*29.,1.3),0.,.55);
+}
+
+vec3 nmzHash33(vec3 q){
+    uvec3 p=uvec3(ivec3(q));
+    p=p*uvec3(374761393U,1103515245U,668265263U)+p.zxy+p.yzx;
+    p=p.yzx*(p.zxy^(p>>3U));
+    return vec3(p^(p>>16U))*(1./4294967295.);
+}
+
+vec4 aurora(vec3 ro,vec3 rd,float time){
+    vec4 col=vec4(0.);
+    vec4 avgCol=vec4(0.);
+    for(float i=0.;i<50.;i++){
+        float pt=((.8+pow(i,1.4)*.002)-ro.y)/(rd.y*2.+.4);
+        vec3 bpos=ro+pt*rd;
+        vec2 p=bpos.zx;
+        float rzt=triNoise2d(p,.06,time);
+        vec4 col2=vec4(0.);
+        col2.a=rzt;
+        col2.rgb=(sin(1.-vec3(2.15,-.5,1.2)+i*.043)*.5+.5)*rzt;
+        avgCol=mix(avgCol,col2,.5);
+        col+=avgCol*exp2(-i*.065-2.5)*smoothstep(0.,5.,i);
+    }
+    col*=clamp(rd.y*15.+.4,0.,1.);
+    return col*1.8;
+}
+
+vec3 stars(vec3 p){
+    vec3 c=vec3(0.);
+    float res=max(u_resolution.x,1.);
+    for(float i=0.;i<4.;i++){
+        vec3 q=fract(p*(.15*res))-.5;
+        vec3 id=floor(p*(.15*res));
+        vec2 rn=nmzHash33(id).xy;
+        float c2=1.-smoothstep(0.,.6,length(q));
+        c2*=step(rn.x,.0005+i*i*.001);
+        c+=c2*(mix(vec3(1.,.49,.1),vec3(.75,.9,1.),rn.y)*.1+.9);
+        p*=1.3;
+    }
+    return c*c*.8;
+}
+
+vec3 background_color(vec3 rd){
+    float sd=dot(normalize(u_auroraDir),rd)*.5+.5;
+    sd=pow(sd,5.);
+    vec3 col=mix(vec3(.05,.1,.2),vec3(.1,.05,.2),sd);
+    return col*.63;
+}
+
+vec3 compute_aurora_sky(vec3 dir){
+    vec3 rd=dir.xzy;
+    rd=vec3(rd.x,rd.z,-rd.y);
+    vec3 ro=vec3(0.);
+    
+    float fade=smoothstep(0.,.01,abs(rd.y))*.1+.9;
+    vec3 col=background_color(rd)*fade;
+    
+    if(rd.y>0.){
+        vec4 aur=smoothstep(0.,1.5,aurora(ro,rd,u_time))*fade;
+        col+=stars(rd);
+        col=col*(1.-aur.a)+aur.rgb;
+    }else{
+        rd.y=abs(rd.y);
+        col=background_color(rd)*fade*.6;
+        vec4 aur=smoothstep(0.,2.5,aurora(ro,rd,u_time));
+        col+=stars(rd)*.1;
+        col=col*(1.-aur.a)+aur.rgb;
+        vec3 pos=ro+((.5-ro.y)/rd.y)*rd;
+        float nz2=triNoise2d(pos.xz*vec2(.5,.7),0.,u_time);
+        col+=mix(vec3(.2,.25,.5)*.08,vec3(.3,.3,.5)*.7,nz2*.4);
+    }
+    
+    if(fogEnabled==1){
+        float horizonFog=pow(clamp(1.-abs(rd.y),0.,1.),1.2);
+        float fogFactor=clamp(horizonFog*fogStrength,0.,1.);
+        col=mix(col,fogColor,fogFactor);
+    }
+    
+    return col;
+}
 
 // Improved 3D pseudo-Perlin noise function
 vec3 hash3(vec3 p){
@@ -152,8 +280,24 @@ void main(){
     
     // Early exit for background pixels (no geometry)
     if(length(normal)<.1){
-        // Background color (dark blue)
-        f_color=vec4(.1,.1,.15,1.);
+        if(skybox_enabled){
+            vec2 ndc=v_texcoord*2.-1.;
+            vec4 clip=vec4(ndc,1.,1.);
+            vec4 view_dir=inverse_projection*clip;
+            vec3 dir=normalize(view_dir.xyz/view_dir.w);
+            vec3 world_dir=mat3(inverse_view)*dir;
+            vec3 rotated_dir=mat3(skybox_rotation)*world_dir;
+            
+            if(u_useProceduralSky==1){
+                vec3 aurora_color=compute_aurora_sky(rotated_dir);
+                f_color=vec4(aurora_color*skybox_intensity,u_transitionAlpha);
+            }else{
+                vec3 sky_color=texture(skybox_texture,rotated_dir).rgb*skybox_intensity;
+                f_color=vec4(sky_color,1.);
+            }
+        }else{
+            f_color=vec4(.1,.1,.15,1.);
+        }
         return;
     }
     

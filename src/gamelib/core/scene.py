@@ -11,6 +11,7 @@ from pyrr import Matrix44, Vector3, Quaternion
 from moderngl_window import geometry
 from . import geometry_utils
 from .frustum import Frustum
+from .skybox import Skybox
 
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -223,6 +224,7 @@ class Scene:
         self.objects: List[SceneObject] = []  # Can contain both SceneObject and Model instances
         self.ctx = ctx
         self.last_render_stats: Dict[str, Dict[str, object]] = {}
+        self.skybox: Optional[Skybox] = None
 
     def add_object(self, obj: SceneObject):
         """
@@ -233,9 +235,18 @@ class Scene:
         """
         self.objects.append(obj)
 
+    def set_skybox(self, skybox: Optional[Skybox]):
+        """Assign a skybox to the scene."""
+        self.skybox = skybox
+
+    def get_skybox(self) -> Optional[Skybox]:
+        """Return the current skybox."""
+        return self.skybox
+
     def clear(self):
         """Remove all objects from the scene"""
         self.objects.clear()
+        self.skybox = None
 
     def create_default_scene(self):
         """

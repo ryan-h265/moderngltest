@@ -19,6 +19,7 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
 )
+from src.gamelib.core.skybox import Skybox
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
@@ -98,6 +99,11 @@ class Game(mglw.WindowConfig):
         loaded_scene = self.scene_manager.load("donut_terrain", camera=self.camera)
         self.scene = loaded_scene.scene
         self.lights = loaded_scene.lights
+
+        # Create and set procedural aurora skybox
+        skybox = Skybox.aurora(self.ctx, name="Aurora Skybox")
+        skybox.intensity = 1.0
+        self.scene.set_skybox(skybox)
 
         # Setup debug overlay
         if DEBUG_OVERLAY_ENABLED:

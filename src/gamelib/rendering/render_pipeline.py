@@ -11,6 +11,7 @@ import moderngl
 from .shader_manager import ShaderManager
 from .shadow_renderer import ShadowRenderer
 from .main_renderer import MainRenderer
+from .skybox_renderer import SkyboxRenderer
 from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
@@ -70,6 +71,7 @@ class RenderPipeline:
 
         # Forward rendering shaders
         self.shader_manager.load_program("main", "main_lighting.vert", "main_lighting.frag")
+        self.shader_manager.load_program("skybox", "skybox.vert", "aurora_skybox.frag")
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
@@ -106,9 +108,14 @@ class RenderPipeline:
         self.shadow_renderer.set_screen_viewport((0, 0, WINDOW_SIZE[0], WINDOW_SIZE[1]))
 
         # Create forward rendering pipeline
+        self.skybox_renderer = SkyboxRenderer(
+            ctx,
+            self.shader_manager.get("skybox")
+        )
         self.main_renderer = MainRenderer(
             ctx,
-            self.shader_manager.get("main")
+            self.shader_manager.get("main"),
+            skybox_renderer=self.skybox_renderer
         )
 
         # Create deferred rendering pipeline
@@ -200,7 +207,13 @@ class RenderPipeline:
         camera_pos = camera.position if camera else None
         self.shadow_renderer.initialize_light_shadow_maps(lights, camera_pos)
 
-    def render_frame(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
+    def render_frame(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render a complete frame.
 
@@ -265,7 +278,13 @@ class RenderPipeline:
         if hasattr(self.text_manager, "refresh_layout_metrics"):
             self.text_manager.refresh_layout_metrics()
 
-    def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
+    def _render_forward(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using forward rendering.
 
@@ -276,17 +295,39 @@ class RenderPipeline:
         """
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
-        
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
+
         # Check if AA is enabled
         if render_target == self.ctx.screen:
             # No AA - render directly to screen (original behavior)
-            self.main_renderer.render(scene, camera, lights, self.window.viewport, time=time)
+            self.main_renderer.render(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                skybox=skybox,
+                time=time,
+            )
         else:
             # AA enabled - render to AA framebuffer then resolve
-            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target, time=time)
+            self.main_renderer.render_to_target(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                render_target,
+                skybox=skybox,
+                time=time,
+            )
             self.aa_renderer.resolve_and_present()
 
-    def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
+    def _render_deferred(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using deferred rendering.
 
@@ -316,6 +357,7 @@ class RenderPipeline:
 
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
 
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
         if render_target == self.ctx.screen:
@@ -339,8 +381,9 @@ class RenderPipeline:
                 camera,
                 self.window.viewport,
                 ssao_texture=ssao_texture,
-                apply_post_lighting=apply_post_lighting,
+                skybox=skybox,
                 time=time,
+                apply_post_lighting=apply_post_lighting,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
@@ -377,8 +420,9 @@ class RenderPipeline:
                 self.window.viewport,
                 render_target,
                 ssao_texture=ssao_texture,
-                apply_post_lighting=apply_post_lighting,
+                skybox=skybox,
                 time=time,
+                apply_post_lighting=apply_post_lighting,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
