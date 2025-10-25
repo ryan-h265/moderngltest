@@ -408,3 +408,10 @@ class LightingRenderer:
             program['fog_wind_direction'].write(np.array(settings.FOG_WIND_DIRECTION, dtype='f4').tobytes())
         if 'fog_time' in program:
             program['fog_time'].value = float(time)
+        if 'fog_detail_scale' in program:
+            program['fog_detail_scale'].value = float(settings.FOG_DETAIL_SCALE)
+        if 'fog_detail_strength' in program:
+            program['fog_detail_strength'].value = float(settings.FOG_DETAIL_STRENGTH)
+        if 'fog_warp_strength' in program:
+            program['fog_warp_strength'].value = float(settings.FOG_WARP_STRENGTH)
+
