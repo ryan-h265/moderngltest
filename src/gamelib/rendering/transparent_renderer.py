@@ -6,6 +6,7 @@ Objects are depth-sorted back-to-front to ensure correct transparency.
 """
 
 from typing import List, Optional, Tuple
+import numpy as np
 import moderngl
 from pyrr import Vector3
 
@@ -44,7 +45,8 @@ class TransparentRenderer:
         lights: List[Light],
         screen_fbo: moderngl.Framebuffer,
         shadow_maps: List[moderngl.Texture],
-        viewport_size: Tuple[int, int]
+        viewport_size: Tuple[int, int],
+        time: float = 0.0,
     ):
         """
         Render transparent objects with forward rendering and depth sorting.
@@ -56,6 +58,7 @@ class TransparentRenderer:
             screen_fbo: Screen framebuffer to render into (already contains opaque objects)
             shadow_maps: Shadow map textures for shadowing
             viewport_size: Viewport size for aspect ratio
+            time: Elapsed time in seconds for animated fog
         """
         # Use screen framebuffer (render on top of deferred results)
         screen_fbo.use()
@@ -80,6 +83,9 @@ class TransparentRenderer:
 
         # Set lighting uniforms
         self._set_lighting_uniforms(lights, shadow_maps)
+
+        # Set fog uniforms
+        self._set_fog_uniforms(time)
 
         # Get transparent objects (meshes with alpha_mode == "BLEND")
         transparent_meshes = scene.get_transparent_meshes()
@@ -169,6 +175,36 @@ class TransparentRenderer:
         # Ambient lighting
         from ..config.settings import AMBIENT_STRENGTH
         self.transparent_program['ambientStrength'].value = AMBIENT_STRENGTH
+
+    def _set_fog_uniforms(self, time: float):
+        """Populate fog configuration uniforms for the transparent shader."""
+
+        from ..config import settings
+
+        if 'fog_enabled' in self.transparent_program:
+            self.transparent_program['fog_enabled'].value = int(settings.FOG_ENABLED)
+        if 'fog_color' in self.transparent_program:
+            self.transparent_program['fog_color'].write(np.array(settings.FOG_COLOR, dtype='f4').tobytes())
+        if 'fog_density' in self.transparent_program:
+            self.transparent_program['fog_density'].value = float(settings.FOG_DENSITY)
+        if 'fog_start_distance' in self.transparent_program:
+            self.transparent_program['fog_start_distance'].value = float(settings.FOG_START_DISTANCE)
+        if 'fog_end_distance' in self.transparent_program:
+            self.transparent_program['fog_end_distance'].value = float(settings.FOG_END_DISTANCE)
+        if 'fog_base_height' in self.transparent_program:
+            self.transparent_program['fog_base_height'].value = float(settings.FOG_BASE_HEIGHT)
+        if 'fog_height_falloff' in self.transparent_program:
+            self.transparent_program['fog_height_falloff'].value = float(settings.FOG_HEIGHT_FALLOFF)
+        if 'fog_noise_scale' in self.transparent_program:
+            self.transparent_program['fog_noise_scale'].value = float(settings.FOG_NOISE_SCALE)
+        if 'fog_noise_strength' in self.transparent_program:
+            self.transparent_program['fog_noise_strength'].value = float(settings.FOG_NOISE_STRENGTH)
+        if 'fog_noise_speed' in self.transparent_program:
+            self.transparent_program['fog_noise_speed'].value = float(settings.FOG_NOISE_SPEED)
+        if 'fog_wind_direction' in self.transparent_program:
+            self.transparent_program['fog_wind_direction'].write(np.array(settings.FOG_WIND_DIRECTION, dtype='f4').tobytes())
+        if 'fog_time' in self.transparent_program:
+            self.transparent_program['fog_time'].value = float(time)
 
     def _depth_sort_meshes(
         self,

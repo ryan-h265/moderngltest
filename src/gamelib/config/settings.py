@@ -64,6 +64,19 @@ BLOOM_FILTER_RADIUS = 1.1    # Upsample filter radius (higher = softer bloom)
 BLOOM_MAX_LEVELS = 5         # Number of downsample/upsample levels (more = softer, slower)
 BLOOM_TINT = (1.0, 1.0, 1.0) # Optional bloom tint (RGB)
 
+# Fog (atmospheric scattering) settings
+FOG_ENABLED = True
+FOG_COLOR = (0.65, 0.70, 0.88)       # Fog color tint (RGB) - Subtle blue-gray haze
+FOG_DENSITY = 0.18                   # Base exponential density (higher = thicker fog)
+FOG_START_DISTANCE = 5.0             # Distance from camera where fog begins
+FOG_END_DISTANCE = 45.0              # Distance where fog reaches full strength
+FOG_BASE_HEIGHT = 0.0                # World-space height where fog is densest
+FOG_HEIGHT_FALLOFF = 0.20            # Exponential falloff per unit height above base
+FOG_NOISE_SCALE = 0.8               # World-space scale of noise variation
+FOG_NOISE_STRENGTH = 0.85            # Strength of noise modulation (0 = uniform fog)
+FOG_NOISE_SPEED = 3.15               # Animation speed multiplier for noise
+FOG_WIND_DIRECTION = (0.3, 0.0, 0.2) # Direction the fog drifts over time
+
 # ============================================================================
 # Anti-Aliasing Settings
 # ============================================================================

@@ -37,7 +37,8 @@ class MainRenderer:
         scene: Scene,
         camera: Camera,
         lights: List[Light],
-        viewport: Tuple[int, int, int, int]
+        viewport: Tuple[int, int, int, int],
+        time: float = 0.0,
     ):
         """
         Render the main scene with frustum culling.
@@ -48,7 +49,7 @@ class MainRenderer:
             lights: List of lights (with shadow maps already rendered)
             viewport: Viewport tuple (x, y, width, height)
         """
-        self.render_to_target(scene, camera, lights, viewport, self.ctx.screen)
+        self.render_to_target(scene, camera, lights, viewport, self.ctx.screen, time=time)
 
     def render_to_target(
         self,
@@ -56,7 +57,8 @@ class MainRenderer:
         camera: Camera,
         lights: List[Light],
         viewport: Tuple[int, int, int, int],
-        target: moderngl.Framebuffer
+        target: moderngl.Framebuffer,
+        time: float = 0.0,
     ):
         """
         Render the main scene to a specific framebuffer.
@@ -85,6 +87,9 @@ class MainRenderer:
 
         # Set light uniforms
         self._set_light_uniforms(lights)
+
+        # Set fog uniforms
+        self._set_fog_uniforms(time)
 
         # Get frustum for culling
         from ..config.settings import ENABLE_FRUSTUM_CULLING
@@ -152,3 +157,21 @@ class MainRenderer:
         # OpenGL requires an array of ints for sampler arrays
         shadow_map_locations = np.array([i for i in range(len(lights))], dtype='i4')
         self.main_program['shadow_maps'].write(shadow_map_locations.tobytes())
+
+    def _set_fog_uniforms(self, time: float):
+        """Set fog-related shader uniforms."""
+
+        from ..config import settings
+
+        self.main_program['fog_enabled'].value = int(settings.FOG_ENABLED)
+        self.main_program['fog_color'].write(np.array(settings.FOG_COLOR, dtype='f4').tobytes())
+        self.main_program['fog_density'].value = float(settings.FOG_DENSITY)
+        self.main_program['fog_start_distance'].value = float(settings.FOG_START_DISTANCE)
+        self.main_program['fog_end_distance'].value = float(settings.FOG_END_DISTANCE)
+        self.main_program['fog_base_height'].value = float(settings.FOG_BASE_HEIGHT)
+        self.main_program['fog_height_falloff'].value = float(settings.FOG_HEIGHT_FALLOFF)
+        self.main_program['fog_noise_scale'].value = float(settings.FOG_NOISE_SCALE)
+        self.main_program['fog_noise_strength'].value = float(settings.FOG_NOISE_STRENGTH)
+        self.main_program['fog_noise_speed'].value = float(settings.FOG_NOISE_SPEED)
+        self.main_program['fog_wind_direction'].write(np.array(settings.FOG_WIND_DIRECTION, dtype='f4').tobytes())
+        self.main_program['fog_time'].value = float(time)

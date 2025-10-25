@@ -138,7 +138,7 @@ class Game(mglw.WindowConfig):
         self.on_update(time, frametime)
 
         # Render frame
-        self.render_pipeline.render_frame(self.scene, self.camera, self.lights)
+        self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """

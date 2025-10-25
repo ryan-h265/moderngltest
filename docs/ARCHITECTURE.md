@@ -123,7 +123,7 @@ Game.on_render()
   │     ├─> Process input (camera movement)
   │     └─> Update camera vectors
   │
-  └─> RenderPipeline.render_frame()
+  └─> RenderPipeline.render_frame(time)
         ├─> ShadowRenderer.render_shadow_maps()
         │     ├─> For each light:
         │     │     ├─> Bind light's shadow FBO

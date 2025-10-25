@@ -200,7 +200,7 @@ class RenderPipeline:
         camera_pos = camera.position if camera else None
         self.shadow_renderer.initialize_light_shadow_maps(lights, camera_pos)
 
-    def render_frame(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def render_frame(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
         """
         Render a complete frame.
 
@@ -219,15 +219,16 @@ class RenderPipeline:
             scene: Scene to render
             camera: Camera for view
             lights: List of lights
+            time: Elapsed time in seconds (used for animated effects)
         """
         # Pass 1: Render shadow maps for all lights (both modes)
         self.shadow_renderer.render_shadow_maps(lights, scene)
 
         # Pass 2+: Render scene (mode-dependent)
         if self.rendering_mode == "deferred":
-            self._render_deferred(scene, camera, lights)
+            self._render_deferred(scene, camera, lights, time=time)
         else:
-            self._render_forward(scene, camera, lights)
+            self._render_forward(scene, camera, lights, time=time)
 
         # Final pass: Render UI overlay
         if DEBUG_OVERLAY_ENABLED or len(self.text_manager.get_all_layers()) > 0:
@@ -264,7 +265,7 @@ class RenderPipeline:
         if hasattr(self.text_manager, "refresh_layout_metrics"):
             self.text_manager.refresh_layout_metrics()
 
-    def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
         """
         Render using forward rendering.
 
@@ -279,13 +280,13 @@ class RenderPipeline:
         # Check if AA is enabled
         if render_target == self.ctx.screen:
             # No AA - render directly to screen (original behavior)
-            self.main_renderer.render(scene, camera, lights, self.window.viewport)
+            self.main_renderer.render(scene, camera, lights, self.window.viewport, time=time)
         else:
             # AA enabled - render to AA framebuffer then resolve
-            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target)
+            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target, time=time)
             self.aa_renderer.resolve_and_present()
 
-    def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light], time: float = 0.0):
         """
         Render using deferred rendering.
 
@@ -339,6 +340,7 @@ class RenderPipeline:
                 self.window.viewport,
                 ssao_texture=ssao_texture,
                 apply_post_lighting=apply_post_lighting,
+                time=time,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
@@ -350,7 +352,8 @@ class RenderPipeline:
                     lights,
                     self.ctx.screen,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
         else:
             # AA enabled - render to AA framebuffer then resolve
@@ -375,6 +378,7 @@ class RenderPipeline:
                 render_target,
                 ssao_texture=ssao_texture,
                 apply_post_lighting=apply_post_lighting,
+                time=time,
             )
 
             # Pass 4: Transparent pass (forward rendering for alpha BLEND objects)
@@ -387,7 +391,8 @@ class RenderPipeline:
                     lights,
                     render_target,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
 
             self.aa_renderer.resolve_and_present()
