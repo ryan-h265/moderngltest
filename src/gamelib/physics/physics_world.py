@@ -209,6 +209,7 @@ class PhysicsWorld:
         self.settings = settings or PhysicsWorldSettings()
         self._client = _pb.connect(_pb.DIRECT)
         self._bodies: Dict[int, PhysicsBodyHandle] = {}
+        self._angular_factor_overrides: Dict[int, Tuple[float, float, float]] = {}
         self._accumulator = 0.0
         self._configure_world()
 
@@ -239,6 +240,7 @@ class PhysicsWorld:
         if self._client is None:
             return
         self._bodies.clear()
+        self._angular_factor_overrides.clear()
         _pb.resetSimulation(physicsClientId=self._client)
         self._configure_world()
         self._accumulator = 0.0
@@ -447,6 +449,28 @@ class PhysicsWorld:
                     physicsClientId=self._client,
                 )
 
+    def _apply_angular_factor_overrides(self) -> None:
+        """Manually clamp angular velocity for bodies without native support."""
+
+        if not self._angular_factor_overrides:
+            return
+
+        for body_id, factor in list(self._angular_factor_overrides.items()):
+            if body_id not in self._bodies:
+                # Body has been removed since the override was registered.
+                self._angular_factor_overrides.pop(body_id, None)
+                continue
+
+            _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+            constrained = tuple(angular_velocity[i] * factor[i] for i in range(3))
+
+            if constrained != angular_velocity:
+                _pb.resetBaseVelocity(
+                    body_id,
+                    angularVelocity=constrained,
+                    physicsClientId=self._client,
+                )
+
     def step_simulation(self, delta_time: float) -> None:
         """Advance the simulation and push transforms back to the scene."""
 
@@ -458,6 +482,7 @@ class PhysicsWorld:
         while self._accumulator >= self.settings.fixed_time_step and substeps < self.settings.max_substeps:
             self._pre_step()
             _pb.stepSimulation(physicsClientId=self._client)
+            self._apply_angular_factor_overrides()
             self._accumulator -= self.settings.fixed_time_step
             substeps += 1
 
@@ -571,6 +596,7 @@ class PhysicsWorld:
         if body_id in self._bodies:
             _pb.removeBody(body_id, physicsClientId=self._client)
             self._bodies.pop(body_id, None)
+            self._angular_factor_overrides.pop(body_id, None)
 
     def get_body(self, body_id: int) -> Optional[PhysicsBodyHandle]:
         return self._bodies.get(body_id)
@@ -641,11 +667,32 @@ class PhysicsWorld:
 
         if body_id not in self._bodies:
             raise ValueError(f"Body {body_id} is not registered")
-        _pb.setAngularFactor(
-            body_id,
-            _vec3(factor),
-            physicsClientId=self._client,
-        )
+
+        factor_vec = _vec3(factor)
+        if hasattr(_pb, "setAngularFactor"):
+            _pb.setAngularFactor(
+                body_id,
+                factor_vec,
+                physicsClientId=self._client,
+            )
+            self._angular_factor_overrides.pop(body_id, None)
+            return
+
+        if factor_vec == (1.0, 1.0, 1.0):
+            self._angular_factor_overrides.pop(body_id, None)
+            return
+
+        # Fall back to manually clamping angular velocity components for older PyBullet builds.
+        self._angular_factor_overrides[body_id] = factor_vec
+
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        constrained = tuple(angular_velocity[i] * factor_vec[i] for i in range(3))
+        if constrained != angular_velocity:
+            _pb.resetBaseVelocity(
+                body_id,
+                angularVelocity=constrained,
+                physicsClientId=self._client,
+            )
 
     def apply_central_impulse(self, body_id: int, impulse: Tuple[float, float, float]) -> None:
         """Apply an instantaneous impulse at the centre of mass."""
