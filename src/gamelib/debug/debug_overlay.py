@@ -110,6 +110,10 @@ class DebugOverlay:
         # Light info
         shadow_res = SHADOW_MAP_SIZE
         lines.append(f"Lights: {len(lights)} | Shadows: {shadow_res}x{shadow_res}")
+        for idx, light in enumerate(lights):
+            lines.append(
+                f"  L{idx} ({light.light_type}): [{light.position.x:.1f}, {light.position.y:.1f}, {light.position.z:.1f}]"
+            )
 
         # Scene info
         if scene:

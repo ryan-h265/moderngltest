@@ -441,15 +441,15 @@ class RenderPipeline:
             # Render into AA buffer before resolving
             if scene.has_transparent_objects():
                 shadow_maps = [light.shadow_map for light in lights]
-            self.transparent_renderer.render(
-                scene,
-                camera,
-                lights,
-                render_target,
-                shadow_maps,
-                self.window.size,
-                time=time,
-            )
+                self.transparent_renderer.render(
+                    scene,
+                    camera,
+                    lights,
+                    render_target,
+                    shadow_maps,
+                    self.window.size,
+                    time=time,
+                )
 
             self.aa_renderer.resolve_and_present()
 
@@ -527,6 +527,17 @@ class RenderPipeline:
         if hasattr(self, 'aa_renderer'):
             return self.aa_renderer.get_aa_mode_name()
         return "Not Available"
+
+    def toggle_light_gizmos(self):
+        """Toggle debug light gizmo rendering."""
+        from ..config import settings
+
+        current = bool(getattr(settings, "DEBUG_DRAW_LIGHT_GIZMOS", False))
+        settings.DEBUG_DRAW_LIGHT_GIZMOS = not current
+
+        state = "enabled" if settings.DEBUG_DRAW_LIGHT_GIZMOS else "disabled"
+
+        return settings.DEBUG_DRAW_LIGHT_GIZMOS
 
     def reload_shaders(self):
         """

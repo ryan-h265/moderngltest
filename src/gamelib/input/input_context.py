@@ -107,6 +107,8 @@ class InputContextManager:
                 InputCommand.SYSTEM_TOGGLE_FXAA,
                 InputCommand.SYSTEM_TOGGLE_SMAA,
 
+                InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+
             },
 
             # ================================================================

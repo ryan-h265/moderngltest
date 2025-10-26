@@ -60,6 +60,10 @@ class RenderingController:
             InputCommand.SYSTEM_TOGGLE_SMAA,
             self.toggle_smaa
         )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+            self.toggle_light_gizmos
+        )
 
     def toggle_ssao(self, delta_time: float = 0.0):
         """
@@ -114,3 +118,12 @@ class RenderingController:
             delta_time: Time since last frame (unused, for handler compatibility)
         """
         self.render_pipeline.toggle_smaa()
+
+    def toggle_light_gizmos(self, delta_time: float = 0.0):
+        """
+        Toggle debug light gizmos.
+
+        Args:
+            delta_time: Time since last frame (unused, for handler compatibility)
+        """
+        self.render_pipeline.toggle_light_gizmos()

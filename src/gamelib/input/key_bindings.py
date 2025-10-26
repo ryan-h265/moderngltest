@@ -95,6 +95,7 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.F4] = InputCommand.SYSTEM_TOGGLE_DEBUG  # F4
         # self.keyboard_bindings[self.keys.F5] = InputCommand.SYSTEM_QUICK_SAVE  # F5
         self.keyboard_bindings[self.keys.T] = InputCommand.SYSTEM_TOGGLE_SSAO   # T
+        self.keyboard_bindings[self.keys.L] = InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS  # L
         self.keyboard_bindings[self.keys.F7] = InputCommand.SYSTEM_CYCLE_AA_MODE # F7
         self.keyboard_bindings[self.keys.F8] = InputCommand.SYSTEM_TOGGLE_MSAA   # F8
         self.keyboard_bindings[self.keys.F9] = InputCommand.SYSTEM_TOGGLE_SMAA   # F9

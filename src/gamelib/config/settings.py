@@ -49,7 +49,7 @@ SHADOW_UPDATE_THROTTLE_FRAMES = 0  # Update static light shadows every N frames 
 DEBUG_SHADOW_RENDERING = False  # Print shadow map rendering statistics
 
 # Debug visualization for light placements
-DEBUG_DRAW_LIGHT_GIZMOS = True  # Render helper gizmos showing light positions and directions
+DEBUG_DRAW_LIGHT_GIZMOS = False  # Render helper gizmos showing light positions and directions
 DEBUG_LIGHT_GIZMO_SPHERE_RADIUS = 0.5  # Radius of the debug sphere drawn at each light position
 DEBUG_LIGHT_GIZMO_LINE_LENGTH = 5.5  # Length of the direction line extending from each light
 DEBUG_LIGHT_GIZMO_ALPHA = 0.75  # Opacity for light gizmo rendering (0-1)
