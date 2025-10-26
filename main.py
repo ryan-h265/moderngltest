@@ -5,25 +5,34 @@ ModernGL 3D Engine - Main Entry Point
 A modular 3D game engine with multi-light shadow mapping.
 """
 
+from __future__ import annotations
+
 import logging
 
 import moderngl
 import moderngl_window as mglw
+from moderngl_window import geometry
 from pyrr import Vector3
 
 from src.gamelib import (
     # Configuration
     WINDOW_SIZE, ASPECT_RATIO, GL_VERSION, WINDOW_TITLE, RESIZABLE,
     # Core
-    Camera, SceneManager,
+    Camera, SceneManager, SceneObject,
+    CameraRig, FreeFlyRig, FirstPersonRig, ThirdPersonRig,
     # Rendering
     RenderPipeline,
+    # Gameplay
+    PlayerCharacter,
+    # Input helpers
+    InputContext,
+    InputCommand,
 )
 from src.gamelib.core.skybox import Skybox
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
-from src.gamelib.input.controllers import CameraController, RenderingController
+from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController
 
 # Physics
 from src.gamelib.physics import PhysicsWorld
@@ -48,45 +57,37 @@ class Game(mglw.WindowConfig):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        # Enable depth testing
+        # Enable core GL states
         self.ctx.enable(moderngl.DEPTH_TEST)
-
-        # Enable backface culling for ~50% fragment shader performance improvement
         self.ctx.enable(moderngl.CULL_FACE)
-        self.ctx.front_face = 'ccw'  # Counter-clockwise winding order
+        self.ctx.front_face = "ccw"
 
-        # Setup camera
+        # Primary camera used by all rigs
         self.camera = Camera(
             position=Vector3([0.0, 5.0, 10.0]),
-            target=Vector3([0.0, 0.0, 0.0])
+            target=Vector3([0.0, 0.0, 0.0]),
         )
 
-        # Setup input system (new Command Pattern architecture)
+        # Input system
         self.input_manager = InputManager(self.wnd.keys)
-        self.camera_controller = CameraController(self.camera, self.input_manager)
 
-        # Capture mouse
+        # Capture mouse by default
         self.wnd.mouse_exclusivity = True
         self.wnd.cursor = False
-
-        # eventually set this to none and have a better
-        # method to close the window
         self.wnd.exit_key = self.wnd.keys.Q
 
-        # Setup rendering pipeline
+        # Rendering pipeline and controllers
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
-
-        # Setup rendering controller for SSAO toggle, etc.
         self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
-        # Setup physics world (PyBullet)
+        # Physics world (optional if PyBullet missing)
         try:
             self.physics_world = PhysicsWorld()
-        except RuntimeError as exc:  # pragma: no cover - only triggered without PyBullet
+        except RuntimeError as exc:  # pragma: no cover - environment dependent
             logger.warning("Physics world disabled: %s", exc)
             self.physics_world = None
 
-        # Scene management (JSON-driven scenes)
+        # Scene management
         self.scene_manager = SceneManager(
             self.ctx,
             self.render_pipeline,
@@ -95,24 +96,68 @@ class Game(mglw.WindowConfig):
         self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
         self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
 
-        # Load scene (change between "default" and "donut_terrain")
         loaded_scene = self.scene_manager.load("default", camera=self.camera)
         self.scene = loaded_scene.scene
         self.lights = loaded_scene.lights
 
-        # Create and set procedural aurora skybox
+        # Skybox
         skybox = Skybox.aurora(self.ctx, name="Aurora Skybox")
         skybox.intensity = 1.0
         self.scene.set_skybox(skybox)
 
-        # Setup debug overlay
-        if DEBUG_OVERLAY_ENABLED:
-            self.debug_overlay = DebugOverlay(self.render_pipeline)
-        else:
-            self.debug_overlay = None
+        # Player character and controllers
+        self.player = self._spawn_player()
+        if self.player is not None:
+            self.scene.add_object(self.player.model)
+
+        self.camera_rig: CameraRig = self._create_camera_rig()
+        self.camera_controller = CameraController(self.camera, self.input_manager, rig=self.camera_rig)
+        self.player_controller = PlayerController(self.player, self.input_manager) if self.player else None
+
+        # Toggle for debug camera context
+        self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
+
+        # Debug overlay
+        self.debug_overlay = DebugOverlay(self.render_pipeline) if DEBUG_OVERLAY_ENABLED else None
 
         # Time tracking
-        self.time = 0
+        self.time = 0.0
+
+    def _spawn_player(self) -> PlayerCharacter | None:
+        if self.physics_world is None:
+            return None
+
+        placeholder = SceneObject(
+            geometry.cube(size=(0.8, 1.8, 0.8)),
+            Vector3([0.0, 2.0, 0.0]),
+            (0.2, 0.6, 0.9),
+            name="Player",
+        )
+
+        player = PlayerCharacter(placeholder, self.physics_world)
+        player.set_yaw(self.camera.yaw)
+        return player
+
+    def _create_camera_rig(self) -> CameraRig:
+        if self.player is None:
+            return FreeFlyRig(self.camera)
+        return FirstPersonRig(self.camera, self.player)
+
+    def toggle_debug_camera(self):
+        context_manager = self.input_manager.context_manager
+        if context_manager.current_context == InputContext.DEBUG_CAMERA:
+            # Return to gameplay
+            context_manager.pop_context()
+            new_rig = self._create_camera_rig()
+            self.camera_rig = new_rig
+            if self.player is not None:
+                self.camera.position = self.player.get_eye_position()
+            self.camera_controller.disable_free_fly(new_rig)
+        else:
+            # Enter debug free-fly
+            context_manager.push_context(InputContext.DEBUG_CAMERA)
+            self.camera_controller.enable_free_fly()
+            self.camera_rig = self.camera_controller.rig
 
     def on_update(self, time, frametime):
         """
@@ -124,18 +169,23 @@ class Game(mglw.WindowConfig):
         """
         self.time = time
 
-        if self.physics_world is not None:
-            self.physics_world.step_simulation(frametime)
-
-        # Animate lights (create a rotating light show!)
-        # for i, light in enumerate(self.lights):
-        #     light.animate_rotation(time * (1.0 + i * 0.1), speed=2)
-
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
 
-        # Update camera target after position changes
-        self.camera.update_vectors()
+        if self.player_controller is not None:
+            self.player_controller.update()
+
+        if self.player is not None:
+            self.player.update(frametime)
+
+        if self.physics_world is not None:
+            self.physics_world.step_simulation(frametime)
+
+        if self.player is not None:
+            self.player.update_post_physics(frametime)
+
+        if self.camera_rig is not None:
+            self.camera_rig.update(frametime)
 
         # Update animations for all models in the scene
         animated_this_frame = False

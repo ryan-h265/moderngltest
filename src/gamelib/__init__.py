@@ -10,6 +10,7 @@ from .config.settings import *
 
 # Core Engine
 from .core.camera import Camera
+from .core.camera_rig import CameraRig, FreeFlyRig, FirstPersonRig, ThirdPersonRig
 from .core.light import Light, LightDefinition
 from .core.scene import Scene, SceneObject, SceneDefinition, SceneNodeDefinition
 from .core.scene_manager import SceneManager
@@ -33,13 +34,20 @@ from .input.input_manager import InputManager
 from .input.input_commands import InputCommand, InputType
 from .input.input_context import InputContext, InputContextManager
 from .input.key_bindings import KeyBindings
-from .input.controllers import CameraController
+from .input.controllers import CameraController, PlayerController
+
+# Gameplay
+from .gameplay import PlayerCharacter
 
 __version__ = "0.2.0"
 __all__ = [
     # Config (exported via *)
     # Core
     "Camera",
+    "CameraRig",
+    "FreeFlyRig",
+    "FirstPersonRig",
+    "ThirdPersonRig",
     "Light",
     "LightDefinition",
     "Scene",
@@ -64,4 +72,6 @@ __all__ = [
     "InputContextManager",
     "KeyBindings",
     "CameraController",
+    "PlayerController",
+    "PlayerCharacter",
 ]

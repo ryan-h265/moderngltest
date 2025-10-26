@@ -53,30 +53,20 @@ class KeyBindings:
         """Set default key bindings"""
 
         # ====================================================================
-        # Camera Movement (WASD + QE)
+        # Player Movement (WASD + modifiers)
         # ====================================================================
-        self.keyboard_bindings[self.keys.W] = InputCommand.CAMERA_MOVE_FORWARD    # W
-        self.keyboard_bindings[self.keys.S] = InputCommand.CAMERA_MOVE_BACKWARD   # S
-        self.keyboard_bindings[self.keys.A] = InputCommand.CAMERA_MOVE_LEFT       # A
-        self.keyboard_bindings[self.keys.D] = InputCommand.CAMERA_MOVE_RIGHT      # D
-        self.keyboard_bindings[self.keys.LEFT_SHIFT] = InputCommand.CAMERA_MOVE_DOWN       # SHIFT
-        self.keyboard_bindings[self.keys.SPACE] = InputCommand.CAMERA_MOVE_UP         # SPACE
+        self.keyboard_bindings[self.keys.W] = InputCommand.PLAYER_MOVE_FORWARD    # W
+        self.keyboard_bindings[self.keys.S] = InputCommand.PLAYER_MOVE_BACKWARD   # S
+        self.keyboard_bindings[self.keys.A] = InputCommand.PLAYER_MOVE_LEFT       # A
+        self.keyboard_bindings[self.keys.D] = InputCommand.PLAYER_MOVE_RIGHT      # D
+        self.keyboard_bindings[self.keys.SPACE] = InputCommand.PLAYER_JUMP        # SPACE
+        self.keyboard_bindings[self.keys.LEFT_SHIFT] = InputCommand.PLAYER_SPRINT # LEFT SHIFT
+        self.keyboard_bindings[self.keys.LEFT_CTRL] = InputCommand.PLAYER_CROUCH  # LEFT CTRL
+        self.keyboard_bindings[self.keys.C] = InputCommand.PLAYER_WALK            # C
 
-        # Alternative arrow keys for camera movement
-        # self.keyboard_bindings[self.keys.UP] = InputCommand.CAMERA_MOVE_FORWARD  # UP
-        # self.keyboard_bindings[self.keys.DOWN] = InputCommand.CAMERA_MOVE_BACKWARD # DOWN
-        # self.keyboard_bindings[self.keys.LEFT] = InputCommand.CAMERA_MOVE_LEFT     # LEFT
-        # self.keyboard_bindings[self.keys.RIGHT] = InputCommand.CAMERA_MOVE_RIGHT    # RIGHT
-
-        # ====================================================================
-        # Game Actions (Future - examples)
-        # ====================================================================
-        # self.keyboard_bindings[self.keys.SPACE] = InputCommand.GAME_JUMP           # SPACE
-        # self.keyboard_bindings[self.keys.LEFT_SHIFT] = InputCommand.GAME_CROUCH        # LEFT SHIFT
-        # self.keyboard_bindings[self.keys.LEFT_CTRL] = InputCommand.GAME_SPRINT        # LEFT CTRL
-        # self.keyboard_bindings[self.keys.F] = InputCommand.GAME_INTERACT       # F
-        # self.keyboard_bindings[self.keys.R] = InputCommand.GAME_RELOAD         # R
-        # self.keyboard_bindings[self.keys.G] = InputCommand.GAME_THROW          # G
+        # Debug camera vertical movement (available in debug context)
+        self.keyboard_bindings[self.keys.E] = InputCommand.CAMERA_MOVE_UP         # E
+        self.keyboard_bindings[self.keys.Q] = InputCommand.CAMERA_MOVE_DOWN       # Q
 
         # ====================================================================
         # UI Actions (Future - examples)
@@ -92,6 +82,7 @@ class KeyBindings:
         # ====================================================================
         self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.SYSTEM_TOGGLE_MOUSE  # ESC
         self.keyboard_bindings[self.keys.F1] = InputCommand.SYSTEM_SCREENSHOT    # F1
+        self.keyboard_bindings[self.keys.F2] = InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA  # F2
         self.keyboard_bindings[self.keys.F4] = InputCommand.SYSTEM_TOGGLE_DEBUG  # F4
         # self.keyboard_bindings[self.keys.F5] = InputCommand.SYSTEM_QUICK_SAVE  # F5
         self.keyboard_bindings[self.keys.T] = InputCommand.SYSTEM_TOGGLE_SSAO   # T

@@ -576,6 +576,115 @@ class PhysicsWorld:
         return self._bodies.get(body_id)
 
     # ------------------------------------------------------------------
+    # Body state queries and mutation helpers
+    # ------------------------------------------------------------------
+    def get_body_position(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the world-space position of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        position, _ = _pb.getBasePositionAndOrientation(body_id, physicsClientId=self._client)
+        return position
+
+    def get_body_orientation(self, body_id: int) -> Tuple[float, float, float, float]:
+        """Return the world-space orientation (quaternion) of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, orientation = _pb.getBasePositionAndOrientation(body_id, physicsClientId=self._client)
+        return orientation
+
+    def set_body_transform(
+        self,
+        body_id: int,
+        position: Optional[Tuple[float, float, float]] = None,
+        orientation: Optional[Tuple[float, float, float, float]] = None,
+    ) -> None:
+        """Set the transform of a body, preserving unspecified components."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        current_position, current_orientation = _pb.getBasePositionAndOrientation(
+            body_id,
+            physicsClientId=self._client,
+        )
+        _pb.resetBasePositionAndOrientation(
+            body_id,
+            position or current_position,
+            orientation or current_orientation,
+            physicsClientId=self._client,
+        )
+
+    def get_linear_velocity(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the linear velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        linear_velocity, _ = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        return linear_velocity
+
+    def set_linear_velocity(self, body_id: int, velocity: Tuple[float, float, float]) -> None:
+        """Set the linear velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        _pb.resetBaseVelocity(
+            body_id,
+            linearVelocity=_vec3(velocity),
+            angularVelocity=angular_velocity,
+            physicsClientId=self._client,
+        )
+
+    def set_angular_factor(self, body_id: int, factor: Tuple[float, float, float]) -> None:
+        """Lock or unlock angular axes for a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _pb.changeDynamics(
+            body_id,
+            -1,
+            angularFactor=_vec3(factor),
+            physicsClientId=self._client,
+        )
+
+    def apply_central_impulse(self, body_id: int, impulse: Tuple[float, float, float]) -> None:
+        """Apply an instantaneous impulse at the centre of mass."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _pb.applyExternalForce(
+            body_id,
+            -1,
+            _vec3(impulse),
+            (0.0, 0.0, 0.0),
+            _pb.WORLD_FRAME,
+            physicsClientId=self._client,
+        )
+
+    def ray_test(
+        self,
+        from_pos: Tuple[float, float, float],
+        to_pos: Tuple[float, float, float],
+    ) -> Optional[Dict[str, Any]]:
+        """Perform a ray test and return the closest hit, if any."""
+
+        if self._client is None:
+            return None
+        result = _pb.rayTest(_vec3(from_pos), _vec3(to_pos), physicsClientId=self._client)
+        if not result:
+            return None
+        body_id = result[0][0]
+        if body_id == -1:
+            return None
+        return {
+            "body_id": body_id,
+            "hit_fraction": result[0][2],
+            "hit_position": result[0][3],
+            "hit_normal": result[0][4],
+        }
+
+    # ------------------------------------------------------------------
     # Debug helpers
     # ------------------------------------------------------------------
     def get_contacts(

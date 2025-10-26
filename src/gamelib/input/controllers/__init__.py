@@ -5,6 +5,7 @@ Controllers translate input commands to specific actions.
 """
 
 from .camera_controller import CameraController
+from .player_controller import PlayerController
 from .rendering_controller import RenderingController
 
-__all__ = ['CameraController', 'RenderingController']
+__all__ = ['CameraController', 'PlayerController', 'RenderingController']
