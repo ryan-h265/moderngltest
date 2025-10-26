@@ -641,10 +641,9 @@ class PhysicsWorld:
 
         if body_id not in self._bodies:
             raise ValueError(f"Body {body_id} is not registered")
-        _pb.changeDynamics(
+        _pb.setAngularFactor(
             body_id,
-            -1,
-            angularFactor=_vec3(factor),
+            _vec3(factor),
             physicsClientId=self._client,
         )
 
