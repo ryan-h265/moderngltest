@@ -459,7 +459,7 @@
     {
       "type": "directional",
       "position": [
-        0.0,
+        10.0,
         20.0,
         20.0
       ],
@@ -469,11 +469,51 @@
         0.0
       ],
       "color": [
+        0.2,
         1.0,
-        1.0,
+        0.2
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        -10.0,
+        20.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
         1.0
       ],
-      "intensity": 3.5,
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        0.0,
+        20.0,
+        -20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.2,
+        0.2
+      ],
+      "intensity": 4.5,
       "cast_shadows": true
     }
   ]
