@@ -21,6 +21,7 @@ from .text_manager import TextManager
 from .ui_renderer import UIRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from .bloom_renderer import BloomRenderer
+from .light_debug_renderer import LightDebugRenderer
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
@@ -84,6 +85,9 @@ class RenderPipeline:
 
         # Forward transparent shader (for alpha BLEND mode)
         self.shader_manager.load_program("transparent", "forward_transparent.vert", "forward_transparent.frag")
+
+        # Debug visualization shader
+        self.shader_manager.load_program("light_debug", "light_debug.vert", "light_debug.frag")
 
         # SSAO shaders
         self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
@@ -191,6 +195,12 @@ class RenderPipeline:
         self.ui_renderer = UIRenderer(
             ctx,
             self.shader_manager.get("ui_text"),
+        )
+
+        # Light debug gizmo renderer (disabled unless flag enabled)
+        self.light_debug_renderer = LightDebugRenderer(
+            ctx,
+            self.shader_manager.get("light_debug"),
         )
         self.viewport_size: Tuple[int, int] = tuple(self.window.size)
 
@@ -321,6 +331,8 @@ class RenderPipeline:
             )
             self.aa_renderer.resolve_and_present()
 
+        self._render_light_debug(camera, lights)
+
     def _render_deferred(
         self,
         scene: Scene,
@@ -429,17 +441,19 @@ class RenderPipeline:
             # Render into AA buffer before resolving
             if scene.has_transparent_objects():
                 shadow_maps = [light.shadow_map for light in lights]
-                self.transparent_renderer.render(
-                    scene,
-                    camera,
-                    lights,
-                    render_target,
-                    shadow_maps,
-                    self.window.size,
-                    time=time,
-                )
+            self.transparent_renderer.render(
+                scene,
+                camera,
+                lights,
+                render_target,
+                shadow_maps,
+                self.window.size,
+                time=time,
+            )
 
             self.aa_renderer.resolve_and_present()
+
+        self._render_light_debug(camera, lights)
 
     def get_shader(self, name: str) -> moderngl.Program:
         """
@@ -452,6 +466,27 @@ class RenderPipeline:
             Shader program
         """
         return self.shader_manager.get(name)
+
+    def _render_light_debug(self, camera: Camera, lights: List[Light]) -> None:
+        """Render light gizmos when enabled."""
+        from ..config import settings
+
+        if not getattr(settings, "DEBUG_DRAW_LIGHT_GIZMOS", False):
+            return
+        if not lights:
+            return
+        if not getattr(self, "light_debug_renderer", None):
+            return
+
+        width, height = self.window.size
+        default_viewport = (0, 0, width, height)
+        viewport = getattr(self.window, "viewport", default_viewport)
+        if isinstance(viewport, tuple) and len(viewport) == 4:
+            target_viewport = viewport
+        else:
+            target_viewport = default_viewport
+
+        self.light_debug_renderer.render(camera, lights, target_viewport)
 
     def cycle_aa_mode(self):
         """Cycle to the next anti-aliasing mode"""
