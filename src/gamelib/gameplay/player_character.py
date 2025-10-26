@@ -144,7 +144,15 @@ class PlayerCharacter:
         self.jump_requested = False
 
     def update_post_physics(self, delta_time: float) -> None:
-        pass
+        # Reinforce upright orientation so we do not accumulate roll/pitch error when
+        # angular axes are locked (especially on PyBullet builds lacking native support).
+        rotation = Quaternion.from_y_rotation(math.radians(self.yaw))
+        self.physics_world.set_body_transform(
+            self.physics_body.body_id,
+            orientation=tuple(rotation),
+        )
+        if hasattr(self.model, "rotation"):
+            self.model.rotation = rotation
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pyrr import Quaternion, Vector3
@@ -385,7 +386,22 @@ class PhysicsWorld:
         if shape == "capsule":
             if config.radius is None or config.height is None:
                 raise ValueError("Capsule collider requires 'radius' and 'height'")
-            return _pb.createCollisionShape(_pb.GEOM_CAPSULE, radius=config.radius, height=config.height, **kwargs)
+
+            # PyBullet capsules are aligned along the local Z axis and the `height` parameter refers
+            # to the cylindrical portion only (the full height is height + 2 * radius). For standing
+            # characters we want the capsule aligned with the world Y axis, so rotate the collision
+            # shape frame accordingly and clamp the cylindrical height to non-negative values.
+            cylinder_height = max(config.height - 2.0 * config.radius, 0.0)
+            capsule_orientation = Quaternion.from_x_rotation(-math.pi / 2.0)
+
+            return _pb.createCollisionShape(
+                _pb.GEOM_CAPSULE,
+                radius=config.radius,
+                height=cylinder_height,
+                collisionFrameOrientation=tuple(float(c) for c in capsule_orientation),
+                physicsClientId=self._client,
+                **kwargs,
+            )
         if shape == "cylinder":
             if config.radius is None or config.height is None:
                 raise ValueError("Cylinder collider requires 'radius' and 'height'")
