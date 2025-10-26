@@ -50,13 +50,23 @@ class PlayerCharacter:
         self.physics_body = self._create_physics_body()
 
         self.movement_intent = Vector3([0.0, 0.0, 0.0])
-        self.velocity = Vector3([0.0, 0.0, 0.0])
+        # Start with a tiny downward velocity to ensure we fall to ground on spawn
+        # If spawned in the air, this will trigger the falling sequence immediately
+        self.velocity = Vector3([0.0, -0.5, 0.0])
         self.yaw = 0.0
+        
+        # For kinematic bodies, we manually track position since PyBullet doesn't auto-update it
+        # Initialize to the spawn position
+        initial_pos = initial_position if initial_position is not None else Vector3([0.0, 2.0, 0.0])
+        self._position = Vector3(initial_pos)
 
         self.is_grounded = False
         self.time_since_grounded = 0.0
         self.jump_requested = False
         self.can_jump = True
+
+        # Skip grounding check on first frame to allow initial velocity to establish contact
+        self._is_first_frame = True
 
         self.is_sprinting = False
         self.is_crouching = False
@@ -68,7 +78,7 @@ class PlayerCharacter:
     def _create_physics_body(self) -> PhysicsBodyHandle:
         config = PhysicsBodyConfig(
             shape="capsule",
-            body_type="dynamic",
+            body_type="kinematic",  # Kinematic body - we control movement, PyBullet handles collisions
             radius=PLAYER_CAPSULE_RADIUS,
             height=PLAYER_CAPSULE_HEIGHT,
             mass=PLAYER_CAPSULE_MASS,
@@ -128,8 +138,8 @@ class PlayerCharacter:
     # Queries
     # ------------------------------------------------------------------
     def get_position(self) -> Vector3:
-        position = self.physics_world.get_body_position(self.physics_body.body_id)
-        return Vector3(position)
+        # For kinematic bodies, we track position internally
+        return Vector3(self._position)
 
     # ------------------------------------------------------------------
     # Update loop
@@ -138,12 +148,30 @@ class PlayerCharacter:
         self._update_ground_state(delta_time)
         self._process_jump()
         self._update_velocity(delta_time)
+        
+        # For kinematic bodies, we must manually move the position based on velocity
+        new_pos = self._position + self.velocity * delta_time
+        self._position = new_pos
+        self.physics_world.set_body_transform(
+            self.physics_body.body_id,
+            position=tuple(new_pos)
+        )
+        
+        # Set velocity for collision detection purposes
         self.physics_world.set_linear_velocity(self.physics_body.body_id, tuple(self.velocity))
+        
         if PLAYER_DEBUG_DRAW_CAPSULE:
             self._draw_debug()
         self.jump_requested = False
 
     def update_post_physics(self, delta_time: float) -> None:
+        # For kinematic bodies, we manually handle movement in update()
+        # So we don't need to sync from PyBullet - our position is already updated
+        # Just ensure the model position stays in sync with our player position
+        
+        if hasattr(self.model, "position"):
+            self.model.position = self.get_position()
+        
         # Reinforce upright orientation so we do not accumulate roll/pitch error when
         # angular axes are locked (especially on PyBullet builds lacking native support).
         rotation = Quaternion.from_y_rotation(math.radians(self.yaw))
@@ -158,24 +186,44 @@ class PlayerCharacter:
     # Internal helpers
     # ------------------------------------------------------------------
     def _update_ground_state(self, delta_time: float) -> None:
-        contacts = self.physics_world.get_contacts(body_id=self.physics_body.body_id)
-        max_slope_radians = math.radians(PLAYER_MAX_SLOPE_ANGLE)
-        min_normal_y = math.cos(max_slope_radians)
+        # Skip grounding check on first frame to allow initial downward velocity to establish contact
+        if self._is_first_frame:
+            self._is_first_frame = False
+            # Force is_grounded = False so _update_velocity will apply gravity
+            self.is_grounded = False
+            return
+        
+        # Use raycast for ground detection (more reliable than contact points for kinematic bodies)
+        # Cast a ray downward from the capsule center to check for ground below
+        capsule_center = self._position
+        
+        # Ray starts from capsule center and goes downward
+        ray_start = capsule_center + Vector3([0.0, -0.1, 0.0])  # Slight offset into capsule for robustness
+        # Check down to a reasonable distance below
+        ray_end = ray_start + Vector3([0.0, -(PLAYER_CAPSULE_HEIGHT/2.0 + PLAYER_CAPSULE_RADIUS + PLAYER_GROUND_CHECK_DISTANCE), 0.0])
+        
+        # Perform raycast
+        hit_info = self.physics_world.ray_test(tuple(ray_start), tuple(ray_end))
+        
         grounded = False
-
-        for contact in contacts:
-            normal = Vector3(contact["normal_on_b"])
-            if contact["body_b"] == self.physics_body.body_id:
-                normal = Vector3(contact["normal_on_b"])
-            elif contact["body_a"] == self.physics_body.body_id:
-                normal = -Vector3(contact["normal_on_b"])
-            else:
-                continue
-
-            if normal.y >= min_normal_y and contact["distance"] <= PLAYER_GROUND_CHECK_DISTANCE:
+        if hit_info:
+            body_id = hit_info.get("body_id", -1)
+            # Accept hits from any body except ourselves
+            # Check if the hit is close to the capsule (within the expected distance)
+            hit_distance = hit_info.get("hit_fraction", 1.0)
+            expected_distance = (PLAYER_CAPSULE_HEIGHT/2.0 + PLAYER_CAPSULE_RADIUS + PLAYER_GROUND_CHECK_DISTANCE)
+            
+            if body_id != self.physics_body.body_id and body_id != -1 and hit_distance <= 1.0:
                 grounded = True
-                break
-
+        
+        # Track grounded state changes
+        if grounded and not self.is_grounded:
+            # Just landed
+            pass
+        elif not grounded and self.is_grounded:
+            # Just left ground (jumped or fell off)
+            pass
+        
         self.is_grounded = grounded
         if grounded:
             self.time_since_grounded = 0.0

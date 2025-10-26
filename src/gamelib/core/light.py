@@ -229,7 +229,10 @@ class Light:
             return True
 
         # Check throttle interval for static lights
-        if throttle_frames > 0:
+        if throttle_frames == 0:
+            # throttle_frames = 0 means render every frame
+            return True
+        elif throttle_frames > 0:
             return self._frames_since_shadow_update >= throttle_frames
 
         return False

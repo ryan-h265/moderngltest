@@ -400,12 +400,16 @@ class PhysicsWorld:
                 height=cylinder_height,
                 collisionFrameOrientation=tuple(float(c) for c in capsule_orientation),
                 physicsClientId=self._client,
-                **kwargs,
             )
         if shape == "cylinder":
             if config.radius is None or config.height is None:
                 raise ValueError("Cylinder collider requires 'radius' and 'height'")
-            return _pb.createCollisionShape(_pb.GEOM_CYLINDER, radius=config.radius, height=config.height, **kwargs)
+            return _pb.createCollisionShape(
+                _pb.GEOM_CYLINDER,
+                radius=config.radius,
+                height=config.height,
+                physicsClientId=self._client,
+            )
         if shape == "cone":
             if config.radius is None or config.height is None:
                 raise ValueError("Cone collider requires 'radius' and 'height'")
@@ -419,7 +423,7 @@ class PhysicsWorld:
                     float(config.height),
                     float(config.radius),
                 ],
-                **kwargs,
+                physicsClientId=self._client,
             )
         if shape == "plane":
             return _pb.createCollisionShape(
@@ -469,7 +473,7 @@ class PhysicsWorld:
         """Manually clamp angular velocity for bodies without native support."""
 
         if not self._angular_factor_overrides:
-            return
+            return  # Early exit - no work needed
 
         for body_id, factor in list(self._angular_factor_overrides.items()):
             if body_id not in self._bodies:
@@ -480,6 +484,7 @@ class PhysicsWorld:
             _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
             constrained = tuple(angular_velocity[i] * factor[i] for i in range(3))
 
+            # Only apply if actually different (avoid unnecessary calls)
             if constrained != angular_velocity:
                 _pb.resetBaseVelocity(
                     body_id,
@@ -678,6 +683,14 @@ class PhysicsWorld:
             physicsClientId=self._client,
         )
 
+    def get_angular_velocity(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the angular velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        return angular_velocity
+
     def set_angular_factor(self, body_id: int, factor: Tuple[float, float, float]) -> None:
         """Lock or unlock angular axes for a body."""
 
@@ -685,20 +698,29 @@ class PhysicsWorld:
             raise ValueError(f"Body {body_id} is not registered")
 
         factor_vec = _vec3(factor)
-        if hasattr(_pb, "setAngularFactor"):
-            _pb.setAngularFactor(
+        
+        # Try native PyBullet method first (available in newer versions)
+        try:
+            _pb.changeDynamics(
                 body_id,
-                factor_vec,
+                -1,
+                angularFactor=factor_vec,
                 physicsClientId=self._client,
             )
+            # If successful, clear any fallback override
             self._angular_factor_overrides.pop(body_id, None)
             return
+        except (TypeError, AttributeError):
+            # Fall through to manual override method
+            pass
 
+        # Fallback: Manual velocity clamping for older PyBullet versions
         if factor_vec == (1.0, 1.0, 1.0):
+            # Full freedom - no override needed
             self._angular_factor_overrides.pop(body_id, None)
             return
 
-        # Fall back to manually clamping angular velocity components for older PyBullet builds.
+        # Register override and apply immediately
         self._angular_factor_overrides[body_id] = factor_vec
 
         _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
@@ -745,6 +767,33 @@ class PhysicsWorld:
             "hit_position": result[0][3],
             "hit_normal": result[0][4],
         }
+
+    def ray_test_all(
+        self,
+        from_pos: Tuple[float, float, float],
+        to_pos: Tuple[float, float, float],
+    ) -> List[Dict[str, Any]]:
+        """Perform a ray test and return all hits along the ray, sorted by distance."""
+
+        if self._client is None:
+            return []
+
+        result = _pb.rayTest(_vec3(from_pos), _vec3(to_pos), physicsClientId=self._client)
+        if not result:
+            return []
+
+        hits = []
+        for hit in result:
+            body_id = hit[0]
+            if body_id != -1:  # Valid hit
+                hits.append({
+                    "body_id": body_id,
+                    "hit_fraction": hit[2],
+                    "hit_position": hit[3],
+                    "hit_normal": hit[4],
+                })
+
+        return sorted(hits, key=lambda h: h["hit_fraction"])
 
     # ------------------------------------------------------------------
     # Debug helpers

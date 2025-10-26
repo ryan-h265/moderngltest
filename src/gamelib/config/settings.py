@@ -212,10 +212,10 @@ MAX_PITCH = 89.0
 # Character Movement Defaults
 # ============================================================================
 
-PLAYER_WALK_SPEED = 3.0
-PLAYER_RUN_SPEED = 6.0
-PLAYER_SPRINT_SPEED = 9.0
-PLAYER_CROUCH_SPEED = 1.5
+PLAYER_WALK_SPEED = 5.0
+PLAYER_RUN_SPEED = 5.0
+PLAYER_SPRINT_SPEED = 5.0
+PLAYER_CROUCH_SPEED = 5.0
 
 PLAYER_AIR_CONTROL_FACTOR = 0.35
 

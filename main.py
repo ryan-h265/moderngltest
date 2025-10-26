@@ -129,7 +129,7 @@ class Game(mglw.WindowConfig):
 
         placeholder = SceneObject(
             geometry.cube(size=(0.8, 1.8, 0.8)),
-            Vector3([0.0, 2.0, 0.0]),
+            Vector3([0.0, 20.0, 0.0]),
             (0.2, 0.6, 0.9),
             name="Player",
         )
@@ -202,7 +202,7 @@ class Game(mglw.WindowConfig):
         # Update debug overlay
         if self.debug_overlay:
             fps = 1.0 / frametime if frametime > 0 else 0
-            self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene)
+            self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene, self.player)
 
     def on_render(self, time, frametime):
         """
