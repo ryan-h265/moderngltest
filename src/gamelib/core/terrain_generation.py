@@ -7,6 +7,13 @@ Adapted from pandas3d terrain generation for ModernGL.
 import numpy as np
 import math
 
+# Optional: Import fractal_perlin for higher-quality Perlin-based noise
+try:
+    from src.gamelib.fractal_perlin import fbm as perlin_fbm
+    HAS_PERLIN = True
+except ImportError:
+    HAS_PERLIN = False
+
 
 def simple_noise(x, y, seed=0):
     """Simple pseudo-noise function using sine waves and random-like behavior.
@@ -33,7 +40,7 @@ def simple_noise(x, y, seed=0):
     return n / 2.5  # Normalize to roughly -1 to 1
 
 
-def fractal_noise(x, y, octaves=4, persistence=0.5, lacunarity=2.0, seed=0):
+def fractal_noise(x, y, octaves=4, persistence=0.5, lacunarity=2.0, seed=0, use_perlin=False):
     """Generate fractal noise by combining multiple octaves.
 
     Args:
@@ -43,10 +50,18 @@ def fractal_noise(x, y, octaves=4, persistence=0.5, lacunarity=2.0, seed=0):
         persistence: How much each octave contributes (amplitude multiplier)
         lacunarity: Frequency multiplier for each octave
         seed: Random seed
+        use_perlin: If True and fractal_perlin module is available, use Perlin-based fBm
+                   instead of sine-based noise (default: False for backward compatibility)
 
     Returns:
         Float noise value
     """
+    # Use Perlin-based fBm if requested and available
+    if use_perlin and HAS_PERLIN:
+        return float(perlin_fbm(x, y, octaves=octaves, persistence=persistence, 
+                                lacunarity=lacunarity, seed=seed))
+    
+    # Fall back to sine-based fractal noise (original implementation)
     value = 0.0
     amplitude = 1.0
     frequency = 1.0
@@ -61,7 +76,7 @@ def fractal_noise(x, y, octaves=4, persistence=0.5, lacunarity=2.0, seed=0):
     return value / max_value
 
 
-def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, height=50, rim_width=40, seed=42):
+def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, height=50, rim_width=40, seed=42, use_perlin=False):
     """Generate height data for a donut-shaped terrain with a thick, walkable top surface.
 
     Creates a 2D grid of height values forming a donut/torus shape with:
@@ -77,6 +92,7 @@ def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, he
         height: Height of the donut rim
         rim_width: Width of the thick, flat top surface
         seed: Random seed for noise variation
+        use_perlin: If True, use Perlin-based noise for higher quality (default: False)
 
     Returns:
         2D numpy array of height values (resolution x resolution)
@@ -118,7 +134,8 @@ def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, he
                         octaves=2,
                         persistence=0.3,
                         lacunarity=2.0,
-                        seed=seed
+                        seed=seed,
+                        use_perlin=use_perlin
                     ) * 1  # Very small noise for subtle texture
 
                     terrain_height = base_height + noise_height
@@ -141,7 +158,8 @@ def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, he
                         octaves=3,
                         persistence=0.5,
                         lacunarity=2.0,
-                        seed=seed
+                        seed=seed,
+                        use_perlin=use_perlin
                     ) * 3
 
                     terrain_height = base_height + noise_height
@@ -156,4 +174,54 @@ def generate_donut_height_data(resolution, outer_radius=200, inner_radius=80, he
                 # Outside the donut - flat ground
                 heights[x][z] = 0
 
+    return heights
+
+
+def generate_fractal_terrain(resolution, world_size=400.0, preset='mountainous', seed=42, 
+                              octaves=None, persistence=None, lacunarity=None, 
+                              amplitude=None, scale=None):
+    """Generate natural fractal terrain using Perlin-based noise.
+    
+    Creates realistic mountainous, hilly, or plateau terrain using high-quality
+    Perlin noise. This is a convenience wrapper around fractal_perlin.generate_noise_grid
+    that returns just the heights array.
+    
+    Args:
+        resolution: Number of vertices per edge (creates resolution x resolution grid)
+        world_size: Size of terrain in world units (default: 400.0)
+        preset: Noise preset ('mountainous', 'rolling', 'plateau') or None for custom
+        seed: Random seed for reproducibility
+        octaves: Number of noise octaves (overrides preset)
+        persistence: Amplitude multiplier per octave (overrides preset)
+        lacunarity: Frequency multiplier per octave (overrides preset)
+        amplitude: Height scale multiplier (overrides preset)
+        scale: Noise sampling scale (overrides preset)
+        
+    Returns:
+        2D numpy array of height values (resolution x resolution)
+        
+    Raises:
+        ImportError: If fractal_perlin module is not available
+    """
+    if not HAS_PERLIN:
+        raise ImportError(
+            "fractal_perlin module not available. "
+            "Cannot generate Perlin-based terrain. "
+            "Use generate_donut_height_data with use_perlin=False instead."
+        )
+    
+    from src.gamelib.fractal_perlin import generate_noise_grid
+    
+    heights, _ = generate_noise_grid(
+        resolution=resolution,
+        world_size=world_size,
+        preset=preset,
+        seed=seed,
+        octaves=octaves,
+        persistence=persistence,
+        lacunarity=lacunarity,
+        amplitude=amplitude,
+        scale=scale
+    )
+    
     return heights

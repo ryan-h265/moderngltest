@@ -1,0 +1,16 @@
+{
+  "type": "fractal_terrain_scene",
+  "heightmap": "../heightmaps/fractal_mountainous_r100_s42.npz",
+  "metadata": {
+    "resolution": 100,
+    "scale": 0.006,
+    "world_size": 400.0,
+    "preset": "mountainous",
+    "seed": 42,
+    "octaves": 6,
+    "persistence": 0.55,
+    "lacunarity": 2.1,
+    "amplitude": 120.0
+  },
+  "objects": []
+}

@@ -117,13 +117,13 @@ class SceneLoader:
         node_type = node.node_type.lower()
 
         if node_type == "primitive":
-            return self._create_primitive(node)
+            return self._create_primitive(node, base_path)
         if node_type == "model":
             return self._create_model(node, base_path)
 
         raise ValueError(f"Unsupported scene node type: {node.node_type}")
 
-    def _create_primitive(self, node: SceneNodeDefinition):
+    def _create_primitive(self, node: SceneNodeDefinition, base_path: Path):
         if node.primitive is None:
             raise ValueError(f"Primitive node '{node.name}' is missing 'primitive' field")
 
@@ -187,6 +187,32 @@ class SceneLoader:
                 offset = world_size / 2
                 diagonal_dist = math.sqrt(offset ** 2 + offset ** 2)
                 bounding_radius = math.sqrt(diagonal_dist ** 2 + height ** 2)
+        elif primitive == "heightmap_terrain":
+            # Load terrain from heightmap file
+            heightmap_path = node.extras.get("heightmap", node.mesh_path)
+            if not heightmap_path:
+                raise ValueError(f"Heightmap terrain node '{node.name}' is missing 'heightmap' path")
+            
+            hm_path = Path(heightmap_path)
+            if not hm_path.is_absolute():
+                hm_path = (base_path / heightmap_path).resolve()
+            if not hm_path.exists():
+                raise FileNotFoundError(f"Heightmap not found: {heightmap_path}")
+            
+            geometry_obj = geometry_utils.heightmap_terrain(str(hm_path))
+            
+            if bounding_radius is None:
+                # Load heightmap metadata to calculate bounding radius
+                import numpy as np
+                import json as json_module
+                data = np.load(str(hm_path))
+                heights = data['heights']
+                meta = json_module.loads(str(data['meta']))
+                world_size = meta.get('world_size', 400.0)
+                offset = world_size / 2.0
+                diagonal_dist = math.sqrt(offset ** 2 + offset ** 2)
+                max_height = float(np.max(np.abs(heights)))
+                bounding_radius = math.sqrt(diagonal_dist ** 2 + max_height ** 2)
         else:
             raise ValueError(f"Unsupported primitive type: {node.primitive}")
 
