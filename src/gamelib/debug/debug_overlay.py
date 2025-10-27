@@ -26,6 +26,7 @@ from ..config.settings import (
 
 if TYPE_CHECKING:
     from ..rendering.render_pipeline import RenderPipeline
+    from ..gameplay import PlayerCharacter
 
 
 class DebugOverlay:
@@ -51,7 +52,7 @@ class DebugOverlay:
         self.max_frame_samples = 60  # Average over 60 frames
 
     def update(self, fps: float, frametime: float, camera: Camera,
-               lights: List[Light], scene: Optional[Scene] = None):
+               lights: List[Light], scene: Optional[Scene] = None, player: Optional["PlayerCharacter"] = None):
         """
         Update debug overlay with current stats.
 
@@ -61,6 +62,7 @@ class DebugOverlay:
             camera: Camera instance
             lights: List of lights
             scene: Optional scene for object count
+            player: Optional PlayerCharacter for movement debugging
         """
         # Track frame times
         self.frame_times.append(frametime * 1000)  # Convert to ms
@@ -71,13 +73,13 @@ class DebugOverlay:
         avg_frametime = sum(self.frame_times) / len(self.frame_times)
 
         # Gather stats
-        stats_lines = self._gather_stats(fps, avg_frametime, camera, lights, scene)
+        stats_lines = self._gather_stats(fps, avg_frametime, camera, lights, scene, player)
 
         # Update text display
         self._update_display(stats_lines)
 
     def _gather_stats(self, fps: float, avg_frametime: float, camera: Camera,
-                      lights: List[Light], scene: Optional[Scene]) -> List[str]:
+                      lights: List[Light], scene: Optional[Scene], player: Optional["PlayerCharacter"] = None) -> List[str]:
         """
         Gather all statistics into formatted lines.
 
@@ -131,6 +133,13 @@ class DebugOverlay:
             lines.append("")
             lines.extend(shadow_lines)
 
+        # Player movement debug info
+        if player:
+            player_lines = self._format_player_stats(player)
+            if player_lines:
+                lines.append("")
+                lines.extend(player_lines)
+
         # Controls hint
         lines.append("")
         lines.append("ESC: Release mouse | T: Toggle SSAO")
@@ -182,6 +191,81 @@ class DebugOverlay:
         if DEBUG_SHADOW_RENDERING:
             lines.append("  (Shadow debug logging enabled)")
 
+        return lines
+
+    def _format_player_stats(self, player: "PlayerCharacter") -> List[str]:
+        """
+        Format player movement and physics debugging info.
+
+        Args:
+            player: PlayerCharacter instance
+
+        Returns:
+            List of formatted player stat lines
+        """
+        lines: List[str] = []
+        
+        # Position and velocity
+        pos = player.model.position
+        lines.append(f"Player Pos: [{pos.x:.2f}, {pos.y:.2f}, {pos.z:.2f}]")
+        
+        vel = player.velocity
+        speed = (vel.x ** 2 + vel.z ** 2) ** 0.5  # Horizontal speed only
+        lines.append(f"Velocity: [{vel.x:.2f}, {vel.y:.2f}, {vel.z:.2f}] (horiz: {speed:.2f} m/s)")
+        
+        # Movement intent and state
+        intent = player.movement_intent
+        lines.append(f"Movement Intent: [{intent.x:.2f}, {intent.z:.2f}]")
+        
+        # Current speed mode
+        speed_mode = "Crouch"
+        if player.is_sprinting and not player.is_walking:
+            speed_mode = "Sprint"
+        elif player.is_walking:
+            speed_mode = "Walk"
+        else:
+            speed_mode = "Run"
+        
+        grounded_status = "GROUNDED" if player.is_grounded else f"AIR ({player.time_since_grounded:.2f}s)"
+        lines.append(f"Mode: {speed_mode} | State: {grounded_status}")
+        
+        # Current target speeds and accelerations from config
+        from ..config.settings import (
+            PLAYER_WALK_SPEED,
+            PLAYER_RUN_SPEED,
+            PLAYER_SPRINT_SPEED,
+            PLAYER_CROUCH_SPEED,
+            PLAYER_GROUND_ACCELERATION,
+            PLAYER_AIR_ACCELERATION,
+            PLAYER_GROUND_DECELERATION,
+            PLAYER_AIR_DECELERATION,
+            PLAYER_AIR_CONTROL_FACTOR,
+            PLAYER_CAPSULE_LINEAR_DAMPING,
+        )
+        
+        # Show current speed limits
+        lines.append(f"Speed Limits - Walk: {PLAYER_WALK_SPEED} | Run: {PLAYER_RUN_SPEED} | Sprint: {PLAYER_SPRINT_SPEED}")
+        
+        # Show acceleration values based on current state
+        current_accel = PLAYER_GROUND_ACCELERATION if player.is_grounded else PLAYER_AIR_ACCELERATION
+        current_decel = PLAYER_GROUND_DECELERATION if player.is_grounded else PLAYER_AIR_DECELERATION
+        accel_type = "Ground" if player.is_grounded else "Air"
+        lines.append(f"Accel ({accel_type}): {current_accel} | Decel: {current_decel}")
+        
+        if not player.is_grounded:
+            lines.append(f"Air Control Factor: {PLAYER_AIR_CONTROL_FACTOR * 100:.0f}%")
+        
+        # Physics body info
+        if player.physics_body:
+            body_id = player.physics_body.body_id
+            # Get actual physics velocity from the world
+            try:
+                actual_vel = player.physics_world.get_linear_velocity(body_id)
+                lines.append(f"Physics Vel: [{actual_vel[0]:.2f}, {actual_vel[1]:.2f}, {actual_vel[2]:.2f}]")
+                lines.append(f"Linear Damping: {PLAYER_CAPSULE_LINEAR_DAMPING}")
+            except:
+                pass
+        
         return lines
 
     def _update_display(self, lines: List[str]):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pyrr import Quaternion, Vector3
@@ -209,6 +210,7 @@ class PhysicsWorld:
         self.settings = settings or PhysicsWorldSettings()
         self._client = _pb.connect(_pb.DIRECT)
         self._bodies: Dict[int, PhysicsBodyHandle] = {}
+        self._angular_factor_overrides: Dict[int, Tuple[float, float, float]] = {}
         self._accumulator = 0.0
         self._configure_world()
 
@@ -239,6 +241,7 @@ class PhysicsWorld:
         if self._client is None:
             return
         self._bodies.clear()
+        self._angular_factor_overrides.clear()
         _pb.resetSimulation(physicsClientId=self._client)
         self._configure_world()
         self._accumulator = 0.0
@@ -383,11 +386,30 @@ class PhysicsWorld:
         if shape == "capsule":
             if config.radius is None or config.height is None:
                 raise ValueError("Capsule collider requires 'radius' and 'height'")
-            return _pb.createCollisionShape(_pb.GEOM_CAPSULE, radius=config.radius, height=config.height, **kwargs)
+
+            # PyBullet capsules are aligned along the local Z axis and the `height` parameter refers
+            # to the cylindrical portion only (the full height is height + 2 * radius). For standing
+            # characters we want the capsule aligned with the world Y axis, so rotate the collision
+            # shape frame accordingly and clamp the cylindrical height to non-negative values.
+            cylinder_height = max(config.height - 2.0 * config.radius, 0.0)
+            capsule_orientation = Quaternion.from_x_rotation(-math.pi / 2.0)
+
+            return _pb.createCollisionShape(
+                _pb.GEOM_CAPSULE,
+                radius=config.radius,
+                height=cylinder_height,
+                collisionFrameOrientation=tuple(float(c) for c in capsule_orientation),
+                physicsClientId=self._client,
+            )
         if shape == "cylinder":
             if config.radius is None or config.height is None:
                 raise ValueError("Cylinder collider requires 'radius' and 'height'")
-            return _pb.createCollisionShape(_pb.GEOM_CYLINDER, radius=config.radius, height=config.height, **kwargs)
+            return _pb.createCollisionShape(
+                _pb.GEOM_CYLINDER,
+                radius=config.radius,
+                height=config.height,
+                physicsClientId=self._client,
+            )
         if shape == "cone":
             if config.radius is None or config.height is None:
                 raise ValueError("Cone collider requires 'radius' and 'height'")
@@ -401,7 +423,7 @@ class PhysicsWorld:
                     float(config.height),
                     float(config.radius),
                 ],
-                **kwargs,
+                physicsClientId=self._client,
             )
         if shape == "plane":
             return _pb.createCollisionShape(
@@ -447,6 +469,29 @@ class PhysicsWorld:
                     physicsClientId=self._client,
                 )
 
+    def _apply_angular_factor_overrides(self) -> None:
+        """Manually clamp angular velocity for bodies without native support."""
+
+        if not self._angular_factor_overrides:
+            return  # Early exit - no work needed
+
+        for body_id, factor in list(self._angular_factor_overrides.items()):
+            if body_id not in self._bodies:
+                # Body has been removed since the override was registered.
+                self._angular_factor_overrides.pop(body_id, None)
+                continue
+
+            _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+            constrained = tuple(angular_velocity[i] * factor[i] for i in range(3))
+
+            # Only apply if actually different (avoid unnecessary calls)
+            if constrained != angular_velocity:
+                _pb.resetBaseVelocity(
+                    body_id,
+                    angularVelocity=constrained,
+                    physicsClientId=self._client,
+                )
+
     def step_simulation(self, delta_time: float) -> None:
         """Advance the simulation and push transforms back to the scene."""
 
@@ -458,6 +503,7 @@ class PhysicsWorld:
         while self._accumulator >= self.settings.fixed_time_step and substeps < self.settings.max_substeps:
             self._pre_step()
             _pb.stepSimulation(physicsClientId=self._client)
+            self._apply_angular_factor_overrides()
             self._accumulator -= self.settings.fixed_time_step
             substeps += 1
 
@@ -571,9 +617,183 @@ class PhysicsWorld:
         if body_id in self._bodies:
             _pb.removeBody(body_id, physicsClientId=self._client)
             self._bodies.pop(body_id, None)
+            self._angular_factor_overrides.pop(body_id, None)
 
     def get_body(self, body_id: int) -> Optional[PhysicsBodyHandle]:
         return self._bodies.get(body_id)
+
+    # ------------------------------------------------------------------
+    # Body state queries and mutation helpers
+    # ------------------------------------------------------------------
+    def get_body_position(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the world-space position of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        position, _ = _pb.getBasePositionAndOrientation(body_id, physicsClientId=self._client)
+        return position
+
+    def get_body_orientation(self, body_id: int) -> Tuple[float, float, float, float]:
+        """Return the world-space orientation (quaternion) of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, orientation = _pb.getBasePositionAndOrientation(body_id, physicsClientId=self._client)
+        return orientation
+
+    def set_body_transform(
+        self,
+        body_id: int,
+        position: Optional[Tuple[float, float, float]] = None,
+        orientation: Optional[Tuple[float, float, float, float]] = None,
+    ) -> None:
+        """Set the transform of a body, preserving unspecified components."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        current_position, current_orientation = _pb.getBasePositionAndOrientation(
+            body_id,
+            physicsClientId=self._client,
+        )
+        _pb.resetBasePositionAndOrientation(
+            body_id,
+            position or current_position,
+            orientation or current_orientation,
+            physicsClientId=self._client,
+        )
+
+    def get_linear_velocity(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the linear velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        linear_velocity, _ = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        return linear_velocity
+
+    def set_linear_velocity(self, body_id: int, velocity: Tuple[float, float, float]) -> None:
+        """Set the linear velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        _pb.resetBaseVelocity(
+            body_id,
+            linearVelocity=_vec3(velocity),
+            angularVelocity=angular_velocity,
+            physicsClientId=self._client,
+        )
+
+    def get_angular_velocity(self, body_id: int) -> Tuple[float, float, float]:
+        """Return the angular velocity of a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        return angular_velocity
+
+    def set_angular_factor(self, body_id: int, factor: Tuple[float, float, float]) -> None:
+        """Lock or unlock angular axes for a body."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+
+        factor_vec = _vec3(factor)
+        
+        # Try native PyBullet method first (available in newer versions)
+        try:
+            _pb.changeDynamics(
+                body_id,
+                -1,
+                angularFactor=factor_vec,
+                physicsClientId=self._client,
+            )
+            # If successful, clear any fallback override
+            self._angular_factor_overrides.pop(body_id, None)
+            return
+        except (TypeError, AttributeError):
+            # Fall through to manual override method
+            pass
+
+        # Fallback: Manual velocity clamping for older PyBullet versions
+        if factor_vec == (1.0, 1.0, 1.0):
+            # Full freedom - no override needed
+            self._angular_factor_overrides.pop(body_id, None)
+            return
+
+        # Register override and apply immediately
+        self._angular_factor_overrides[body_id] = factor_vec
+
+        _, angular_velocity = _pb.getBaseVelocity(body_id, physicsClientId=self._client)
+        constrained = tuple(angular_velocity[i] * factor_vec[i] for i in range(3))
+        if constrained != angular_velocity:
+            _pb.resetBaseVelocity(
+                body_id,
+                angularVelocity=constrained,
+                physicsClientId=self._client,
+            )
+
+    def apply_central_impulse(self, body_id: int, impulse: Tuple[float, float, float]) -> None:
+        """Apply an instantaneous impulse at the centre of mass."""
+
+        if body_id not in self._bodies:
+            raise ValueError(f"Body {body_id} is not registered")
+        _pb.applyExternalForce(
+            body_id,
+            -1,
+            _vec3(impulse),
+            (0.0, 0.0, 0.0),
+            _pb.WORLD_FRAME,
+            physicsClientId=self._client,
+        )
+
+    def ray_test(
+        self,
+        from_pos: Tuple[float, float, float],
+        to_pos: Tuple[float, float, float],
+    ) -> Optional[Dict[str, Any]]:
+        """Perform a ray test and return the closest hit, if any."""
+
+        if self._client is None:
+            return None
+        result = _pb.rayTest(_vec3(from_pos), _vec3(to_pos), physicsClientId=self._client)
+        if not result:
+            return None
+        body_id = result[0][0]
+        if body_id == -1:
+            return None
+        return {
+            "body_id": body_id,
+            "hit_fraction": result[0][2],
+            "hit_position": result[0][3],
+            "hit_normal": result[0][4],
+        }
+
+    def ray_test_all(
+        self,
+        from_pos: Tuple[float, float, float],
+        to_pos: Tuple[float, float, float],
+    ) -> List[Dict[str, Any]]:
+        """Perform a ray test and return all hits along the ray, sorted by distance."""
+
+        if self._client is None:
+            return []
+
+        result = _pb.rayTest(_vec3(from_pos), _vec3(to_pos), physicsClientId=self._client)
+        if not result:
+            return []
+
+        hits = []
+        for hit in result:
+            body_id = hit[0]
+            if body_id != -1:  # Valid hit
+                hits.append({
+                    "body_id": body_id,
+                    "hit_fraction": hit[2],
+                    "hit_position": hit[3],
+                    "hit_normal": hit[4],
+                })
+
+        return sorted(hits, key=lambda h: h["hit_fraction"])
 
     # ------------------------------------------------------------------
     # Debug helpers
