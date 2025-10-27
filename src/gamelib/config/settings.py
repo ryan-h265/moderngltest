@@ -238,6 +238,12 @@ PLAYER_MAX_SLOPE_ANGLE = 45.0
 PLAYER_GROUND_CHECK_DISTANCE = 0.15
 PLAYER_STEP_HEIGHT = 0.4
 
+# Collision response settings
+PLAYER_DEPENETRATION_ITERATIONS = 3  # Number of iterations to resolve penetration
+PLAYER_SLOPE_ACCELERATION_MULTIPLIER = 1.2  # Extra force when climbing slopes
+PLAYER_COLLISION_MARGIN = 0.04  # Collision margin to prevent edge snagging (default 0.04, try 0.06-0.08 if snagging occurs)
+PLAYER_MIN_DEPENETRATION_DISTANCE = 0.001  # Minimum penetration depth to resolve (meters)
+
 PLAYER_FIRST_PERSON_EYE_HEIGHT = 1.6
 PLAYER_THIRD_PERSON_DISTANCE = 5.0
 PLAYER_THIRD_PERSON_HEIGHT = 2.0

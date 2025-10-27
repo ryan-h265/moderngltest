@@ -17,16 +17,20 @@ from ..config.settings import (
     PLAYER_CAPSULE_LINEAR_DAMPING,
     PLAYER_CAPSULE_MASS,
     PLAYER_CAPSULE_RADIUS,
+    PLAYER_COLLISION_MARGIN,
     PLAYER_COYOTE_TIME,
     PLAYER_CROUCH_SPEED,
     PLAYER_DEBUG_DRAW_CAPSULE,
+    PLAYER_DEPENETRATION_ITERATIONS,
     PLAYER_FIRST_PERSON_EYE_HEIGHT,
     PLAYER_GROUND_ACCELERATION,
     PLAYER_GROUND_CHECK_DISTANCE,
     PLAYER_GROUND_DECELERATION,
     PLAYER_JUMP_VELOCITY,
     PLAYER_MAX_SLOPE_ANGLE,
+    PLAYER_MIN_DEPENETRATION_DISTANCE,
     PLAYER_RUN_SPEED,
+    PLAYER_SLOPE_ACCELERATION_MULTIPLIER,
     PLAYER_SPRINT_SPEED,
     PLAYER_WALK_SPEED,
 )
@@ -72,6 +76,10 @@ class PlayerCharacter:
         self.is_crouching = False
         self.is_walking = False
 
+        # Slope and collision tracking
+        self.ground_normal = Vector3([0.0, 1.0, 0.0])  # World up by default
+        self.slope_angle = 0.0  # Current ground slope in degrees
+
     # ------------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------------
@@ -85,6 +93,7 @@ class PlayerCharacter:
             friction=PLAYER_CAPSULE_FRICTION,
             linear_damping=PLAYER_CAPSULE_LINEAR_DAMPING,
             angular_damping=PLAYER_CAPSULE_ANGULAR_DAMPING,
+            margin=PLAYER_COLLISION_MARGIN,  # Collision margin to prevent edge snagging
             user_data={"name": "player"},
         )
 
@@ -148,7 +157,7 @@ class PlayerCharacter:
         self._update_ground_state(delta_time)
         self._process_jump()
         self._update_velocity(delta_time)
-        
+
         # For kinematic bodies, we must manually move the position based on velocity
         new_pos = self._position + self.velocity * delta_time
         self._position = new_pos
@@ -156,10 +165,13 @@ class PlayerCharacter:
             self.physics_body.body_id,
             position=tuple(new_pos)
         )
-        
+
+        # Resolve any collisions/penetrations after movement
+        self._resolve_collisions()
+
         # Set velocity for collision detection purposes
         self.physics_world.set_linear_velocity(self.physics_body.body_id, tuple(self.velocity))
-        
+
         if PLAYER_DEBUG_DRAW_CAPSULE:
             self._draw_debug()
         self.jump_requested = False
@@ -191,31 +203,46 @@ class PlayerCharacter:
             self._is_first_frame = False
             # Force is_grounded = False so _update_velocity will apply gravity
             self.is_grounded = False
+            self.ground_normal = Vector3([0.0, 1.0, 0.0])
+            self.slope_angle = 0.0
             return
-        
+
         # Use raycast for ground detection (more reliable than contact points for kinematic bodies)
         # Cast a ray downward from the capsule center to check for ground below
         capsule_center = self._position
-        
+
         # Ray starts from capsule center and goes downward
         ray_start = capsule_center + Vector3([0.0, -0.1, 0.0])  # Slight offset into capsule for robustness
         # Check down to a reasonable distance below
         ray_end = ray_start + Vector3([0.0, -(PLAYER_CAPSULE_HEIGHT/2.0 + PLAYER_CAPSULE_RADIUS + PLAYER_GROUND_CHECK_DISTANCE), 0.0])
-        
+
         # Perform raycast
         hit_info = self.physics_world.ray_test(tuple(ray_start), tuple(ray_end))
-        
+
         grounded = False
+        ground_normal = Vector3([0.0, 1.0, 0.0])  # Default to flat ground
+        slope_angle_deg = 0.0
+
         if hit_info:
             body_id = hit_info.get("body_id", -1)
             # Accept hits from any body except ourselves
-            # Check if the hit is close to the capsule (within the expected distance)
             hit_distance = hit_info.get("hit_fraction", 1.0)
-            expected_distance = (PLAYER_CAPSULE_HEIGHT/2.0 + PLAYER_CAPSULE_RADIUS + PLAYER_GROUND_CHECK_DISTANCE)
-            
+
             if body_id != self.physics_body.body_id and body_id != -1 and hit_distance <= 1.0:
-                grounded = True
-        
+                # We hit ground, now check the slope angle
+                hit_normal = hit_info.get("hit_normal", (0.0, 1.0, 0.0))
+                ground_normal = Vector3(hit_normal)
+
+                # Calculate slope angle: angle between surface normal and world up
+                world_up = Vector3([0.0, 1.0, 0.0])
+                dot_product = max(-1.0, min(1.0, ground_normal.dot(world_up)))  # Clamp for acos safety
+                slope_angle_rad = math.acos(dot_product)
+                slope_angle_deg = math.degrees(slope_angle_rad)
+
+                # Only consider grounded if slope is walkable
+                if slope_angle_deg <= PLAYER_MAX_SLOPE_ANGLE:
+                    grounded = True
+
         # Track grounded state changes
         if grounded and not self.is_grounded:
             # Just landed
@@ -223,8 +250,11 @@ class PlayerCharacter:
         elif not grounded and self.is_grounded:
             # Just left ground (jumped or fell off)
             pass
-        
+
         self.is_grounded = grounded
+        self.ground_normal = ground_normal
+        self.slope_angle = slope_angle_deg
+
         if grounded:
             self.time_since_grounded = 0.0
             self.can_jump = True
@@ -254,6 +284,10 @@ class PlayerCharacter:
         else:
             target_speed = PLAYER_RUN_SPEED
 
+        # Apply slope acceleration multiplier when climbing
+        if self.is_grounded and self.slope_angle > 5.0:  # Only on noticeable slopes
+            target_speed *= PLAYER_SLOPE_ACCELERATION_MULTIPLIER
+
         target_velocity = self.movement_intent * target_speed
 
         if not self.is_grounded:
@@ -281,18 +315,88 @@ class PlayerCharacter:
                     horizontal_velocity -= horizontal_velocity.normalized * decel_amount
 
         if not self.is_grounded:
+            # In air: apply gravity
             gravity_y = self.physics_world.settings.gravity[1]
             self.velocity = Vector3([horizontal_velocity.x, self.velocity.y + gravity_y * delta_time, horizontal_velocity.z])
         else:
-            self.velocity = Vector3([horizontal_velocity.x, 0.0, horizontal_velocity.z])
+            # On ground: project movement onto slope
+            if self.slope_angle > 1.0:  # On a slope
+                # Project horizontal velocity onto the slope plane
+                # This allows smooth movement up and down slopes
+
+                # Create a 3D velocity by projecting onto slope
+                horizontal_3d = Vector3([horizontal_velocity.x, 0.0, horizontal_velocity.z])
+
+                # Project onto slope plane (perpendicular to ground normal)
+                # velocity_on_slope = velocity - (velocity · normal) * normal
+                velocity_along_normal = horizontal_3d.dot(self.ground_normal)
+                velocity_on_slope = horizontal_3d - self.ground_normal * velocity_along_normal
+
+                self.velocity = velocity_on_slope
+            else:
+                # Flat ground: zero Y velocity
+                self.velocity = Vector3([horizontal_velocity.x, 0.0, horizontal_velocity.z])
 
     def _draw_debug(self) -> None:  # pragma: no cover - visualization only
         debug_info = {
             "pos": tuple(self.get_position()),
             "vel": tuple(self.velocity),
             "grounded": self.is_grounded,
+            "slope": f"{self.slope_angle:.1f}°",
         }
         print(f"[PlayerDebug] {debug_info}")
+
+    def _resolve_collisions(self) -> None:
+        """
+        Resolve penetrations by pushing player out of colliding geometry.
+        This implements depenetration and slide-along-wall behavior.
+        """
+        for _ in range(PLAYER_DEPENETRATION_ITERATIONS):
+            # Get all contacts for the player body
+            contacts = self.physics_world.get_contacts(body_id=self.physics_body.body_id)
+
+            if not contacts:
+                break  # No collisions, we're done
+
+            # Track if any penetration was resolved this iteration
+            resolved_any = False
+
+            for contact in contacts:
+                penetration_depth = contact["distance"]
+
+                # Negative distance means penetration
+                if penetration_depth >= -PLAYER_MIN_DEPENETRATION_DISTANCE:
+                    continue  # Not penetrating (or penetration too small to care)
+
+                resolved_any = True
+
+                # Determine which body is us and which is the other
+                if contact["body_a"] == self.physics_body.body_id:
+                    # We are body_a, contact normal points from b to a
+                    contact_normal = Vector3(contact["normal_on_b"])
+                else:
+                    # We are body_b, need to flip the normal
+                    contact_normal = -Vector3(contact["normal_on_b"])
+
+                # Push player out along the contact normal
+                # Penetration depth is negative, so we need to move in positive normal direction
+                depenetration_vector = contact_normal * (-penetration_depth)
+                self._position += depenetration_vector
+
+                # Project velocity to slide along the surface (remove component into surface)
+                velocity_into_surface = self.velocity.dot(contact_normal)
+                if velocity_into_surface < 0:
+                    # Remove the component of velocity pushing into the surface
+                    self.velocity -= contact_normal * velocity_into_surface
+
+            if not resolved_any:
+                break  # No penetrations resolved, we're done
+
+        # Update physics body position after depenetration
+        self.physics_world.set_body_transform(
+            self.physics_body.body_id,
+            position=tuple(self._position)
+        )
 
     # Convenience hooks used by camera rigs
     def get_eye_position(self) -> Vector3:
