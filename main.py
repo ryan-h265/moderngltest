@@ -94,10 +94,11 @@ class Game(mglw.WindowConfig):
             physics_world=self.physics_world,
         )
         self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
-        self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
-        self.scene_manager.register_scene("fractal_mountainous", "assets/scenes/fractal_mountainous_scene.json")
+        # self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
+        # self.scene_manager.register_scene("fractal_mountainous", "assets/scenes/fractal_mountainous_scene.json")
+        self.scene_manager.register_scene("incline_test", "assets/scenes/incline_test_scene.json")
 
-        loaded_scene = self.scene_manager.load("fractal_mountainous", camera=self.camera)
+        loaded_scene = self.scene_manager.load("incline_test", camera=self.camera)
         self.scene = loaded_scene.scene
         self.lights = loaded_scene.lights
 

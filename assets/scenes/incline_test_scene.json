@@ -1,0 +1,114 @@
+{
+  "name": "Incline Test Scene",
+  "camera": {
+    "position": [
+      -150.0,
+      50.0,
+      100.0
+    ],
+    "target": [
+      0.0,
+      20.0,
+      0.0
+    ]
+  },
+  "lights": [
+    {
+      "type": "directional",
+      "position": [
+        10.0,
+        50.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.9,
+        0.9,
+        0.85
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        -10.0,
+        50.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
+        1.0
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        0.0,
+        50.0,
+        -20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.2,
+        0.2
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    }
+  ],
+  "metadata": {
+    "description": "Test scene with flat plane and progressive inclines (10°, 20°, 30°, 40°, 50°)",
+    "preset": "incline_test",
+    "purpose": "Collision detection testing with varying slopes"
+  },
+  "objects": [
+    {
+      "name": "Incline Test Terrain",
+      "type": "primitive",
+      "primitive": "heightmap_terrain",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "heightmap": "../heightmaps/incline_test.npz",
+      "physics": {
+        "type": "static",
+        "shape": "mesh",
+        "collision_mesh": {
+          "type": "generator",
+          "name": "incline_test_collision",
+          "generator": "tools.export_collision_meshes:export_heightmap_collision",
+          "params": {
+            "heightmap_path": "assets/heightmaps/incline_test.npz"
+          }
+        },
+        "friction": 0.6,
+        "restitution": 0.1
+      }
+    }
+  ]
+}

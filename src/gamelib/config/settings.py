@@ -212,10 +212,10 @@ MAX_PITCH = 89.0
 # Character Movement Defaults
 # ============================================================================
 
-PLAYER_WALK_SPEED = 5.0
-PLAYER_RUN_SPEED = 5.0
-PLAYER_SPRINT_SPEED = 5.0
-PLAYER_CROUCH_SPEED = 5.0
+PLAYER_WALK_SPEED = 25.0
+PLAYER_RUN_SPEED = 35.0
+PLAYER_SPRINT_SPEED = 50.0
+PLAYER_CROUCH_SPEED = 10.0
 
 PLAYER_AIR_CONTROL_FACTOR = 0.35
 
@@ -245,7 +245,7 @@ PLAYER_THIRD_PERSON_SPRING_STIFFNESS = 0.18
 PLAYER_THIRD_PERSON_MIN_DISTANCE = 1.0
 PLAYER_THIRD_PERSON_MAX_DISTANCE = 10.0
 
-PLAYER_DEBUG_DRAW_CAPSULE = False
+PLAYER_DEBUG_DRAW_CAPSULE = True
 
 # ============================================================================
 # Lighting Defaults
