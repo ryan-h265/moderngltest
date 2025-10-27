@@ -26,12 +26,16 @@ from ..config.settings import (
     PLAYER_GROUND_ACCELERATION,
     PLAYER_GROUND_CHECK_DISTANCE,
     PLAYER_GROUND_DECELERATION,
+    PLAYER_GROUND_SNAP_DISTANCE,
+    PLAYER_GROUND_SNAP_SPEED_THRESHOLD,
     PLAYER_JUMP_VELOCITY,
     PLAYER_MAX_SLOPE_ANGLE,
     PLAYER_MIN_DEPENETRATION_DISTANCE,
     PLAYER_RUN_SPEED,
     PLAYER_SLOPE_ACCELERATION_MULTIPLIER,
     PLAYER_SPRINT_SPEED,
+    PLAYER_STEP_HEIGHT,
+    PLAYER_STEP_UP_EXTRA_HEIGHT,
     PLAYER_WALK_SPEED,
 )
 from ..physics import PhysicsBodyConfig, PhysicsBodyHandle, PhysicsWorld
@@ -168,6 +172,9 @@ class PlayerCharacter:
 
         # Resolve any collisions/penetrations after movement
         self._resolve_collisions()
+
+        # Apply ground snapping to stick to slopes when moving downhill
+        self._apply_ground_snapping()
 
         # Set velocity for collision detection purposes
         self.physics_world.set_linear_velocity(self.physics_body.body_id, tuple(self.velocity))
@@ -378,6 +385,11 @@ class PlayerCharacter:
                     # We are body_b, need to flip the normal
                     contact_normal = -Vector3(contact["normal_on_b"])
 
+                # Check if this is a step-up situation (hitting a low wall while grounded)
+                if self._try_step_up(contact_normal, -penetration_depth):
+                    # Successfully stepped up, no need to depenetrate
+                    continue
+
                 # Push player out along the contact normal
                 # Penetration depth is negative, so we need to move in positive normal direction
                 depenetration_vector = contact_normal * (-penetration_depth)
@@ -397,6 +409,187 @@ class PlayerCharacter:
             self.physics_body.body_id,
             position=tuple(self._position)
         )
+
+    def _try_step_up(self, contact_normal: Vector3, penetration_depth: float) -> bool:
+        """
+        Try to step up over a small obstacle (stairs, curbs, etc.).
+
+        Args:
+            contact_normal: Normal of the surface we're colliding with
+            penetration_depth: How far we've penetrated (positive value)
+
+        Returns:
+            True if successfully stepped up, False otherwise
+        """
+        # Only try stepping up if we're grounded or recently grounded
+        if not self.is_grounded and self.time_since_grounded > PLAYER_COYOTE_TIME:
+            return False
+
+        # Only step up if the contact is mostly horizontal (hitting a wall, not floor/ceiling)
+        # Normal should be pointing mostly horizontally (Y component near zero)
+        if abs(contact_normal.y) > 0.7:  # More than 45° from horizontal
+            return False
+
+        # Only step up if penetration is small (we're just barely hitting the obstacle)
+        if penetration_depth > PLAYER_CAPSULE_RADIUS:
+            return False
+
+        # Calculate how high we need to step up
+        # Start from slightly above our current position
+        step_start_height = self._position.y + PLAYER_STEP_UP_EXTRA_HEIGHT
+        max_step_height = step_start_height + PLAYER_STEP_HEIGHT
+
+        # Cast a ray upward to check for a ceiling
+        ray_start = self._position
+        ray_end = Vector3([self._position.x, max_step_height + PLAYER_CAPSULE_RADIUS, self._position.z])
+        ceiling_hit = self.physics_world.ray_test(tuple(ray_start), tuple(ray_end))
+
+        if ceiling_hit:
+            ceiling_body_id = ceiling_hit.get("body_id", -1)
+            if ceiling_body_id != self.physics_body.body_id and ceiling_body_id != -1:
+                # There's a ceiling, can't step up
+                return False
+
+        # Try stepping up: move position upward and check if we're clear of obstacles
+        original_position = Vector3(self._position)
+
+        # Move up by step height
+        test_position = Vector3([
+            self._position.x,
+            self._position.y + PLAYER_STEP_HEIGHT + PLAYER_STEP_UP_EXTRA_HEIGHT,
+            self._position.z
+        ])
+
+        # Temporarily move to the stepped-up position
+        self._position = test_position
+        self.physics_world.set_body_transform(
+            self.physics_body.body_id,
+            position=tuple(test_position)
+        )
+
+        # Check if we still have collisions at this height
+        contacts_after_step = self.physics_world.get_contacts(body_id=self.physics_body.body_id)
+
+        # Filter for horizontal penetrations
+        has_horizontal_collision = False
+        for contact in contacts_after_step:
+            if contact["distance"] < -PLAYER_MIN_DEPENETRATION_DISTANCE:
+                # Check if it's a horizontal collision
+                if contact["body_a"] == self.physics_body.body_id:
+                    normal = Vector3(contact["normal_on_b"])
+                else:
+                    normal = -Vector3(contact["normal_on_b"])
+
+                if abs(normal.y) < 0.7:  # Horizontal collision
+                    has_horizontal_collision = True
+                    break
+
+        if has_horizontal_collision:
+            # Still colliding horizontally after stepping up, revert
+            self._position = original_position
+            self.physics_world.set_body_transform(
+                self.physics_body.body_id,
+                position=tuple(original_position)
+            )
+            return False
+
+        # Success! Now find the ground at this new height
+        # Cast a ray downward to find where to land
+        ray_start = Vector3([test_position.x, test_position.y, test_position.z])
+        ray_end = Vector3([test_position.x, original_position.y - PLAYER_GROUND_CHECK_DISTANCE, test_position.z])
+        ground_hit = self.physics_world.ray_test(tuple(ray_start), tuple(ray_end))
+
+        if ground_hit:
+            ground_body_id = ground_hit.get("body_id", -1)
+            if ground_body_id != self.physics_body.body_id and ground_body_id != -1:
+                # Found ground, land on it
+                hit_position = Vector3(ground_hit.get("hit_position", (test_position.x, test_position.y, test_position.z)))
+                # Position capsule bottom at hit point
+                landed_position = Vector3([
+                    hit_position.x,
+                    hit_position.y + PLAYER_CAPSULE_HEIGHT / 2.0 + PLAYER_CAPSULE_RADIUS,
+                    hit_position.z
+                ])
+                self._position = landed_position
+                self.physics_world.set_body_transform(
+                    self.physics_body.body_id,
+                    position=tuple(landed_position)
+                )
+                return True
+
+        # Keep the stepped-up position even if we didn't find ground immediately
+        # (we'll fall naturally next frame)
+        return True
+
+    def _apply_ground_snapping(self) -> None:
+        """
+        Snap player down to ground when moving downhill.
+        Prevents "bouncing" when running down slopes or over small bumps.
+        """
+        # Only snap when:
+        # 1. We were grounded last frame (or recently)
+        # 2. We're not moving upward too fast (not jumping)
+        # 3. We have some horizontal movement
+
+        if not self.is_grounded and self.time_since_grounded > PLAYER_COYOTE_TIME:
+            return  # Not grounded, don't snap
+
+        # Don't snap if we're intentionally moving upward (jumping)
+        if self.velocity.y > PLAYER_GROUND_SNAP_SPEED_THRESHOLD:
+            return
+
+        # Don't snap if we're not moving horizontally (standing still)
+        horizontal_speed = Vector3([self.velocity.x, 0.0, self.velocity.z]).length
+        if horizontal_speed < 0.1:
+            return  # Not moving, no need to snap
+
+        # Cast a ray downward from current position
+        ray_start = self._position
+        ray_end = self._position + Vector3([0.0, -PLAYER_GROUND_SNAP_DISTANCE, 0.0])
+
+        ground_hit = self.physics_world.ray_test(tuple(ray_start), tuple(ray_end))
+
+        if not ground_hit:
+            return  # No ground below us
+
+        ground_body_id = ground_hit.get("body_id", -1)
+        if ground_body_id == self.physics_body.body_id or ground_body_id == -1:
+            return  # Hit ourselves or nothing
+
+        # Check if the ground is walkable (not too steep)
+        hit_normal = Vector3(ground_hit.get("hit_normal", (0.0, 1.0, 0.0)))
+        world_up = Vector3([0.0, 1.0, 0.0])
+        dot_product = max(-1.0, min(1.0, hit_normal.dot(world_up)))
+        slope_angle_rad = math.acos(dot_product)
+        slope_angle_deg = math.degrees(slope_angle_rad)
+
+        if slope_angle_deg > PLAYER_MAX_SLOPE_ANGLE:
+            return  # Too steep, don't snap
+
+        # Snap down to the ground
+        hit_position = Vector3(ground_hit.get("hit_position", self._position))
+
+        # Calculate the distance we need to move down
+        snap_distance = self._position.y - hit_position.y
+
+        # Only snap if we're actually above the ground (not already on it)
+        if snap_distance > PLAYER_GROUND_CHECK_DISTANCE:
+            # Position capsule bottom at hit point
+            snapped_position = Vector3([
+                hit_position.x,
+                hit_position.y + PLAYER_CAPSULE_HEIGHT / 2.0 + PLAYER_CAPSULE_RADIUS,
+                hit_position.z
+            ])
+
+            self._position = snapped_position
+            self.physics_world.set_body_transform(
+                self.physics_body.body_id,
+                position=tuple(snapped_position)
+            )
+
+            # Zero out downward velocity when snapping
+            if self.velocity.y < 0:
+                self.velocity = Vector3([self.velocity.x, 0.0, self.velocity.z])
 
     # Convenience hooks used by camera rigs
     def get_eye_position(self) -> Vector3:
