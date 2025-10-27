@@ -302,7 +302,7 @@ ENABLE_FRUSTUM_CULLING = True  # Highly recommended for performance
 # ============================================================================
 
 # SSAO (Screen Space Ambient Occlusion)
-SSAO_ENABLED = True
+SSAO_ENABLED = False
 SSAO_KERNEL_SIZE = 64
 SSAO_RADIUS = 0.5
 SSAO_BIAS = 0.025
