@@ -20,11 +20,27 @@ from src.gamelib.fractal_perlin import generate_noise_grid, save_heightmap, expo
 
 
 def make_scene_json(scene_path: str, heightmap_relpath: str, metadata: dict):
+    # Create the terrain object entry
+    # Note: collision_mesh is auto-generated from heightmap by physics system
+    terrain_object = {
+        'name': 'Fractal Terrain',
+        'type': 'primitive',
+        'primitive': 'heightmap_terrain',
+        'position': [0.0, 0.0, 0.0],
+        'color': [1.0, 1.0, 1.0],
+        'heightmap': heightmap_relpath,
+        'physics': {
+            'type': 'static',
+            'shape': 'mesh',
+            'friction': 0.6,
+            'restitution': 0.1
+        }
+    }
+
     scene = {
         'type': 'fractal_terrain_scene',
-        'heightmap': heightmap_relpath,
         'metadata': metadata,
-        'objects': []
+        'objects': [terrain_object]
     }
 
     os.makedirs(os.path.dirname(scene_path), exist_ok=True)
@@ -69,8 +85,7 @@ def main():
     # Write a scene JSON referencing the heightmap (relative path from assets/scenes)
     scene_dir = Path('assets/scenes')
     scene_dir.mkdir(parents=True, exist_ok=True)
-    # Compute relative path used by scene file
-    # store relative path from scenes to heightmap
+    # Compute relative path from scene directory to heightmap
     rel_path = os.path.relpath(npz_path, scene_dir)
     scene_path = scene_dir / 'fractal_terrain_scene.json'
     make_scene_json(str(scene_path), rel_path, meta)

@@ -110,6 +110,14 @@ self.objects.append(
 )
 ```
 
+### Fractal Perlin Terrain
+
+
+```
+PYTHONPATH=. python examples/generate_fractal_scene.py --preset mountainous --res 64 --seed 4205 --world-size 100 --out assets/heightmaps --json
+```
+
+
 ### Changing Shadow Quality
 
 ```python
