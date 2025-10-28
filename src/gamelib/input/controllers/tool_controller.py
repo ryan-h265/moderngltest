@@ -170,13 +170,32 @@ class ToolController:
 
     def save_scene(self):
         """Save current scene to JSON."""
-        print("Save scene - TODO: Implement scene serialization")
-        # TODO: Implement scene.save_to_json()
+        from pathlib import Path
+        from datetime import datetime
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_dir = Path("scenes")
+        save_dir.mkdir(exist_ok=True)
+        filepath = save_dir / f"scene_{timestamp}.json"
+
+        # Get lights from somewhere (need to be passed in or accessible)
+        # For now, assume we have access via a lights attribute
+        lights = getattr(self, 'lights', None)
+
+        try:
+            self.scene.save_to_json(str(filepath), lights=lights)
+            print(f"Scene saved to: {filepath}")
+        except Exception as e:
+            print(f"Error saving scene: {e}")
+            import traceback
+            traceback.print_exc()
 
     def load_scene(self):
         """Load scene from JSON."""
-        print("Load scene - TODO: Implement scene loading")
-        # TODO: Implement scene.load_from_json()
+        print("Load scene - Not yet implemented (need file picker)")
+        # TODO: Implement file picker UI to select scene file
+        # For now, user can call scene.load_from_json() directly
 
     def toggle_grid(self):
         """Toggle grid snapping on/off."""

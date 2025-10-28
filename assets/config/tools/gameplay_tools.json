@@ -1,0 +1,22 @@
+{
+  "name": "Gameplay Tools",
+  "version": "1.0",
+  "tools": [
+    {
+      "id": "crowbar",
+      "name": "Crowbar",
+      "category": "WEAPON",
+      "type": "MeleeTool",
+      "icon": "icons/crowbar.png",
+      "cursor": "crosshair_melee",
+      "cooldown": 0.5,
+      "use_duration": 0.3,
+      "properties": {
+        "damage": 25,
+        "range": 2.0,
+        "swing_duration": 0.3,
+        "knockback": 5.0
+      }
+    }
+  ]
+}
