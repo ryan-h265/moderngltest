@@ -27,6 +27,7 @@ class SceneLoadResult:
     lights: List[Light]
     camera_position: Optional[Vector3] = None
     camera_target: Optional[Vector3] = None
+    player_spawn_position: Optional[Vector3] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     physics_bodies: List[PhysicsBodyHandle] = field(default_factory=list)
 
@@ -77,12 +78,14 @@ class SceneLoader:
 
         camera_position = Vector3(definition.camera_position) if definition.camera_position else None
         camera_target = Vector3(definition.camera_target) if definition.camera_target else None
+        player_spawn_position = Vector3(definition.player_spawn_position) if definition.player_spawn_position else None
 
         return SceneLoadResult(
             scene=scene,
             lights=lights,
             camera_position=camera_position,
             camera_target=camera_target,
+            player_spawn_position=player_spawn_position,
             metadata=definition.metadata,
             physics_bodies=physics_handles,
         )

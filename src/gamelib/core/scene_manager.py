@@ -45,6 +45,7 @@ class SceneManager:
         self._active: Optional[ActiveScene] = None
         self._camera_position: Optional[Vector3] = None
         self._camera_target: Optional[Vector3] = None
+        self._player_spawn_position: Optional[Vector3] = None
 
     @property
     def scene(self) -> Optional[Scene]:
@@ -74,6 +75,10 @@ class SceneManager:
     def camera_target(self) -> Optional[Vector3]:
         return self._camera_target
 
+    @property
+    def player_spawn_position(self) -> Optional[Vector3]:
+        return self._player_spawn_position
+
     def register_scene(self, name: str, path: Path | str):
         scene_path = Path(path)
         if not scene_path.is_absolute():
@@ -102,6 +107,7 @@ class SceneManager:
 
         self._camera_position = result.camera_position
         self._camera_target = result.camera_target
+        self._player_spawn_position = result.player_spawn_position
 
         if camera is not None:
             self._apply_camera_defaults(camera)
@@ -124,6 +130,7 @@ class SceneManager:
         self._active = None
         self._camera_position = None
         self._camera_target = None
+        self._player_spawn_position = None
         if self.physics_world is not None:
             self.physics_world.reset()
 

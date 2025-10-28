@@ -256,7 +256,7 @@ PLAYER_THIRD_PERSON_SPRING_STIFFNESS = 0.18
 PLAYER_THIRD_PERSON_MIN_DISTANCE = 1.0
 PLAYER_THIRD_PERSON_MAX_DISTANCE = 10.0
 
-PLAYER_DEBUG_DRAW_CAPSULE = True
+PLAYER_DEBUG_DRAW_CAPSULE = False
 
 # ============================================================================
 # Lighting Defaults

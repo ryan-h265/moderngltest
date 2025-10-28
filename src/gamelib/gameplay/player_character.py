@@ -65,7 +65,7 @@ class PlayerCharacter:
         
         # For kinematic bodies, we manually track position since PyBullet doesn't auto-update it
         # Initialize to the spawn position
-        initial_pos = initial_position if initial_position is not None else Vector3([-180.0, 3.1, -30.0])
+        initial_pos = initial_position if initial_position is not None else Vector3([0.0, 5.0, 0.0])
         self._position = Vector3(initial_pos)
 
         self.is_grounded = False
