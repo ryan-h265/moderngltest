@@ -1,0 +1,155 @@
+{
+  "name": "default_scene",
+  "metadata": {
+    "description": "Default demo scene with primitives and GLTF models",
+    "physics": {
+      "gravity": [
+        0.0,
+        -9.81,
+        0.0
+      ],
+      "fixed_time_step": 0.016666667,
+      "max_substeps": 2
+    }
+  },
+  "camera": {
+    "position": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "player_spawn_position": [
+    0.0,
+    3.1,
+    0.0
+  ],
+  "objects": [
+    {
+      "name": "Ground",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        60.0,
+        0.5,
+        60.0
+      ],
+      "position": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "color": [
+        0.3,
+        0.45,
+        0.85
+      ],
+      "bounding_radius": 14.15,
+      "physics": {
+        "type": "static",
+        "shape": "box",
+        "friction": 0.6,
+        "restitution": 0.5
+      }
+    },
+    {
+      "name": "ScatteringSkull",
+      "type": "model",
+      "path": "assets/models/props/ScatteringSkull.glb",
+      "position": [
+        0.0,
+        0.5,
+        -10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        10.0,
+        10.0,
+        10.0
+      ],
+      "play_first_animation": true,
+      "physics": {
+        "type": "static",
+        "shape": "mesh",
+        "collision_mesh": {
+          "type": "gltf",
+          "name": "scattering_skull_collision",
+          "source": "assets/models/props/ScatteringSkull.glb"
+        },
+        "friction": 0.5,
+        "restitution": 0.2
+      }
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [
+        10.0,
+        20.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.9,
+        0.9,
+        0.85
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        -10.0,
+        20.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
+        1.0
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        0.0,
+        20.0,
+        -20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.2,
+        0.2
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    }
+  ]
+}

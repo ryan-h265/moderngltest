@@ -4,9 +4,13 @@ Rendering Controller
 Handles rendering-related input commands like toggling SSAO, shadows, etc.
 """
 
+from typing import Optional, TYPE_CHECKING
 from ...rendering.render_pipeline import RenderPipeline
 from ..input_commands import InputCommand
 from ..input_manager import InputManager
+
+if TYPE_CHECKING:
+    from ...debug.debug_overlay import DebugOverlay
 
 
 class RenderingController:
@@ -21,16 +25,19 @@ class RenderingController:
         controller = RenderingController(render_pipeline, input_manager)
     """
 
-    def __init__(self, render_pipeline: RenderPipeline, input_manager: InputManager):
+    def __init__(self, render_pipeline: RenderPipeline, input_manager: InputManager,
+                 debug_overlay: Optional["DebugOverlay"] = None):
         """
         Initialize rendering controller.
 
         Args:
             render_pipeline: RenderPipeline instance
             input_manager: InputManager to register handlers with
+            debug_overlay: Optional DebugOverlay instance for toggling
         """
         self.render_pipeline = render_pipeline
         self.input_manager = input_manager
+        self.debug_overlay = debug_overlay
 
         # State tracking
         self.ssao_enabled = True  # Track current SSAO state
@@ -40,6 +47,10 @@ class RenderingController:
 
     def _register_handlers(self):
         """Register input handlers with InputManager"""
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY,
+            self.toggle_debug_overlay
+        )
         self.input_manager.register_handler(
             InputCommand.SYSTEM_TOGGLE_SSAO,
             self.toggle_ssao
@@ -60,6 +71,25 @@ class RenderingController:
             InputCommand.SYSTEM_TOGGLE_SMAA,
             self.toggle_smaa
         )
+        self.input_manager.register_handler(
+            InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+            self.toggle_light_gizmos
+        )
+
+    def toggle_debug_overlay(self, delta_time: float = 0.0):
+        """
+        Toggle debug overlay on/off.
+
+        Args:
+            delta_time: Time since last frame (unused, for handler compatibility)
+        """
+        if self.debug_overlay is None:
+            print("Debug overlay is not available")
+            return
+
+        self.debug_overlay.toggle()
+        status = "visible" if self.debug_overlay.visible else "hidden"
+        print(f"Debug overlay {status}")
 
     def toggle_ssao(self, delta_time: float = 0.0):
         """
@@ -114,3 +144,12 @@ class RenderingController:
             delta_time: Time since last frame (unused, for handler compatibility)
         """
         self.render_pipeline.toggle_smaa()
+
+    def toggle_light_gizmos(self, delta_time: float = 0.0):
+        """
+        Toggle debug light gizmos.
+
+        Args:
+            delta_time: Time since last frame (unused, for handler compatibility)
+        """
+        self.render_pipeline.toggle_light_gizmos()

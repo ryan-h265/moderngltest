@@ -131,8 +131,8 @@ pipeline = RenderPipeline(ctx, window)
 # Initialize lights with shadow maps
 pipeline.initialize_lights(lights)
 
-# Render frame
-pipeline.render_frame(scene, camera, lights)
+# Render frame (optionally pass elapsed time for animated effects)
+pipeline.render_frame(scene, camera, lights, time)
 ```
 
 ---

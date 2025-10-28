@@ -110,6 +110,14 @@ self.objects.append(
 )
 ```
 
+### Fractal Perlin Terrain
+
+
+```
+PYTHONPATH=. python examples/generate_fractal_scene.py --preset mountainous --res 64 --seed 4205 --world-size 100 --out assets/heightmaps --json
+```
+
+
 ### Changing Shadow Quality
 
 ```python
@@ -196,6 +204,14 @@ float bias = 0.001;  # Was 0.005
 - Keep draw calls reasonable (<10K per frame)
 - Use instancing for repeated objects
 - Profile with `self.wnd.print_context_info()`
+
+## Collision Mesh Pipeline
+
+- Author physics-enabled objects with a `collision_mesh` block (e.g. `{"type": "gltf", "source": "assets/models/…/scene.gltf"}`).
+- For procedural geometry, point at any callable that writes an OBJ: `{"type": "generator", "generator": "tools.export_collision_meshes:export_donut_collision", "params": {...}}`.
+- Generate or refresh OBJ collision meshes by running `python tools/export_collision_meshes.py`.
+- The tool scans every scene in `assets/scenes`, builds missing meshes under `assets/collision`, and skips files that are already up to date.
+- At runtime the physics system resolves those definitions automatically, so no hard-coded OBJ paths are required.
 
 ## Troubleshooting
 

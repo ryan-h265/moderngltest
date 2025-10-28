@@ -4,14 +4,16 @@ Main Renderer
 Handles main scene rendering with lighting and shadows.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import numpy as np
 import moderngl
 
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
+from ..core.skybox import Skybox
 from ..config.settings import CLEAR_COLOR
+from .skybox_renderer import SkyboxRenderer
 
 
 class MainRenderer:
@@ -21,23 +23,32 @@ class MainRenderer:
     This is the final rendering pass that composites all lights and shadows.
     """
 
-    def __init__(self, ctx: moderngl.Context, main_program: moderngl.Program):
+    def __init__(
+        self,
+        ctx: moderngl.Context,
+        main_program: moderngl.Program,
+        skybox_renderer: Optional[SkyboxRenderer] = None,
+    ):
         """
         Initialize main renderer.
 
         Args:
             ctx: ModernGL context
             main_program: Shader program for main scene rendering
+            skybox_renderer: Optional renderer used for drawing skyboxes
         """
         self.ctx = ctx
         self.main_program = main_program
+        self.skybox_renderer = skybox_renderer
 
     def render(
         self,
         scene: Scene,
         camera: Camera,
         lights: List[Light],
-        viewport: Tuple[int, int, int, int]
+        viewport: Tuple[int, int, int, int],
+        skybox: Optional[Skybox] = None,
+        time: float | None = None,
     ):
         """
         Render the main scene with frustum culling.
@@ -47,8 +58,17 @@ class MainRenderer:
             camera: Camera for view
             lights: List of lights (with shadow maps already rendered)
             viewport: Viewport tuple (x, y, width, height)
+            skybox: Optional skybox to render before scene geometry
         """
-        self.render_to_target(scene, camera, lights, viewport, self.ctx.screen)
+        self.render_to_target(
+            scene,
+            camera,
+            lights,
+            viewport,
+            self.ctx.screen,
+            skybox=skybox,
+            time=time,
+        )
 
     def render_to_target(
         self,
@@ -56,7 +76,9 @@ class MainRenderer:
         camera: Camera,
         lights: List[Light],
         viewport: Tuple[int, int, int, int],
-        target: moderngl.Framebuffer
+        target: moderngl.Framebuffer,
+        skybox: Optional[Skybox] = None,
+        time: float | None = None,
     ):
         """
         Render the main scene to a specific framebuffer.
@@ -67,15 +89,20 @@ class MainRenderer:
             lights: List of lights (with shadow maps already rendered)
             viewport: Viewport tuple (x, y, width, height)
             target: Target framebuffer
+            skybox: Optional skybox to render before scene geometry
         """
         # Use target framebuffer
         target.use()
 
+        # Set viewport before clearing
+        self.ctx.viewport = viewport
+
         # Clear with background color
         self.ctx.clear(*CLEAR_COLOR)
 
-        # Set viewport
-        self.ctx.viewport = viewport
+        # Render skybox first if available
+        if self.skybox_renderer is not None and skybox is not None:
+            self.skybox_renderer.render(camera, skybox, viewport, time=time)
 
         # Bind shadow maps
         self._bind_shadow_maps(lights)
@@ -85,6 +112,9 @@ class MainRenderer:
 
         # Set light uniforms
         self._set_light_uniforms(lights)
+
+        # Set fog uniforms
+        self._set_fog_uniforms(time)
 
         # Get frustum for culling
         from ..config.settings import ENABLE_FRUSTUM_CULLING
@@ -152,3 +182,21 @@ class MainRenderer:
         # OpenGL requires an array of ints for sampler arrays
         shadow_map_locations = np.array([i for i in range(len(lights))], dtype='i4')
         self.main_program['shadow_maps'].write(shadow_map_locations.tobytes())
+
+    def _set_fog_uniforms(self, time: float):
+        """Set fog-related shader uniforms."""
+
+        from ..config import settings
+
+        self.main_program['fog_enabled'].value = int(settings.FOG_ENABLED)
+        self.main_program['fog_color'].write(np.array(settings.FOG_COLOR, dtype='f4').tobytes())
+        self.main_program['fog_density'].value = float(settings.FOG_DENSITY)
+        self.main_program['fog_start_distance'].value = float(settings.FOG_START_DISTANCE)
+        self.main_program['fog_end_distance'].value = float(settings.FOG_END_DISTANCE)
+        self.main_program['fog_base_height'].value = float(settings.FOG_BASE_HEIGHT)
+        self.main_program['fog_height_falloff'].value = float(settings.FOG_HEIGHT_FALLOFF)
+        self.main_program['fog_noise_scale'].value = float(settings.FOG_NOISE_SCALE)
+        self.main_program['fog_noise_strength'].value = float(settings.FOG_NOISE_STRENGTH)
+        self.main_program['fog_noise_speed'].value = float(settings.FOG_NOISE_SPEED)
+        self.main_program['fog_wind_direction'].write(np.array(settings.FOG_WIND_DIRECTION, dtype='f4').tobytes())
+        self.main_program['fog_time'].value = float(time)

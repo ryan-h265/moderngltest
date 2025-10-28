@@ -1,15 +1,134 @@
 """
 Scene Management
 
-Handles scene objects and rendering.
+Handles scene objects, rendering, and data-driven scene descriptors.
 """
 
-from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Tuple, Optional, Any, TYPE_CHECKING
 import numpy as np
-from pyrr import Matrix44, Vector3
+from pyrr import Matrix44, Vector3, Quaternion
 from moderngl_window import geometry
 from . import geometry_utils
 from .frustum import Frustum
+from .skybox import Skybox
+
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from .light import LightDefinition
+
+
+def _vec3(value, fallback: Tuple[float, float, float] = (0.0, 0.0, 0.0)) -> Tuple[float, float, float]:
+    """Convert a JSON vector to a tuple of floats."""
+
+    if value is None:
+        value = fallback
+    if len(value) != 3:
+        raise ValueError(f"Expected 3 components, got {value}")
+    return tuple(float(v) for v in value)
+
+
+def _opt_vec3(value: Optional[List[float]]) -> Optional[Tuple[float, float, float]]:
+    """Convert an optional JSON vector to a tuple of floats."""
+
+    if value is None:
+        return None
+    if len(value) != 3:
+        raise ValueError(f"Expected 3 components, got {value}")
+    return tuple(float(v) for v in value)
+
+
+@dataclass
+class SceneNodeDefinition:
+    """Data descriptor for a scene object loaded from JSON."""
+
+    name: str
+    node_type: str
+    position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    scale: Tuple[float, float, float] = (1.0, 1.0, 1.0)
+    color: Optional[Tuple[float, float, float]] = None
+    primitive: Optional[str] = None
+    mesh_path: Optional[str] = None
+    bounding_radius: Optional[float] = None
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SceneNodeDefinition":
+        """Create a node definition from JSON data."""
+
+        if "type" not in data:
+            raise ValueError("Scene object is missing required 'type' field")
+
+        known_keys = {
+            "name",
+            "type",
+            "position",
+            "rotation",
+            "scale",
+            "color",
+            "primitive",
+            "path",
+            "bounding_radius",
+        }
+
+        extras = {k: v for k, v in data.items() if k not in known_keys}
+
+        return cls(
+            name=data.get("name", data.get("type", "Object")),
+            node_type=data["type"],
+            position=_vec3(data.get("position"), (0.0, 0.0, 0.0)),
+            rotation=_vec3(data.get("rotation"), (0.0, 0.0, 0.0)),
+            scale=_vec3(data.get("scale"), (1.0, 1.0, 1.0)),
+            color=_opt_vec3(data.get("color")),
+            primitive=data.get("primitive"),
+            mesh_path=data.get("path"),
+            bounding_radius=float(data["bounding_radius"]) if data.get("bounding_radius") is not None else None,
+            extras=extras,
+        )
+
+
+@dataclass
+class SceneDefinition:
+    """Container for scene-level metadata and node descriptors."""
+
+    name: str
+    nodes: List[SceneNodeDefinition] = field(default_factory=list)
+    light_definitions: List["LightDefinition"] = field(default_factory=list)
+    camera_position: Optional[Tuple[float, float, float]] = None
+    camera_target: Optional[Tuple[float, float, float]] = None
+    player_spawn_position: Optional[Tuple[float, float, float]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SceneDefinition":
+        """Create a scene definition from JSON data."""
+
+        name = data.get("name", "Scene")
+        nodes = [SceneNodeDefinition.from_dict(obj) for obj in data.get("objects", [])]
+
+        camera = data.get("camera", {})
+        camera_position = _opt_vec3(camera.get("position")) if camera else None
+        camera_target = _opt_vec3(camera.get("target")) if camera else None
+
+        player_spawn = data.get("player_spawn_position")
+        player_spawn_position = _opt_vec3(player_spawn) if player_spawn else None
+
+        from .light import LightDefinition  # Local import to avoid circular dependency
+
+        light_definitions = [LightDefinition.from_dict(light) for light in data.get("lights", [])]
+
+        metadata = data.get("metadata", {})
+
+        return cls(
+            name=name,
+            nodes=nodes,
+            light_definitions=light_definitions,
+            camera_position=camera_position,
+            camera_target=camera_target,
+            player_spawn_position=player_spawn_position,
+            metadata=metadata,
+        )
 
 
 class SceneObject:
@@ -23,8 +142,16 @@ class SceneObject:
     - Bounding sphere for frustum culling
     """
 
-    def __init__(self, geom, position: Vector3, color: Tuple[float, float, float],
-                 bounding_radius: float = None, name: str = "Object"):
+    def __init__(
+        self,
+        geom,
+        position: Vector3,
+        color: Tuple[float, float, float],
+        bounding_radius: float = None,
+        name: str = "Object",
+        rotation: Tuple[float, float, float] | Quaternion | None = None,
+        scale: Tuple[float, float, float] | None = None,
+    ):
         """
         Initialize scene object.
 
@@ -36,10 +163,17 @@ class SceneObject:
             name: Debug name for this object
         """
         self.geometry = geom
-        self.position = position
+        self.position = Vector3(position)
         self.color = color
         self.bounding_radius = bounding_radius if bounding_radius is not None else 1.0
         self.name = name
+        if isinstance(rotation, Quaternion):
+            self.rotation = Quaternion(rotation)
+        elif rotation is not None:
+            self.rotation = Quaternion.from_eulers(rotation)
+        else:
+            self.rotation = Quaternion()
+        self.scale = Vector3(scale) if scale is not None else Vector3([1.0, 1.0, 1.0])
 
     def get_model_matrix(self) -> Matrix44:
         """
@@ -48,7 +182,22 @@ class SceneObject:
         Returns:
             4x4 transformation matrix (currently just translation)
         """
-        return Matrix44.from_translation(self.position)
+        matrix = Matrix44.from_translation(self.position)
+        matrix = matrix * Matrix44.from_quaternion(self.rotation)
+
+        if not np.allclose(np.asarray(self.scale, dtype=float), (1.0, 1.0, 1.0)):
+            matrix = matrix * Matrix44.from_scale(self.scale)
+        return matrix
+
+    def apply_physics_transform(
+        self,
+        position: Tuple[float, float, float],
+        orientation: Tuple[float, float, float, float],
+    ) -> None:
+        """Apply a transform received from the physics simulation."""
+
+        self.position = Vector3(position)
+        self.rotation = Quaternion(orientation).normalised
 
     def is_visible(self, frustum: Frustum) -> bool:
         """
@@ -80,6 +229,7 @@ class Scene:
         self.objects: List[SceneObject] = []  # Can contain both SceneObject and Model instances
         self.ctx = ctx
         self.last_render_stats: Dict[str, Dict[str, object]] = {}
+        self.skybox: Optional[Skybox] = None
 
     def add_object(self, obj: SceneObject):
         """
@@ -90,9 +240,18 @@ class Scene:
         """
         self.objects.append(obj)
 
+    def set_skybox(self, skybox: Optional[Skybox]):
+        """Assign a skybox to the scene."""
+        self.skybox = skybox
+
+    def get_skybox(self) -> Optional[Skybox]:
+        """Return the current skybox."""
+        return self.skybox
+
     def clear(self):
         """Remove all objects from the scene"""
         self.objects.clear()
+        self.skybox = None
 
     def create_default_scene(self):
         """

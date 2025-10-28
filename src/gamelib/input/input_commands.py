@@ -34,6 +34,18 @@ class InputCommand(Enum):
     CAMERA_ZOOM_OUT = auto()
 
     # ========================================================================
+    # Player Movement (Physics-driven character controller)
+    # ========================================================================
+    PLAYER_MOVE_FORWARD = auto()
+    PLAYER_MOVE_BACKWARD = auto()
+    PLAYER_MOVE_LEFT = auto()
+    PLAYER_MOVE_RIGHT = auto()
+    PLAYER_JUMP = auto()
+    PLAYER_CROUCH = auto()
+    PLAYER_SPRINT = auto()
+    PLAYER_WALK = auto()
+
+    # ========================================================================
     # Game Actions (Future)
     # ========================================================================
 
@@ -106,12 +118,15 @@ class InputCommand(Enum):
     SYSTEM_TOGGLE_MOUSE = auto()     # Capture/release mouse
     SYSTEM_SCREENSHOT = auto()
     SYSTEM_TOGGLE_DEBUG = auto()
+    SYSTEM_TOGGLE_DEBUG_OVERLAY = auto()  # Toggle debug overlay on/off
     SYSTEM_TOGGLE_FULLSCREEN = auto()
     SYSTEM_TOGGLE_SSAO = auto()      # Toggle SSAO on/off
     SYSTEM_TOGGLE_MSAA = auto()      # Toggle MSAA on/off
     SYSTEM_TOGGLE_FXAA = auto()      # Toggle FXAA on/off
     SYSTEM_TOGGLE_SMAA = auto()      # Toggle SMAA on/off
     SYSTEM_CYCLE_AA_MODE = auto()    # Cycle through AA modes
+    SYSTEM_TOGGLE_LIGHT_GIZMOS = auto()  # Toggle debug light gizmos
+    SYSTEM_TOGGLE_DEBUG_CAMERA = auto()  # Toggle free-fly debug camera
     SYSTEM_QUICK_SAVE = auto()
     SYSTEM_QUICK_LOAD = auto()
     SYSTEM_PAUSE = auto()
@@ -153,6 +168,16 @@ COMMAND_TYPES = {
     InputCommand.CAMERA_ZOOM_IN: InputType.CONTINUOUS,
     InputCommand.CAMERA_ZOOM_OUT: InputType.CONTINUOUS,
 
+    # Player movement
+    InputCommand.PLAYER_MOVE_FORWARD: InputType.CONTINUOUS,
+    InputCommand.PLAYER_MOVE_BACKWARD: InputType.CONTINUOUS,
+    InputCommand.PLAYER_MOVE_LEFT: InputType.CONTINUOUS,
+    InputCommand.PLAYER_MOVE_RIGHT: InputType.CONTINUOUS,
+    InputCommand.PLAYER_JUMP: InputType.INSTANT,
+    InputCommand.PLAYER_CROUCH: InputType.TOGGLE,
+    InputCommand.PLAYER_SPRINT: InputType.TOGGLE,
+    InputCommand.PLAYER_WALK: InputType.TOGGLE,
+
     # Instant (press once)
     InputCommand.GAME_JUMP: InputType.INSTANT,
     InputCommand.GAME_INTERACT: InputType.INSTANT,
@@ -162,11 +187,14 @@ COMMAND_TYPES = {
     InputCommand.SYSTEM_TOGGLE_MOUSE: InputType.INSTANT,
     InputCommand.SYSTEM_SCREENSHOT: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_DEBUG: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_SSAO: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_MSAA: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_FXAA: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_SMAA: InputType.INSTANT,
     InputCommand.SYSTEM_CYCLE_AA_MODE: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA: InputType.INSTANT,
 
     # Toggle (on/off state)
     InputCommand.GAME_CROUCH: InputType.TOGGLE,

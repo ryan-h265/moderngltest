@@ -3,8 +3,28 @@
 // Deferred Rendering - Emissive Pass Fragment Shader
 // Outputs emissive contribution (self-illumination, independent of lighting)
 
-// G-Buffer emissive texture
+// G-Buffer textures
 uniform sampler2D gEmissive;
+uniform sampler2D gPosition;
+
+// Camera and fog
+uniform mat4 inverse_view;
+uniform vec3 camera_pos;
+uniform bool fog_enabled;
+uniform vec3 fog_color;
+uniform float fog_density;
+uniform float fog_start_distance;
+uniform float fog_end_distance;
+uniform float fog_base_height;
+uniform float fog_height_falloff;
+uniform float fog_noise_scale;
+uniform float fog_noise_strength;
+uniform float fog_noise_speed;
+uniform vec3 fog_wind_direction;
+uniform float fog_time;
+uniform float fog_detail_scale;
+uniform float fog_detail_strength;
+uniform float fog_warp_strength;
 
 // Input from vertex shader
 in vec2 v_texcoord;
@@ -12,10 +32,114 @@ in vec2 v_texcoord;
 // Output
 out vec4 f_color;
 
-void main() {
-    // Sample emissive contribution from G-Buffer
-    vec3 emissive = texture(gEmissive, v_texcoord).rgb;
+// Improved 3D pseudo-Perlin noise function
+vec3 hash3(vec3 p){
+    p=fract(p*vec3(443.897,441.423,437.195));
+    p+=dot(p,p.yxz+19.19);
+    return fract(vec3((p.x+p.y)*p.z,(p.x+p.z)*p.y,(p.y+p.z)*p.x));
+}
 
+float noise3d(vec3 p){
+    vec3 i=floor(p);
+    vec3 f=fract(p);
+    
+    // Quintic interpolation for smoother results
+    vec3 u=f*f*f*(f*(f*6.-15.)+10.);
+    
+    // Sample 8 corners of the cube
+    float n000=dot(hash3(i+vec3(0,0,0))-.5,f-vec3(0,0,0));
+    float n100=dot(hash3(i+vec3(1,0,0))-.5,f-vec3(1,0,0));
+    float n010=dot(hash3(i+vec3(0,1,0))-.5,f-vec3(0,1,0));
+    float n110=dot(hash3(i+vec3(1,1,0))-.5,f-vec3(1,1,0));
+    float n001=dot(hash3(i+vec3(0,0,1))-.5,f-vec3(0,0,1));
+    float n101=dot(hash3(i+vec3(1,0,1))-.5,f-vec3(1,0,1));
+    float n011=dot(hash3(i+vec3(0,1,1))-.5,f-vec3(0,1,1));
+    float n111=dot(hash3(i+vec3(1,1,1))-.5,f-vec3(1,1,1));
+    
+    // Trilinear interpolation
+    return mix(
+        mix(mix(n000,n100,u.x),mix(n010,n110,u.x),u.y),
+        mix(mix(n001,n101,u.x),mix(n011,n111,u.x),u.y),
+        u.z
+    );
+}
+
+// Fractional Brownian Motion - multiple octaves of noise
+float fbm(vec3 p,int octaves){
+    float value=0.;
+    float amplitude=.5;
+    float frequency=1.;
+    float total_amplitude=0.;
+    
+    for(int i=0;i<octaves;i++){
+        value+=amplitude*noise3d(p*frequency);
+        total_amplitude+=amplitude;
+        amplitude*=.5;
+        frequency*=2.;
+    }
+    
+    return value/total_amplitude;
+}
+
+void main(){
+    // Sample emissive contribution from G-Buffer
+    vec3 emissive=texture(gEmissive,v_texcoord).rgb;
+    
+    // Early out if nothing to emit
+    if(dot(emissive,emissive)<1e-8){
+        f_color=vec4(0.,0.,0.,1.);
+        return;
+    }
+    
+    vec3 view_position=texture(gPosition,v_texcoord).rgb;
+    vec3 world_position=(inverse_view*vec4(view_position,1.)).xyz;
+    
+    float fog_factor=0.;
+    if(fog_enabled){
+        float fog_range=max(fog_end_distance-fog_start_distance,.001);
+        float distance_to_camera=length(camera_pos-world_position);
+        float distance_factor=clamp((distance_to_camera-fog_start_distance)/fog_range,0.,1.);
+        
+        float height_offset=max(world_position.y-fog_base_height,0.);
+        float height_factor=exp(-height_offset*fog_height_falloff);
+        
+        // Base animated position with wind
+        vec3 animated_pos=world_position*fog_noise_scale+fog_wind_direction*(fog_time*fog_noise_speed);
+        
+        // Domain warping: use one noise field to distort another for organic flow
+        vec3 warp_offset=vec3(
+            fbm(animated_pos+vec3(0.,0.,0.),2),
+            fbm(animated_pos+vec3(5.2,1.3,8.4),2),
+            fbm(animated_pos+vec3(3.7,9.1,2.8),2)
+        )*fog_warp_strength;
+        
+        vec3 warped_pos=animated_pos+warp_offset;
+        
+        // Main fog density with 5 octaves for smooth, organic variation
+        float base_noise=fbm(warped_pos,5);
+        
+        // Add a second layer moving at different speed for depth
+        vec3 detail_pos=world_position*fog_detail_scale+fog_wind_direction*(fog_time*fog_noise_speed*1.7);
+        float detail_noise=fbm(detail_pos,3);
+        
+        // Combine base and detail layers
+        float combined_noise=base_noise+detail_noise*fog_detail_strength;
+        
+        // Normalize to [0, 1] range
+        float noise_normalized=combined_noise*.5+.5;
+        
+        // Apply smoothstep for even softer transitions
+        noise_normalized=smoothstep(.1,.9,noise_normalized);
+        
+        // Create more pronounced variation for wispy effect
+        float variation=mix(1.-fog_noise_strength,1.+fog_noise_strength*1.5,noise_normalized);
+        
+        float fog_density_world=fog_density*variation*height_factor;
+        fog_factor=clamp((1.-exp(-distance_to_camera*fog_density_world))*distance_factor,0.,1.);
+    }
+    
+    vec3 final_emissive=mix(emissive,vec3(0.),fog_factor);
+    
     // Output emissive color (will be additively blended onto accumulated lighting)
-    f_color = vec4(emissive, 1.0);
+    f_color=vec4(final_emissive,1.);
 }

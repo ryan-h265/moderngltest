@@ -11,6 +11,7 @@ import moderngl
 from .shader_manager import ShaderManager
 from .shadow_renderer import ShadowRenderer
 from .main_renderer import MainRenderer
+from .skybox_renderer import SkyboxRenderer
 from .gbuffer import GBuffer
 from .geometry_renderer import GeometryRenderer
 from .lighting_renderer import LightingRenderer
@@ -22,6 +23,7 @@ from .icon_manager import IconManager
 from .ui_sprite_renderer import UISpriteRenderer
 from .antialiasing_renderer import AntiAliasingRenderer, AAMode
 from .bloom_renderer import BloomRenderer
+from .light_debug_renderer import LightDebugRenderer
 from ..core.camera import Camera
 from ..core.light import Light
 from ..core.scene import Scene
@@ -71,6 +73,7 @@ class RenderPipeline:
 
         # Forward rendering shaders
         self.shader_manager.load_program("main", "main_lighting.vert", "main_lighting.frag")
+        self.shader_manager.load_program("skybox", "skybox.vert", "aurora_skybox.frag")
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
@@ -83,6 +86,9 @@ class RenderPipeline:
 
         # Forward transparent shader (for alpha BLEND mode)
         self.shader_manager.load_program("transparent", "forward_transparent.vert", "forward_transparent.frag")
+
+        # Debug visualization shader
+        self.shader_manager.load_program("light_debug", "light_debug.vert", "light_debug.frag")
 
         # SSAO shaders
         self.shader_manager.load_program("ssao", "ssao.vert", "ssao.frag")
@@ -107,9 +113,14 @@ class RenderPipeline:
         self.shadow_renderer.set_screen_viewport((0, 0, WINDOW_SIZE[0], WINDOW_SIZE[1]))
 
         # Create forward rendering pipeline
+        self.skybox_renderer = SkyboxRenderer(
+            ctx,
+            self.shader_manager.get("skybox")
+        )
         self.main_renderer = MainRenderer(
             ctx,
-            self.shader_manager.get("main")
+            self.shader_manager.get("main"),
+            skybox_renderer=self.skybox_renderer
         )
 
         # Create deferred rendering pipeline
@@ -192,6 +203,12 @@ class RenderPipeline:
             ctx,
             self.shader_manager.get("ui_sprite"),
         )
+
+        # Light debug gizmo renderer (disabled unless flag enabled)
+        self.light_debug_renderer = LightDebugRenderer(
+            ctx,
+            self.shader_manager.get("light_debug"),
+        )
         self.viewport_size: Tuple[int, int] = tuple(self.window.size)
 
     def initialize_lights(self, lights: List[Light], camera: Camera = None):
@@ -207,7 +224,13 @@ class RenderPipeline:
         camera_pos = camera.position if camera else None
         self.shadow_renderer.initialize_light_shadow_maps(lights, camera_pos)
 
-    def render_frame(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def render_frame(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render a complete frame.
 
@@ -226,15 +249,16 @@ class RenderPipeline:
             scene: Scene to render
             camera: Camera for view
             lights: List of lights
+            time: Elapsed time in seconds (used for animated effects)
         """
         # Pass 1: Render shadow maps for all lights (both modes)
         self.shadow_renderer.render_shadow_maps(lights, scene)
 
         # Pass 2+: Render scene (mode-dependent)
         if self.rendering_mode == "deferred":
-            self._render_deferred(scene, camera, lights)
+            self._render_deferred(scene, camera, lights, time=time)
         else:
-            self._render_forward(scene, camera, lights)
+            self._render_forward(scene, camera, lights, time=time)
 
         # Final pass: Render UI overlay
         if hasattr(self, "icon_manager") and self.icon_manager.has_icons():
@@ -277,7 +301,13 @@ class RenderPipeline:
         if hasattr(self.text_manager, "refresh_layout_metrics"):
             self.text_manager.refresh_layout_metrics()
 
-    def _render_forward(self, scene: Scene, camera: Camera, lights: List[Light]):
+    def _render_forward(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using forward rendering.
 
@@ -288,17 +318,41 @@ class RenderPipeline:
         """
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
-        
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
+
         # Check if AA is enabled
         if render_target == self.ctx.screen:
             # No AA - render directly to screen (original behavior)
-            self.main_renderer.render(scene, camera, lights, self.window.viewport)
+            self.main_renderer.render(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                skybox=skybox,
+                time=time,
+            )
         else:
             # AA enabled - render to AA framebuffer then resolve
-            self.main_renderer.render_to_target(scene, camera, lights, self.window.viewport, render_target)
+            self.main_renderer.render_to_target(
+                scene,
+                camera,
+                lights,
+                self.window.viewport,
+                render_target,
+                skybox=skybox,
+                time=time,
+            )
             self.aa_renderer.resolve_and_present()
 
-    def _render_deferred(self, scene: Scene, camera: Camera, lights: List[Light]):
+        self._render_light_debug(camera, lights)
+
+    def _render_deferred(
+        self,
+        scene: Scene,
+        camera: Camera,
+        lights: List[Light],
+        time: float | None = None,
+    ):
         """
         Render using deferred rendering.
 
@@ -328,6 +382,7 @@ class RenderPipeline:
 
         # Get AA render target
         render_target = self.aa_renderer.get_render_target()
+        skybox = scene.get_skybox() if hasattr(scene, 'get_skybox') else None
 
         # Pass 3: Lighting pass (accumulate all lights from G-Buffer)
         if render_target == self.ctx.screen:
@@ -351,6 +406,8 @@ class RenderPipeline:
                 camera,
                 self.window.viewport,
                 ssao_texture=ssao_texture,
+                skybox=skybox,
+                time=time,
                 apply_post_lighting=apply_post_lighting,
             )
 
@@ -363,7 +420,8 @@ class RenderPipeline:
                     lights,
                     self.ctx.screen,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
         else:
             # AA enabled - render to AA framebuffer then resolve
@@ -387,6 +445,8 @@ class RenderPipeline:
                 self.window.viewport,
                 render_target,
                 ssao_texture=ssao_texture,
+                skybox=skybox,
+                time=time,
                 apply_post_lighting=apply_post_lighting,
             )
 
@@ -400,10 +460,13 @@ class RenderPipeline:
                     lights,
                     render_target,
                     shadow_maps,
-                    self.window.size
+                    self.window.size,
+                    time=time,
                 )
 
             self.aa_renderer.resolve_and_present()
+
+        self._render_light_debug(camera, lights)
 
     def get_shader(self, name: str) -> moderngl.Program:
         """
@@ -416,6 +479,27 @@ class RenderPipeline:
             Shader program
         """
         return self.shader_manager.get(name)
+
+    def _render_light_debug(self, camera: Camera, lights: List[Light]) -> None:
+        """Render light gizmos when enabled."""
+        from ..config import settings
+
+        if not getattr(settings, "DEBUG_DRAW_LIGHT_GIZMOS", False):
+            return
+        if not lights:
+            return
+        if not getattr(self, "light_debug_renderer", None):
+            return
+
+        width, height = self.window.size
+        default_viewport = (0, 0, width, height)
+        viewport = getattr(self.window, "viewport", default_viewport)
+        if isinstance(viewport, tuple) and len(viewport) == 4:
+            target_viewport = viewport
+        else:
+            target_viewport = default_viewport
+
+        self.light_debug_renderer.render(camera, lights, target_viewport)
 
     def cycle_aa_mode(self):
         """Cycle to the next anti-aliasing mode"""
@@ -456,6 +540,17 @@ class RenderPipeline:
         if hasattr(self, 'aa_renderer'):
             return self.aa_renderer.get_aa_mode_name()
         return "Not Available"
+
+    def toggle_light_gizmos(self):
+        """Toggle debug light gizmo rendering."""
+        from ..config import settings
+
+        current = bool(getattr(settings, "DEBUG_DRAW_LIGHT_GIZMOS", False))
+        settings.DEBUG_DRAW_LIGHT_GIZMOS = not current
+
+        state = "enabled" if settings.DEBUG_DRAW_LIGHT_GIZMOS else "disabled"
+
+        return settings.DEBUG_DRAW_LIGHT_GIZMOS
 
     def reload_shaders(self):
         """

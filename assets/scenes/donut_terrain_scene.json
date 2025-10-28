@@ -1,0 +1,674 @@
+{
+  "name": "donut_terrain_scene",
+  "metadata": {
+    "description": "Demonstration scene featuring procedurally generated donut terrain"
+  },
+  "camera": {
+    "position": [
+      0.0,
+      5.0,
+      10.0
+    ],
+    "target": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "player_spawn_position": [
+    0.0,
+    3.1,
+    0.0
+  ],
+  "objects": [
+    {
+      "name": "DonutTerrain",
+      "type": "primitive",
+      "primitive": "donut_terrain",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.4,
+        0.6,
+        0.3
+      ],
+      "resolution": 128,
+      "outer_radius": 200.0,
+      "inner_radius": 80.0,
+      "height": 50.0,
+      "rim_width": 40.0,
+      "seed": 42,
+      "bounding_radius": 320.0,
+      "physics": {
+        "type": "static",
+        "shape": "mesh",
+        "collision_mesh": {
+          "type": "generator",
+          "name": "donut_terrain_collision",
+          "generator": "tools.export_collision_meshes:export_donut_collision",
+          "params": {
+            "resolution": 128,
+            "outer_radius": 200.0,
+            "inner_radius": 80.0,
+            "height": 50.0,
+            "rim_width": 40.0,
+            "seed": 42
+          }
+        },
+        "friction": 0.25,
+        "restitution": 0.3
+      }
+    },
+    {
+      "name": "CenterMarker",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 5.0,
+      "position": [
+        0.0,
+        2.5,
+        0.0
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.2
+      ],
+      "bounding_radius": 5.0
+    },
+    {
+      "name": "RimMarker1",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        140.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
+        0.9
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker2",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        140.0
+      ],
+      "color": [
+        0.9,
+        0.9,
+        0.2
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker3",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -140.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.9,
+        0.2
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimMarker4",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        -140.0
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.9
+      ],
+      "bounding_radius": 3.0
+    },
+    {
+      "name": "RimSphere_East",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        175.0,
+        52.0,
+        0.0
+      ],
+      "color": [
+        0.85,
+        0.6,
+        0.25
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          -5.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_NorthEast",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        123.744,
+        52.0,
+        123.744
+      ],
+      "color": [
+        0.25,
+        0.7,
+        0.85
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          -3.535,
+          0.0,
+          -3.535
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_North",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        0.0,
+        52.0,
+        175.0
+      ],
+      "color": [
+        0.9,
+        0.5,
+        0.2
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          -5.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_NorthWest",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -123.744,
+        52.0,
+        123.744
+      ],
+      "color": [
+        0.2,
+        0.85,
+        0.6
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          3.535,
+          0.0,
+          -3.535
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_West",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -49.0,
+        48.0,
+        -85.0
+      ],
+      "color": [
+        0.75,
+        0.3,
+        0.85
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          5.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_2",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        46.0,
+        45.0,
+        83.0
+      ],
+      "color": [
+        0.6,
+        0.85,
+        0.25
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          3.535,
+          0.0,
+          3.535
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_3",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        -86.0,
+        47.0,
+        43.0
+      ],
+      "color": [
+        0.85,
+        0.4,
+        0.35
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          5.0
+        ]
+      }
+    },
+    {
+      "name": "RimSphere_SouthEast",
+      "type": "primitive",
+      "primitive": "sphere",
+      "radius": 3.0,
+      "position": [
+        123.744,
+        52.0,
+        -123.744
+      ],
+      "color": [
+        0.35,
+        0.5,
+        0.9
+      ],
+      "bounding_radius": 3.0,
+      "physics": {
+        "type": "dynamic",
+        "shape": "sphere",
+        "mass": 20.0,
+        "restitution": 0.45,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          -3.535,
+          0.0,
+          3.535
+        ]
+      }
+    },
+    {
+      "name": "RimCube_North",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        0.0,
+        50.0,
+        165.0
+      ],
+      "color": [
+        0.35,
+        0.65,
+        0.85
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          -4.0
+        ]
+      }
+    },
+    {
+      "name": "RimCube_NW",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        -142.894,
+        50.0,
+        82.5
+      ],
+      "color": [
+        0.85,
+        0.55,
+        0.25
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          3.464,
+          0.0,
+          -2.0
+        ]
+      }
+    },
+    {
+      "name": "RimCube_SW",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        -142.894,
+        50.0,
+        -82.5
+      ],
+      "color": [
+        0.25,
+        0.85,
+        0.45
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          3.464,
+          0.0,
+          2.0
+        ]
+      }
+    },
+    {
+      "name": "RimCube_South",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        0.0,
+        50.0,
+        -165.0
+      ],
+      "color": [
+        0.8,
+        0.4,
+        0.3
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          0.0,
+          0.0,
+          4.0
+        ]
+      }
+    },
+    {
+      "name": "RimCube_SE",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "position": [
+        142.894,
+        50.0,
+        -82.5
+      ],
+      "color": [
+        0.45,
+        0.3,
+        0.85
+      ],
+      "bounding_radius": 5.2,
+      "physics": {
+        "type": "dynamic",
+        "shape": "box",
+        "mass": 20.5,
+        "half_extents": [
+          3.0,
+          3.0,
+          3.0
+        ],
+        "restitution": 0.4,
+        "friction": 0.05,
+        "linear_damping": 0.0,
+        "angular_damping": 0.0,
+        "enable_sleeping": false,
+        "linear_velocity": [
+          -3.464,
+          0.0,
+          2.0
+        ]
+      }
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [
+        -10.0,
+        20.0,
+        20.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.2,
+        0.2,
+        1.0
+      ],
+      "intensity": 4.5,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        100.0,
+        200.0,
+        100.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        1.0,
+        0.95,
+        0.9
+      ],
+      "intensity": 4.0,
+      "cast_shadows": true
+    },
+    {
+      "type": "directional",
+      "position": [
+        -100.0,
+        150.0,
+        -50.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "color": [
+        0.6,
+        0.7,
+        0.9
+      ],
+      "intensity": 2.0,
+      "cast_shadows": false
+    }
+  ]
+}

@@ -2,11 +2,14 @@
 Light Module
 
 Shadow-casting light sources with support for directional, point, and spot lights.
+Includes lightweight descriptors for data-driven scene loading.
 """
 
 import math
 import numpy as np
 from dataclasses import dataclass, field
+from typing import Dict, Any, Tuple
+import numpy as np
 from pyrr import Matrix44, Vector3
 import moderngl
 
@@ -20,6 +23,58 @@ from ..config.settings import (
     LIGHT_ORTHO_NEAR,
     LIGHT_ORTHO_FAR,
 )
+
+
+def _vec3(value, fallback: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    """Utility to coerce JSON vectors into tuples."""
+
+    if value is None:
+        value = fallback
+    if len(value) != 3:
+        raise ValueError(f"Expected 3 components, got {value}")
+    return tuple(float(v) for v in value)
+
+
+@dataclass
+class LightDefinition:
+    """Data descriptor for defining lights in external scene assets."""
+
+    position: Tuple[float, float, float] = (0.0, 10.0, 0.0)
+    target: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    color: Tuple[float, float, float] = DEFAULT_LIGHT_COLOR
+    intensity: float = DEFAULT_LIGHT_INTENSITY
+    light_type: str = "directional"
+    cast_shadows: bool = True
+    extras: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "LightDefinition":
+        """Create a light definition from JSON data."""
+
+        known = {"position", "target", "color", "intensity", "type", "cast_shadows"}
+        extras = {k: v for k, v in data.items() if k not in known}
+
+        return cls(
+            position=_vec3(data.get("position"), (0.0, 10.0, 0.0)),
+            target=_vec3(data.get("target"), (0.0, 0.0, 0.0)),
+            color=_vec3(data.get("color"), DEFAULT_LIGHT_COLOR),
+            intensity=float(data.get("intensity", DEFAULT_LIGHT_INTENSITY)),
+            light_type=data.get("type", "directional"),
+            cast_shadows=bool(data.get("cast_shadows", True)),
+            extras=extras,
+        )
+
+    def instantiate(self) -> "Light":
+        """Create a runtime light from this definition."""
+
+        return Light(
+            position=Vector3(self.position),
+            target=Vector3(self.target),
+            color=Vector3(self.color),
+            intensity=self.intensity,
+            light_type=self.light_type,
+            cast_shadows=self.cast_shadows,
+        )
 
 
 @dataclass
@@ -174,7 +229,10 @@ class Light:
             return True
 
         # Check throttle interval for static lights
-        if throttle_frames > 0:
+        if throttle_frames == 0:
+            # throttle_frames = 0 means render every frame
+            return True
+        elif throttle_frames > 0:
             return self._frames_since_shadow_update >= throttle_frames
 
         return False

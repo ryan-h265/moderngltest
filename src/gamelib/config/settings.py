@@ -48,6 +48,12 @@ SHADOW_MAP_SIZE_HIGH = 2048  # Resolution for high-importance lights (close/brig
 SHADOW_UPDATE_THROTTLE_FRAMES = 0  # Update static light shadows every N frames (0=every frame)
 DEBUG_SHADOW_RENDERING = False  # Print shadow map rendering statistics
 
+# Debug visualization for light placements
+DEBUG_DRAW_LIGHT_GIZMOS = False  # Render helper gizmos showing light positions and directions
+DEBUG_LIGHT_GIZMO_SPHERE_RADIUS = 0.5  # Radius of the debug sphere drawn at each light position
+DEBUG_LIGHT_GIZMO_LINE_LENGTH = 5.5  # Length of the direction line extending from each light
+DEBUG_LIGHT_GIZMO_ALPHA = 0.75  # Opacity for light gizmo rendering (0-1)
+
 # Deferred rendering optimizations
 MAX_LIGHTS_PER_FRAME = None  # Limit lights rendered per frame (None = unlimited)
 ENABLE_LIGHT_SORTING = True  # Sort lights by importance (brightness/distance)
@@ -63,6 +69,22 @@ BLOOM_INTENSITY = 0.65       # Intensity multiplier when compositing bloom
 BLOOM_FILTER_RADIUS = 1.1    # Upsample filter radius (higher = softer bloom)
 BLOOM_MAX_LEVELS = 5         # Number of downsample/upsample levels (more = softer, slower)
 BLOOM_TINT = (1.0, 1.0, 1.0) # Optional bloom tint (RGB)
+
+# Fog (atmospheric scattering) settings
+FOG_ENABLED = True
+FOG_COLOR = (0.65, 0.70, 0.88)       # Fog color tint (RGB) - Subtle blue-gray haze
+FOG_DENSITY = 0.0085                  # Base exponential density (reduced for more transparency)
+FOG_START_DISTANCE = 34.0            # Distance from camera where fog begins
+FOG_END_DISTANCE = 125.0              # Distance where fog reaches full strength
+FOG_BASE_HEIGHT = 0.0                # World-space height where fog is densest
+FOG_HEIGHT_FALLOFF = 0.05            # Exponential falloff per unit height above base
+FOG_NOISE_SCALE = 0.18                # World-space scale of noise (lower = larger, less tiled features)
+FOG_NOISE_STRENGTH = 0.75            # Strength of noise modulation (higher for more variation)
+FOG_NOISE_SPEED = 0.8                 # Animation speed multiplier (slower for more natural drift)
+FOG_WIND_DIRECTION = (0.3, 0.0, 0.2) # Direction the fog drifts over time
+FOG_DETAIL_SCALE = 0.85               # Scale for high-frequency wispy details
+FOG_DETAIL_STRENGTH = 0.35           # Strength of fine detail layer
+FOG_WARP_STRENGTH = 0.4              # Domain warping intensity for organic flow
 
 # ============================================================================
 # Anti-Aliasing Settings
@@ -180,11 +202,63 @@ MAX_FOV = 90.0
 
 # Clipping planes
 NEAR_PLANE = 0.1
-FAR_PLANE = 100.0
+FAR_PLANE = 1000.0  # Increased for large terrain (donut extends to ~220 units)
 
 # Pitch limits (prevents camera flipping)
 MIN_PITCH = -89.0
 MAX_PITCH = 89.0
+
+# ============================================================================
+# Character Movement Defaults
+# ============================================================================
+
+PLAYER_WALK_SPEED = 15.0
+PLAYER_RUN_SPEED = 35.0
+PLAYER_SPRINT_SPEED = 50.0
+PLAYER_CROUCH_SPEED = 10.0
+
+PLAYER_AIR_CONTROL_FACTOR = 0.35
+
+PLAYER_JUMP_VELOCITY = 5.0
+PLAYER_COYOTE_TIME = 0.1
+
+PLAYER_GROUND_ACCELERATION = 40.0
+PLAYER_AIR_ACCELERATION = 10.0
+PLAYER_GROUND_DECELERATION = 55.0
+PLAYER_AIR_DECELERATION = 5.0
+
+PLAYER_CAPSULE_RADIUS = 0.4
+PLAYER_CAPSULE_HEIGHT = 1.8
+PLAYER_CAPSULE_MASS = 75.0
+PLAYER_CAPSULE_FRICTION = 0.8
+PLAYER_CAPSULE_LINEAR_DAMPING = 0.1
+PLAYER_CAPSULE_ANGULAR_DAMPING = 0.0
+
+PLAYER_MAX_SLOPE_ANGLE = 45.0
+PLAYER_GROUND_CHECK_DISTANCE = 0.15
+PLAYER_STEP_HEIGHT = 0.4  # Maximum height player can step up (stairs, curbs, etc.)
+
+# Collision response settings
+PLAYER_DEPENETRATION_ITERATIONS = 5  # Number of iterations to resolve penetration
+PLAYER_SLOPE_ACCELERATION_MULTIPLIER = 1.2  # Extra force when climbing slopes
+PLAYER_COLLISION_MARGIN = 0.04  # Collision margin to prevent edge snagging (default 0.04, try 0.06-0.08 if snagging occurs)
+PLAYER_MIN_DEPENETRATION_DISTANCE = 0.001  # Minimum penetration depth to resolve (meters)
+PLAYER_CCD_ENABLED = True  # Enable Continuous Collision Detection to prevent tunneling at high speeds
+PLAYER_CCD_SWEEP_STEPS = 5  # Number of steps to subdivide movement for swept collision detection
+
+# Step-up and ground snapping settings
+PLAYER_STEP_UP_EXTRA_HEIGHT = 0.05  # Extra height to lift when stepping (prevents edge catching)
+PLAYER_GROUND_SNAP_DISTANCE = 0.3  # Maximum distance to snap down to ground when moving downhill
+PLAYER_GROUND_SNAP_SPEED_THRESHOLD = 0.5  # Don't snap if moving upward faster than this (m/s)
+
+PLAYER_FIRST_PERSON_EYE_HEIGHT = 1.6
+PLAYER_THIRD_PERSON_DISTANCE = 5.0
+PLAYER_THIRD_PERSON_HEIGHT = 2.0
+PLAYER_THIRD_PERSON_SPRING_STIFFNESS = 0.18
+PLAYER_THIRD_PERSON_MIN_DISTANCE = 1.0
+PLAYER_THIRD_PERSON_MAX_DISTANCE = 10.0
+
+PLAYER_DEBUG_DRAW_CAPSULE = False
 
 # ============================================================================
 # Lighting Defaults
@@ -241,7 +315,7 @@ ENABLE_FRUSTUM_CULLING = True  # Highly recommended for performance
 # ============================================================================
 
 # SSAO (Screen Space Ambient Occlusion)
-SSAO_ENABLED = True
+SSAO_ENABLED = False
 SSAO_KERNEL_SIZE = 64
 SSAO_RADIUS = 0.5
 SSAO_BIAS = 0.025
@@ -263,8 +337,8 @@ UI_FONT_SIZE = 24  # Font size in pixels
 UI_ATLAS_SIZE = 512  # Texture atlas resolution (512x512)
 
 # Debug overlay
-DEBUG_OVERLAY_ENABLED = True
-DEBUG_TEXT_COLOR = (0.0, 1.0, 0.0, 1.0)  # RGBA (green - original)
+DEBUG_OVERLAY_ENABLED = False
+DEBUG_TEXT_COLOR = (0.3, 1.0, 0.3, 0.8)  # RGBA (green - original)
 DEBUG_TEXT_SCALE = 1.0  # Normal scale
 DEBUG_POSITION = (10, 10)  # Top-left
 DEBUG_LINE_SPACING = 35  # Pixels between lines

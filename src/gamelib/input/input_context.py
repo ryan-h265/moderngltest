@@ -19,6 +19,7 @@ class InputContext(Enum):
     """
 
     GAMEPLAY = auto()      # Normal gameplay mode
+    DEBUG_CAMERA = auto()  # Free-fly debug camera
     MENU = auto()          # Main menu or pause menu
     DIALOGUE = auto()      # Talking to NPC, reading text
     INVENTORY = auto()     # Inventory/equipment screen
@@ -68,6 +69,14 @@ class InputContextManager:
                 InputCommand.CAMERA_ZOOM_OUT,
 
                 # Player actions
+                InputCommand.PLAYER_MOVE_FORWARD,
+                InputCommand.PLAYER_MOVE_BACKWARD,
+                InputCommand.PLAYER_MOVE_LEFT,
+                InputCommand.PLAYER_MOVE_RIGHT,
+                InputCommand.PLAYER_JUMP,
+                InputCommand.PLAYER_CROUCH,
+                InputCommand.PLAYER_SPRINT,
+                InputCommand.PLAYER_WALK,
                 InputCommand.GAME_JUMP,
                 InputCommand.GAME_CROUCH,
                 InputCommand.GAME_SPRINT,
@@ -107,6 +116,31 @@ class InputContextManager:
                 InputCommand.SYSTEM_TOGGLE_FXAA,
                 InputCommand.SYSTEM_TOGGLE_SMAA,
 
+                InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+                InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA,
+                InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY
+
+            },
+
+            # ================================================================
+            # DEBUG CAMERA - Free-fly camera controls for debugging
+            # ================================================================
+            InputContext.DEBUG_CAMERA: {
+                InputCommand.CAMERA_MOVE_FORWARD,
+                InputCommand.CAMERA_MOVE_BACKWARD,
+                InputCommand.CAMERA_MOVE_LEFT,
+                InputCommand.CAMERA_MOVE_RIGHT,
+                InputCommand.CAMERA_MOVE_UP,
+                InputCommand.CAMERA_MOVE_DOWN,
+                InputCommand.CAMERA_LOOK,
+                InputCommand.CAMERA_ZOOM_IN,
+                InputCommand.CAMERA_ZOOM_OUT,
+
+                InputCommand.SYSTEM_TOGGLE_MOUSE,
+                InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA,
+                InputCommand.SYSTEM_SCREENSHOT,
+                InputCommand.SYSTEM_TOGGLE_DEBUG,
+                InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
             },
 
             # ================================================================
