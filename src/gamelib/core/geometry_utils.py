@@ -332,41 +332,47 @@ def heightmap_terrain(heightmap_path):
     
     vertices = np.array(vertices, dtype='f4')
     
-    # Calculate normals using cross product
-    normals = np.zeros((resolution * resolution, 3), dtype='f4')
-    
+    # Calculate normals using finite differences (gradient method)
+    # This matches the approach used in donut_terrain for smooth, accurate normals
+    normals = []
+
     def idx(i, j):
         return i * resolution + j
-    
-    for i in range(resolution - 1):
-        for j in range(resolution - 1):
-            # Get vertices of the quad
-            v0 = vertices[idx(i, j)]
-            v1 = vertices[idx(i + 1, j)]
-            v2 = vertices[idx(i + 1, j + 1)]
-            v3 = vertices[idx(i, j + 1)]
-            
-            # Calculate normals for both triangles
-            n1 = np.cross(v1 - v0, v2 - v0)
-            n2 = np.cross(v2 - v0, v3 - v0)
-            
-            # Normalize
-            n1_norm = n1 / (np.linalg.norm(n1) + 1e-8)
-            n2_norm = n2 / (np.linalg.norm(n2) + 1e-8)
-            
-            # Accumulate normals at vertices
-            normals[idx(i, j)] += n1_norm + n2_norm
-            normals[idx(i + 1, j)] += n1_norm
-            normals[idx(i + 1, j + 1)] += n1_norm + n2_norm
-            normals[idx(i, j + 1)] += n2_norm
-    
-    # Normalize accumulated normals
-    for i in range(len(normals)):
-        norm = np.linalg.norm(normals[i])
-        if norm > 0:
-            normals[i] /= norm
-        else:
-            normals[i] = [0, 1, 0]  # Default up
+
+    for i in range(resolution):
+        for j in range(resolution):
+            # Calculate gradients using finite differences
+            di = 0.0
+            dj = 0.0
+
+            # Central differences when possible, forward/backward at edges
+            if i > 0 and i < resolution - 1:
+                di = (heights[i + 1, j] - heights[i - 1, j]) / (2 * dx)
+            elif i > 0:
+                di = (heights[i, j] - heights[i - 1, j]) / dx
+            elif i < resolution - 1:
+                di = (heights[i + 1, j] - heights[i, j]) / dx
+
+            if j > 0 and j < resolution - 1:
+                dj = (heights[i, j + 1] - heights[i, j - 1]) / (2 * dz)
+            elif j > 0:
+                dj = (heights[i, j] - heights[i, j - 1]) / dz
+            elif j < resolution - 1:
+                dj = (heights[i, j + 1] - heights[i, j]) / dz
+
+            # Normal is perpendicular to the tangent plane
+            # Tangent vectors: (1, di, 0) in i-direction and (0, dj, 1) in j-direction
+            # Normal = cross product = (-di, 1, -dj)
+            normal = np.array([-di, 1.0, -dj], dtype='f4')
+            norm = np.linalg.norm(normal)
+            if norm > 0:
+                normal = normal / norm
+            else:
+                normal = np.array([0.0, 1.0, 0.0], dtype='f4')
+
+            normals.append(normal)
+
+    normals = np.array(normals, dtype='f4')
     
     # Build indices (two triangles per quad)
     # Using counter-clockwise winding when viewed from above
@@ -377,11 +383,11 @@ def heightmap_terrain(heightmap_path):
             v1 = idx(i + 1, j)
             v2 = idx(i + 1, j + 1)
             v3 = idx(i, j + 1)
-            
-            # Triangle 1: v0, v2, v1 (counter-clockwise from above)
-            indices.extend([v0, v2, v1])
-            # Triangle 2: v0, v3, v2 (counter-clockwise from above)
-            indices.extend([v0, v3, v2])
+
+            # Triangle 1: v0, v3, v1 (counter-clockwise from above)
+            indices.extend([v0, v3, v1])
+            # Triangle 2: v1, v3, v2 (counter-clockwise from above)
+            indices.extend([v1, v3, v2])
     
     indices = np.array(indices, dtype='i4')
     
