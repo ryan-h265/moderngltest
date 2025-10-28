@@ -1,10 +1,8 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
-ModernGL 3D game engine with multi-light shadow mapping. Built using ModernGL, featuring a modular architecture with Command Pattern input system and two-pass shadow rendering.
+ModernGL 3D game engine with multi-light shadow mapping. Built using ModernGL, featuring a modular architecture with Command Pattern input system and two-pass shadow rendering. Pybullet for physics and collision detection. Semi-procedural terrian generation (Fractal perlin noise saved to json files)
 
 **Stack**: Python 3.12, ModernGL (OpenGL 4.1 for macOS compatibility), pyrr, moderngl-window
 
@@ -17,9 +15,6 @@ source venv/bin/activate
 
 # Run the main engine
 python main.py
-
-# Run with Python directly (alternative)
-python3 main.py
 ```
 
 ### Testing

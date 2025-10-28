@@ -330,6 +330,25 @@ class PhysicsWorld:
             scale = getattr(scene_object, "scale")
             if isinstance(scale, Vector3):
                 config.mesh_scale = (float(scale.x), float(scale.y), float(scale.z))
+
+        # For heightmap_terrain primitives, auto-populate collision mesh from heightmap
+        if primitive == "heightmap_terrain" and config.collision_mesh is None:
+            heightmap_path = None
+            if hasattr(node_definition, "extras") and node_definition.extras:
+                heightmap_path = node_definition.extras.get("heightmap")
+            if not heightmap_path and hasattr(node_definition, "mesh_path"):
+                heightmap_path = node_definition.mesh_path
+
+            if heightmap_path:
+                # Create collision mesh definition using the heightmap
+                config.collision_mesh = {
+                    "type": "generator",
+                    "generator": "tools.export_collision_meshes:export_heightmap_collision",
+                    "params": {
+                        "heightmap_path": str(heightmap_path)
+                    }
+                }
+
         if config.mesh_path is None and config.collision_mesh is not None:
             mesh_result = resolve_collision_mesh(config.collision_mesh, base_path=resource_base)
             config.mesh_path = str(mesh_result.path)

@@ -123,6 +123,67 @@ def export_donut_collision(
     _write_obj(out_path, vertices, faces)
 
 
+def export_heightmap_collision(
+    out_path: Path,
+    *,
+    heightmap_path: str,
+) -> None:
+    """Export a heightmap terrain to an OBJ collision mesh."""
+
+    import numpy as np
+    
+    # Resolve heightmap path relative to project root
+    hmap_path = Path(heightmap_path)
+    if not hmap_path.is_absolute():
+        hmap_path = (ROOT / heightmap_path).resolve()
+    
+    if not hmap_path.exists():
+        raise FileNotFoundError(f"Heightmap not found: {heightmap_path}")
+    
+    # Load heightmap data
+    data = np.load(str(hmap_path))
+    heights = data['heights']
+    meta = json.loads(str(data['meta']))
+    
+    resolution = meta['resolution']
+    world_size = meta['world_size']
+    
+    # Calculate spacing
+    dx = world_size / (resolution - 1)
+    dz = world_size / (resolution - 1)
+    offset = world_size / 2.0
+    
+    # Build vertices
+    vertices: List[Tuple[float, float, float]] = []
+    for i in range(resolution):
+        for j in range(resolution):
+            x = -offset + i * dx
+            z = -offset + j * dz
+            y = float(heights[i, j])
+            vertices.append((x, y, z))
+    
+    # Build faces (two triangles per quad)
+    # Using counter-clockwise winding when viewed from above
+    faces: List[Tuple[int, int, int]] = []
+    
+    def idx(i, j):
+        return i * resolution + j + 1  # OBJ indices are 1-based
+    
+    for i in range(resolution - 1):
+        for j in range(resolution - 1):
+            v0 = idx(i, j)
+            v1 = idx(i + 1, j)
+            v2 = idx(i + 1, j + 1)
+            v3 = idx(i, j + 1)
+            
+            # Triangle 1: v0, v2, v1 (counter-clockwise from above)
+            faces.append((v0, v2, v1))
+            # Triangle 2: v0, v3, v2 (counter-clockwise from above)
+            faces.append((v0, v3, v2))
+    
+    _write_obj(out_path, vertices, faces)
+
+
 # GLTF extraction ---------------------------------------------------------------
 
 def _load_gltf(path: Path) -> Tuple[Dict, List[bytes]]:

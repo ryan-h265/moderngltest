@@ -97,6 +97,7 @@ class SceneDefinition:
     light_definitions: List["LightDefinition"] = field(default_factory=list)
     camera_position: Optional[Tuple[float, float, float]] = None
     camera_target: Optional[Tuple[float, float, float]] = None
+    player_spawn_position: Optional[Tuple[float, float, float]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -110,6 +111,9 @@ class SceneDefinition:
         camera_position = _opt_vec3(camera.get("position")) if camera else None
         camera_target = _opt_vec3(camera.get("target")) if camera else None
 
+        player_spawn = data.get("player_spawn_position")
+        player_spawn_position = _opt_vec3(player_spawn) if player_spawn else None
+
         from .light import LightDefinition  # Local import to avoid circular dependency
 
         light_definitions = [LightDefinition.from_dict(light) for light in data.get("lights", [])]
@@ -122,6 +126,7 @@ class SceneDefinition:
             light_definitions=light_definitions,
             camera_position=camera_position,
             camera_target=camera_target,
+            player_spawn_position=player_spawn_position,
             metadata=metadata,
         )
 

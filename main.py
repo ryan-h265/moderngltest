@@ -95,8 +95,10 @@ class Game(mglw.WindowConfig):
         )
         self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
         self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
+        # self.scene_manager.register_scene("fractal_mountainous", "assets/scenes/fractal_terrain_scene.json")
+        self.scene_manager.register_scene("incline_test", "assets/scenes/incline_test_scene.json")
 
-        loaded_scene = self.scene_manager.load("default", camera=self.camera)
+        loaded_scene = self.scene_manager.load("donut_terrain", camera=self.camera)
         self.scene = loaded_scene.scene
         self.lights = loaded_scene.lights
 
@@ -127,14 +129,17 @@ class Game(mglw.WindowConfig):
         if self.physics_world is None:
             return None
 
+        # Use player spawn position from scene, or default if not specified
+        spawn_pos = self.scene_manager.player_spawn_position
+
         placeholder = SceneObject(
             geometry.cube(size=(0.8, 1.8, 0.8)),
-            Vector3([0.0, 20.0, 0.0]),
+            spawn_pos,
             (0.2, 0.6, 0.9),
             name="Player",
         )
 
-        player = PlayerCharacter(placeholder, self.physics_world)
+        player = PlayerCharacter(placeholder, self.physics_world, initial_position=spawn_pos)
         player.set_yaw(self.camera.yaw)
         return player
 
