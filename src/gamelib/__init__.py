@@ -17,6 +17,7 @@ from .core.scene_manager import SceneManager
 
 # Rendering
 from .rendering.render_pipeline import RenderPipeline
+from .ui.player_hud import PlayerHUD
 
 # Loaders
 from .loaders import SceneLoader, SceneLoadResult
@@ -64,6 +65,7 @@ __all__ = [
     "PhysicsBodyHandle",
     # Rendering
     "RenderPipeline",
+    "PlayerHUD",
     # Input
     "InputManager",
     "InputCommand",

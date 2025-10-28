@@ -5,7 +5,7 @@ ModernGL 3D Engine - Main Entry Point
 A modular 3D game engine with multi-light shadow mapping.
 """
 
-from __future__ import annotations
+import math
 
 import logging
 
@@ -22,6 +22,8 @@ from src.gamelib import (
     CameraRig, FreeFlyRig, FirstPersonRig, ThirdPersonRig,
     # Rendering
     RenderPipeline,
+    # UI
+    PlayerHUD,
     # Gameplay
     PlayerCharacter,
     # Input helpers
@@ -39,7 +41,7 @@ from src.gamelib.physics import PhysicsWorld
 
 # Debug overlay
 from src.gamelib.debug import DebugOverlay
-from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED
+from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED, HUD_ENABLED
 
 
 logger = logging.getLogger(__name__)
@@ -111,6 +113,21 @@ class Game(mglw.WindowConfig):
         if self.player is not None:
             self.scene.add_object(self.player.model)
 
+        # Setup HUD
+        if HUD_ENABLED:
+            self.player_hud = PlayerHUD(self.render_pipeline)
+            self.player_hud.set_health(86, 100)
+            self.player_hud.set_minimap_status("no map")
+            self.player_hud.set_equipped_tool("None")
+            self.player_hud.set_hints([
+                "WASD to move",
+                "Space to jump",
+            ])
+        else:
+            self.player_hud = None
+
+        # Time tracking
+        self.time = 0
         self.camera_rig: CameraRig = self._create_camera_rig()
         self.camera_controller = CameraController(self.camera, self.input_manager, rig=self.camera_rig)
         self.player_controller = PlayerController(self.player, self.input_manager) if self.player else None
@@ -209,6 +226,13 @@ class Game(mglw.WindowConfig):
             for light in self.lights:
                 if light.cast_shadows:
                     light.mark_shadow_dirty()
+
+        # Update HUD and debug overlay
+        if self.player_hud:
+            # Animate the health bar for demonstration purposes.
+            oscillating_health = 70.0 + 30.0 * (0.5 + 0.5 * math.sin(time * 0.35))
+            self.player_hud.set_health(oscillating_health, 100.0)
+            self.player_hud.update(self.camera, frametime)
 
         # Update debug overlay (it handles visibility internally)
         fps = 1.0 / frametime if frametime > 0 else 0

@@ -337,10 +337,67 @@ UI_FONT_SIZE = 24  # Font size in pixels
 UI_ATLAS_SIZE = 512  # Texture atlas resolution (512x512)
 
 # Debug overlay
-DEBUG_OVERLAY_ENABLED = True
-DEBUG_TEXT_COLOR = (0.0, 1.0, 0.0, 1.0)  # RGBA (green - original)
+DEBUG_OVERLAY_ENABLED = False
+DEBUG_TEXT_COLOR = (0.3, 1.0, 0.3, 0.8)  # RGBA (green - original)
 DEBUG_TEXT_SCALE = 1.0  # Normal scale
 DEBUG_POSITION = (10, 10)  # Top-left
 DEBUG_LINE_SPACING = 35  # Pixels between lines
 DEBUG_OVERLAY_BACKGROUND_COLOR = (0.1, 0.1, 0.1, 0.6)  # Semi-transparent gray
 DEBUG_OVERLAY_BACKGROUND_PADDING = 6.0  # Pixels of padding around text
+
+# Player HUD configuration
+HUD_ENABLED = True
+HUD_ANCHOR = "bottom_left"
+HUD_MARGIN = (32, 32)  # Pixels from anchored corner
+HUD_TEXT_SCALE = 0.95
+HUD_TEXT_COLOR = (0.94, 0.97, 1.0, 1.0)
+HUD_LABEL_COLOR = (0.65, 0.85, 1.0, 0.95)
+HUD_VALUE_COLOR = (1.0, 1.0, 1.0, 1.0)
+HUD_WARNING_COLOR = (1.0, 0.73, 0.27, 1.0)
+HUD_CRITICAL_COLOR = (1.0, 0.33, 0.33, 1.0)
+HUD_HEALTH_THRESHOLDS = {
+    "warning": 0.6,
+    "critical": 0.35,
+}
+HUD_ICON_SIZE = (48, 48)
+HUD_ICON_TINT = (1.0, 1.0, 1.0, 1.0)
+HUD_ICON_TEXT_GAP = 12.0
+HUD_LINE_SPACING = 8.0
+HUD_SECTION_SPACING = 16.0
+HUD_BACKGROUND_COLOR = (0.02, 0.02, 0.02, 0.55)
+HUD_BACKGROUND_PADDING = 6.0
+HUD_HINT_SLOTS = 3
+HUD_HINT_LINE_SPACING = 4.0
+HUD_VALUE_GAP = 6.0
+HUD_HINT_COLOR = (0.85, 0.85, 0.85, 1.0)
+HUD_LAYER_TEXT = "hud_text"
+HUD_LAYER_ICONS = "hud_icons"
+HUD_SECTIONS = {
+    "compass": {
+        "label": "Compass",
+        "icon": "assets/ui/icons/compass.png",
+    },
+    "health": {
+        "label": "Health",
+        "icon": "assets/ui/icons/health.png",
+    },
+    "minimap": {
+        "label": "Minimap",
+        "icon": "assets/ui/icons/minimap.png",
+    },
+    "tool": {
+        "label": "Tool",
+        "icon": "assets/ui/icons/tool.png",
+    },
+    "hints": {
+        "label": "Hints",
+        "icon": "assets/ui/icons/hints.png",
+    },
+}
+HUD_SECTION_ORDER = (
+    "hints",  # Rendered closest to anchor when anchored bottom
+    "tool",
+    "minimap",
+    "health",
+    "compass",  # Furthest from anchor
+)
