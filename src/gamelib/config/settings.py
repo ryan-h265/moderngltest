@@ -212,7 +212,7 @@ MAX_PITCH = 89.0
 # Character Movement Defaults
 # ============================================================================
 
-PLAYER_WALK_SPEED = 25.0
+PLAYER_WALK_SPEED = 15.0
 PLAYER_RUN_SPEED = 35.0
 PLAYER_SPRINT_SPEED = 50.0
 PLAYER_CROUCH_SPEED = 10.0
@@ -239,10 +239,12 @@ PLAYER_GROUND_CHECK_DISTANCE = 0.15
 PLAYER_STEP_HEIGHT = 0.4  # Maximum height player can step up (stairs, curbs, etc.)
 
 # Collision response settings
-PLAYER_DEPENETRATION_ITERATIONS = 3  # Number of iterations to resolve penetration
+PLAYER_DEPENETRATION_ITERATIONS = 5  # Number of iterations to resolve penetration
 PLAYER_SLOPE_ACCELERATION_MULTIPLIER = 1.2  # Extra force when climbing slopes
 PLAYER_COLLISION_MARGIN = 0.04  # Collision margin to prevent edge snagging (default 0.04, try 0.06-0.08 if snagging occurs)
 PLAYER_MIN_DEPENETRATION_DISTANCE = 0.001  # Minimum penetration depth to resolve (meters)
+PLAYER_CCD_ENABLED = True  # Enable Continuous Collision Detection to prevent tunneling at high speeds
+PLAYER_CCD_SWEEP_STEPS = 5  # Number of steps to subdivide movement for swept collision detection
 
 # Step-up and ground snapping settings
 PLAYER_STEP_UP_EXTRA_HEIGHT = 0.05  # Extra height to lift when stepping (prevents edge catching)

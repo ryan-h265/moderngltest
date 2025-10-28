@@ -17,6 +17,8 @@ from ..config.settings import (
     PLAYER_CAPSULE_LINEAR_DAMPING,
     PLAYER_CAPSULE_MASS,
     PLAYER_CAPSULE_RADIUS,
+    PLAYER_CCD_ENABLED,
+    PLAYER_CCD_SWEEP_STEPS,
     PLAYER_COLLISION_MARGIN,
     PLAYER_COYOTE_TIME,
     PLAYER_CROUCH_SPEED,
@@ -162,16 +164,19 @@ class PlayerCharacter:
         self._process_jump()
         self._update_velocity(delta_time)
 
-        # For kinematic bodies, we must manually move the position based on velocity
-        new_pos = self._position + self.velocity * delta_time
-        self._position = new_pos
-        self.physics_world.set_body_transform(
-            self.physics_body.body_id,
-            position=tuple(new_pos)
-        )
-
-        # Resolve any collisions/penetrations after movement
-        self._resolve_collisions()
+        # Use swept collision detection to prevent tunneling at high speeds
+        if PLAYER_CCD_ENABLED:
+            self._swept_move(self.velocity * delta_time)
+        else:
+            # Fallback: simple discrete collision (vulnerable to tunneling)
+            new_pos = self._position + self.velocity * delta_time
+            self._position = new_pos
+            self.physics_world.set_body_transform(
+                self.physics_body.body_id,
+                position=tuple(new_pos)
+            )
+            # Resolve any collisions/penetrations after movement
+            self._resolve_collisions()
 
         # Apply ground snapping to stick to slopes when moving downhill
         self._apply_ground_snapping()
@@ -352,6 +357,122 @@ class PlayerCharacter:
             "slope": f"{self.slope_angle:.1f}°",
         }
         print(f"[PlayerDebug] {debug_info}")
+
+    def _swept_move(self, displacement: Vector3) -> None:
+        """
+        Perform swept collision detection to prevent tunneling.
+
+        This method subdivides the movement into smaller steps and checks for
+        collisions along the path. If a collision is detected, the movement
+        is stopped at the collision point and the velocity is adjusted.
+
+        Args:
+            displacement: The desired movement vector for this frame
+        """
+        if displacement.length < 1e-6:
+            # No movement, skip
+            return
+
+        start_position = Vector3(self._position)
+        remaining_displacement = Vector3(displacement)
+
+        # Subdivide movement into multiple sweep steps to catch collisions
+        sweep_steps = PLAYER_CCD_SWEEP_STEPS
+        step_fraction = 1.0 / sweep_steps
+
+        for step in range(sweep_steps):
+            if remaining_displacement.length < 1e-6:
+                break  # No more movement needed
+
+            # Calculate the step displacement
+            step_displacement = remaining_displacement * step_fraction * (sweep_steps - step)
+            step_length = step_displacement.length
+
+            if step_length < 1e-6:
+                break
+
+            # Perform a raycast along the movement direction
+            # Cast from capsule center, accounting for capsule radius
+            ray_start = self._position
+            ray_end = self._position + step_displacement
+
+            # We need to check if our capsule will hit anything
+            # Use a sphere cast by checking multiple rays around the capsule
+            collision_detected = False
+            collision_normal = Vector3([0.0, 0.0, 0.0])
+            collision_distance = step_length
+
+            # Multi-ray sphere cast: cast rays from different points on the capsule
+            # This approximates a swept capsule test
+            cast_points = [
+                Vector3([0.0, 0.0, 0.0]),  # Center
+                Vector3([PLAYER_CAPSULE_RADIUS, 0.0, 0.0]),  # Right
+                Vector3([-PLAYER_CAPSULE_RADIUS, 0.0, 0.0]),  # Left
+                Vector3([0.0, 0.0, PLAYER_CAPSULE_RADIUS]),  # Forward
+                Vector3([0.0, 0.0, -PLAYER_CAPSULE_RADIUS]),  # Back
+                Vector3([0.0, PLAYER_CAPSULE_HEIGHT / 2.0, 0.0]),  # Top
+                Vector3([0.0, -PLAYER_CAPSULE_HEIGHT / 2.0, 0.0]),  # Bottom
+            ]
+
+            for offset in cast_points:
+                cast_start = ray_start + offset
+                cast_end = ray_end + offset
+
+                hit_info = self.physics_world.ray_test(tuple(cast_start), tuple(cast_end))
+
+                if hit_info:
+                    body_id = hit_info.get("body_id", -1)
+                    if body_id != self.physics_body.body_id and body_id != -1:
+                        hit_fraction = hit_info.get("hit_fraction", 1.0)
+                        hit_distance = step_length * hit_fraction
+
+                        # Found a closer collision
+                        if hit_distance < collision_distance:
+                            collision_detected = True
+                            collision_distance = hit_distance
+                            collision_normal = Vector3(hit_info.get("hit_normal", (0.0, 1.0, 0.0)))
+
+            if collision_detected:
+                # Stop at the collision point, leaving a small margin
+                safe_distance = max(0.0, collision_distance - PLAYER_COLLISION_MARGIN * 2.0)
+                safe_displacement = step_displacement.normalized * safe_distance if safe_distance > 1e-6 else Vector3([0.0, 0.0, 0.0])
+
+                # Move to the safe position
+                self._position += safe_displacement
+                self.physics_world.set_body_transform(
+                    self.physics_body.body_id,
+                    position=tuple(self._position)
+                )
+
+                # Slide along the collision surface
+                # Remove the component of velocity that's pushing into the surface
+                velocity_into_surface = self.velocity.dot(collision_normal)
+                if velocity_into_surface < 0:
+                    self.velocity -= collision_normal * velocity_into_surface
+
+                # Update remaining displacement to slide along surface
+                displacement_into_surface = remaining_displacement.dot(collision_normal)
+                if displacement_into_surface < 0:
+                    remaining_displacement -= collision_normal * displacement_into_surface
+
+                # Resolve any penetrations at this position
+                self._resolve_collisions()
+
+                # Continue with the remaining displacement
+                continue
+            else:
+                # No collision detected in this step, move the full amount
+                self._position += step_displacement
+                self.physics_world.set_body_transform(
+                    self.physics_body.body_id,
+                    position=tuple(self._position)
+                )
+
+                # Resolve any penetrations (in case we still ended up inside something)
+                self._resolve_collisions()
+
+                # Update remaining displacement
+                remaining_displacement -= step_displacement
 
     def _resolve_collisions(self) -> None:
         """
