@@ -78,9 +78,8 @@ class Game(mglw.WindowConfig):
 
         # Rendering pipeline and controllers
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
-        self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
-        # Physics world (optional if PyBullet missing)
+        # Setup physics world (PyBullet)
         try:
             self.physics_world = PhysicsWorld()
         except RuntimeError as exc:  # pragma: no cover - environment dependent
@@ -119,8 +118,15 @@ class Game(mglw.WindowConfig):
         # Toggle for debug camera context
         self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
 
-        # Debug overlay
-        self.debug_overlay = DebugOverlay(self.render_pipeline) if DEBUG_OVERLAY_ENABLED else None
+        # Setup debug overlay (always create, but respect initial visibility setting)
+        self.debug_overlay = DebugOverlay(self.render_pipeline, visible=DEBUG_OVERLAY_ENABLED)
+
+        # Setup rendering controller for SSAO toggle, debug overlay, etc.
+        self.rendering_controller = RenderingController(
+            self.render_pipeline,
+            self.input_manager,
+            debug_overlay=self.debug_overlay
+        )
 
         # Time tracking
         self.time = 0.0
@@ -204,10 +210,9 @@ class Game(mglw.WindowConfig):
                 if light.cast_shadows:
                     light.mark_shadow_dirty()
 
-        # Update debug overlay
-        if self.debug_overlay:
-            fps = 1.0 / frametime if frametime > 0 else 0
-            self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene, self.player)
+        # Update debug overlay (it handles visibility internally)
+        fps = 1.0 / frametime if frametime > 0 else 0
+        self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene)
 
     def on_render(self, time, frametime):
         """

@@ -118,6 +118,7 @@ class InputCommand(Enum):
     SYSTEM_TOGGLE_MOUSE = auto()     # Capture/release mouse
     SYSTEM_SCREENSHOT = auto()
     SYSTEM_TOGGLE_DEBUG = auto()
+    SYSTEM_TOGGLE_DEBUG_OVERLAY = auto()  # Toggle debug overlay on/off
     SYSTEM_TOGGLE_FULLSCREEN = auto()
     SYSTEM_TOGGLE_SSAO = auto()      # Toggle SSAO on/off
     SYSTEM_TOGGLE_MSAA = auto()      # Toggle MSAA on/off
@@ -186,6 +187,7 @@ COMMAND_TYPES = {
     InputCommand.SYSTEM_TOGGLE_MOUSE: InputType.INSTANT,
     InputCommand.SYSTEM_SCREENSHOT: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_DEBUG: InputType.INSTANT,
+    InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_SSAO: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_MSAA: InputType.INSTANT,
     InputCommand.SYSTEM_TOGGLE_FXAA: InputType.INSTANT,
