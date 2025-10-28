@@ -32,7 +32,13 @@ from src.gamelib.core.skybox import Skybox
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
-from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController
+from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController, ToolController
+
+# Tool system
+from src.gamelib.tools import ToolManager
+from src.gamelib.tools.editor_history import EditorHistory
+from src.gamelib.tools.grid_overlay import GridOverlay
+from src.gamelib.config.settings import PROJECT_ROOT
 
 # Physics
 from src.gamelib.physics import PhysicsWorld
@@ -119,6 +125,43 @@ class Game(mglw.WindowConfig):
         # Toggle for debug camera context
         self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
 
+        # Tool system initialization
+        self.tool_manager = ToolManager(self.ctx)
+        self.editor_history = EditorHistory(max_history=100)
+        self.grid_overlay = GridOverlay(self.ctx, grid_size=1.0, grid_extent=50)
+        self.grid_overlay.set_visible(False)  # Hidden by default
+
+        # Load tools from JSON
+        tools_path = PROJECT_ROOT / "assets/config/tools/editor_tools.json"
+        self.tool_manager.load_tools_from_json(tools_path)
+
+        # Configure editor tools with scene references
+        for tool in self.tool_manager.tools.values():
+            # Set editor history for undo/redo
+            if hasattr(tool, 'editor_history'):
+                tool.editor_history = self.editor_history
+
+            # For LightEditorTool, set lights list reference
+            if hasattr(tool, 'lights_list'):
+                tool.lights_list = self.lights
+
+        # Create tool controller
+        self.tool_controller = ToolController(
+            self.tool_manager,
+            self.input_manager,
+            self.camera,
+            self.scene
+        )
+        self.tool_controller.editor_history = self.editor_history
+        self.tool_controller.lights = self.lights  # For scene saving
+
+        # Start with first tool equipped (if available)
+        if self.tool_manager.inventory.get_hotbar_tool(0):
+            self.tool_manager.equip_hotbar_slot(0)
+
+        # Register editor mode toggle
+        self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
+
         # Debug overlay
         self.debug_overlay = DebugOverlay(self.render_pipeline) if DEBUG_OVERLAY_ENABLED else None
 
@@ -164,6 +207,39 @@ class Game(mglw.WindowConfig):
             self.camera_controller.enable_free_fly()
             self.camera_rig = self.camera_controller.rig
 
+    def toggle_editor_mode(self):
+        """Toggle between GAMEPLAY and LEVEL_EDITOR contexts."""
+        context_manager = self.input_manager.context_manager
+        current_context = context_manager.current_context
+
+        if current_context == InputContext.LEVEL_EDITOR:
+            # Return to gameplay mode
+            context_manager.set_context(InputContext.GAMEPLAY)
+            self.grid_overlay.set_visible(False)
+            print("Entered GAMEPLAY mode")
+
+            # Restore appropriate camera rig
+            new_rig = self._create_camera_rig()
+            self.camera_rig = new_rig
+            if self.player is not None:
+                self.camera.position = self.player.get_eye_position()
+            self.camera_controller.disable_free_fly(new_rig)
+        else:
+            # Enter level editor mode
+            context_manager.set_context(InputContext.LEVEL_EDITOR)
+            self.grid_overlay.set_visible(True)
+            print("Entered LEVEL EDITOR mode")
+            print("Controls:")
+            print("  - Tab: Return to gameplay")
+            print("  - 1-9: Select tools")
+            print("  - G: Toggle grid snapping")
+            print("  - Ctrl+Z/Y: Undo/Redo")
+            print("  - Ctrl+S: Save scene")
+
+            # Enable free-fly camera for editor
+            self.camera_controller.enable_free_fly()
+            self.camera_rig = self.camera_controller.rig
+
     def on_update(self, time, frametime):
         """
         Update game logic.
@@ -204,6 +280,10 @@ class Game(mglw.WindowConfig):
                 if light.cast_shadows:
                     light.mark_shadow_dirty()
 
+        # Update tool system (only in LEVEL_EDITOR mode)
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            self.tool_manager.update(frametime, self.camera, self.scene)
+
         # Update debug overlay
         if self.debug_overlay:
             fps = 1.0 / frametime if frametime > 0 else 0
@@ -222,6 +302,30 @@ class Game(mglw.WindowConfig):
 
         # Render frame
         self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
+
+        # Render editor overlays (after main scene, before UI)
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            # Render grid overlay
+            self.grid_overlay.render(
+                self.camera.get_view_matrix(),
+                self.camera.get_projection_matrix()
+            )
+
+            # Render tool previews (e.g., ModelPlacementTool preview)
+            active_tool = self.tool_manager.get_active_tool()
+            if active_tool and hasattr(active_tool, 'render_preview'):
+                # Get shader programs from render pipeline
+                # Note: render_preview needs primitive and textured shaders
+                # This is a placeholder - may need adjustment based on RenderPipeline structure
+                try:
+                    active_tool.render_preview(
+                        self.render_pipeline.geometry_renderer.program,
+                        self.render_pipeline.geometry_renderer.textured_program
+                    )
+                except AttributeError:
+                    # If shaders aren't accessible this way, tool preview won't render
+                    # Can be fixed later when we know the exact RenderPipeline structure
+                    pass
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """
