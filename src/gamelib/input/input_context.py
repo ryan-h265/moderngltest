@@ -120,6 +120,9 @@ class InputContextManager:
                 InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
                 InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA,
 
+                # Editor mode toggle (to enter LEVEL_EDITOR mode)
+                InputCommand.EDITOR_TOGGLE_MODE,
+
             },
 
             # ================================================================
@@ -141,6 +144,9 @@ class InputContextManager:
                 InputCommand.SYSTEM_SCREENSHOT,
                 InputCommand.SYSTEM_TOGGLE_DEBUG,
                 InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+
+                # Editor mode toggle (to enter LEVEL_EDITOR mode from debug)
+                InputCommand.EDITOR_TOGGLE_MODE,
             },
 
             # ================================================================
