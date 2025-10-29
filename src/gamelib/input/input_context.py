@@ -20,6 +20,7 @@ class InputContext(Enum):
 
     GAMEPLAY = auto()      # Normal gameplay mode
     DEBUG_CAMERA = auto()  # Free-fly debug camera
+    LEVEL_EDITOR = auto()  # Level editor mode (scene editing)
     MENU = auto()          # Main menu or pause menu
     DIALOGUE = auto()      # Talking to NPC, reading text
     INVENTORY = auto()     # Inventory/equipment screen
@@ -118,7 +119,10 @@ class InputContextManager:
 
                 InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
                 InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA,
-                InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY
+                InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY,
+
+                # Editor mode toggle (to enter LEVEL_EDITOR mode)
+                InputCommand.EDITOR_TOGGLE_MODE,
 
             },
 
@@ -138,6 +142,63 @@ class InputContextManager:
 
                 InputCommand.SYSTEM_TOGGLE_MOUSE,
                 InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA,
+                InputCommand.SYSTEM_SCREENSHOT,
+                InputCommand.SYSTEM_TOGGLE_DEBUG,
+                InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,
+
+                # Editor mode toggle (to enter LEVEL_EDITOR mode from debug)
+                InputCommand.EDITOR_TOGGLE_MODE,
+            },
+
+            # ================================================================
+            # LEVEL_EDITOR - Level editor mode
+            # ================================================================
+            InputContext.LEVEL_EDITOR: {
+                # Camera (free-fly for editor)
+                InputCommand.CAMERA_MOVE_FORWARD,
+                InputCommand.CAMERA_MOVE_BACKWARD,
+                InputCommand.CAMERA_MOVE_LEFT,
+                InputCommand.CAMERA_MOVE_RIGHT,
+                InputCommand.CAMERA_MOVE_UP,
+                InputCommand.CAMERA_MOVE_DOWN,
+                InputCommand.CAMERA_LOOK,
+                InputCommand.CAMERA_ZOOM_IN,
+                InputCommand.CAMERA_ZOOM_OUT,
+                InputCommand.CAMERA_SPEED_INCREASE,
+
+                # Tool commands
+                InputCommand.TOOL_USE,
+                InputCommand.TOOL_USE_SECONDARY,
+                InputCommand.TOOL_NEXT,
+                InputCommand.TOOL_PREVIOUS,
+                InputCommand.TOOL_MODEL_NEXT,
+                InputCommand.TOOL_MODEL_PREVIOUS,
+                InputCommand.TOOL_CANCEL,
+                InputCommand.TOOL_HOTBAR_1,
+                InputCommand.TOOL_HOTBAR_2,
+                InputCommand.TOOL_HOTBAR_3,
+                InputCommand.TOOL_HOTBAR_4,
+                InputCommand.TOOL_HOTBAR_5,
+                InputCommand.TOOL_HOTBAR_6,
+                InputCommand.TOOL_HOTBAR_7,
+                InputCommand.TOOL_HOTBAR_8,
+                InputCommand.TOOL_HOTBAR_9,
+
+                # Editor commands
+                InputCommand.EDITOR_UNDO,
+                InputCommand.EDITOR_REDO,
+                InputCommand.EDITOR_SAVE_SCENE,
+                InputCommand.EDITOR_LOAD_SCENE,
+                InputCommand.EDITOR_TOGGLE_GRID,
+                InputCommand.EDITOR_TOGGLE_MODE,
+                InputCommand.EDITOR_ROTATE_CW,
+                InputCommand.EDITOR_ROTATE_CCW,
+                InputCommand.EDITOR_DELETE,
+                InputCommand.EDITOR_DUPLICATE,
+                InputCommand.EDITOR_OPEN_BROWSER,
+
+                # System
+                InputCommand.SYSTEM_TOGGLE_MOUSE,
                 InputCommand.SYSTEM_SCREENSHOT,
                 InputCommand.SYSTEM_TOGGLE_DEBUG,
                 InputCommand.SYSTEM_TOGGLE_LIGHT_GIZMOS,

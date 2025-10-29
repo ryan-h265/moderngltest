@@ -30,6 +30,7 @@ uniform vec3 emissiveFactor;
 uniform float emissiveStrength;   // KHR_materials_emissive_strength (multiplier for HDR emissive)
 uniform float occlusionStrength;  // Strength of baked AO (0.0 = none, 1.0 = full)
 uniform float normalScale;        // Normal map intensity
+uniform vec4 previewTint = vec4(0.0, 0.0, 0.0, 0.0);  // Preview tint (RGB) + blend factor (A)
 
 // Alpha transparency
 uniform int alphaMode;      // 0=OPAQUE, 1=MASK, 2=BLEND
@@ -133,7 +134,12 @@ void main() {
     }
 
     // Store albedo (base color) + baked ambient occlusion (A channel)
-    gAlbedo = vec4(albedo.rgb, occlusion);
+    // Apply preview tint if active (previewTint.a > 0)
+    vec3 final_albedo = albedo.rgb;
+    if (previewTint.a > 0.0) {
+        final_albedo = mix(albedo.rgb, previewTint.rgb, previewTint.a);
+    }
+    gAlbedo = vec4(final_albedo, occlusion);
 
     // Store PBR material properties
     gMaterial = vec2(metallic, roughness);

@@ -33,6 +33,9 @@ class InputCommand(Enum):
     CAMERA_ZOOM_IN = auto()
     CAMERA_ZOOM_OUT = auto()
 
+    # Camera Speed (for editor mode)
+    CAMERA_SPEED_INCREASE = auto()
+
     # ========================================================================
     # Player Movement (Physics-driven character controller)
     # ========================================================================
@@ -139,6 +142,45 @@ class InputCommand(Enum):
     SOCIAL_VOICE = auto()
     SOCIAL_EMOTE = auto()
 
+    # ========================================================================
+    # Tool System
+    # ========================================================================
+    TOOL_USE = auto()                # Primary tool action (left click)
+    TOOL_USE_SECONDARY = auto()      # Secondary tool action (right click)
+    TOOL_RELOAD = auto()             # Reload tool (R key, for weapons)
+    TOOL_NEXT = auto()               # Next tool in hotbar (scroll wheel up / E)
+    TOOL_PREVIOUS = auto()           # Previous tool in hotbar (scroll wheel down)
+    TOOL_CANCEL = auto()             # Cancel tool action
+    TOOL_HOTBAR_1 = auto()           # Select hotbar slot 1
+    TOOL_HOTBAR_2 = auto()           # Select hotbar slot 2
+    TOOL_HOTBAR_3 = auto()           # Select hotbar slot 3
+    TOOL_HOTBAR_4 = auto()           # Select hotbar slot 4
+    TOOL_HOTBAR_5 = auto()           # Select hotbar slot 5
+    TOOL_HOTBAR_6 = auto()           # Select hotbar slot 6
+    TOOL_HOTBAR_7 = auto()           # Select hotbar slot 7
+    TOOL_HOTBAR_8 = auto()           # Select hotbar slot 8
+    TOOL_HOTBAR_9 = auto()           # Select hotbar slot 9
+
+    # Level Editor Commands
+    # ========================================================================
+    EDITOR_UNDO = auto()             # Undo last action (Ctrl+Z)
+    EDITOR_REDO = auto()             # Redo last undone action (Ctrl+Y)
+    EDITOR_SAVE_SCENE = auto()       # Save scene to JSON (Ctrl+S)
+    EDITOR_LOAD_SCENE = auto()       # Load scene from JSON (Ctrl+O)
+    EDITOR_TOGGLE_GRID = auto()      # Toggle grid snapping (G)
+    EDITOR_TOGGLE_MODE = auto()      # Toggle GAMEPLAY ↔ LEVEL_EDITOR (Tab)
+    EDITOR_ROTATE_CW = auto()        # Rotate object clockwise (R)
+    EDITOR_ROTATE_CCW = auto()       # Rotate object counter-clockwise (Shift+R)
+    EDITOR_DELETE = auto()           # Delete selected object (Delete/Backspace)
+    EDITOR_DUPLICATE = auto()        # Duplicate selected object (Ctrl+D)
+    EDITOR_OPEN_BROWSER = auto()     # Open model/asset browser (B)
+
+    # ========================================================================
+    # Tool-Specific Model Selection (ModelPlacementTool)
+    # ========================================================================
+    TOOL_MODEL_NEXT = auto()         # Cycle to next model in tool library ([)
+    TOOL_MODEL_PREVIOUS = auto()     # Cycle to previous model in tool library (])
+
 
 class InputType(Enum):
     """
@@ -167,6 +209,7 @@ COMMAND_TYPES = {
     InputCommand.CAMERA_LOOK: InputType.AXIS,
     InputCommand.CAMERA_ZOOM_IN: InputType.CONTINUOUS,
     InputCommand.CAMERA_ZOOM_OUT: InputType.CONTINUOUS,
+    InputCommand.CAMERA_SPEED_INCREASE: InputType.CONTINUOUS,
 
     # Player movement
     InputCommand.PLAYER_MOVE_FORWARD: InputType.CONTINUOUS,
@@ -200,6 +243,40 @@ COMMAND_TYPES = {
     InputCommand.GAME_CROUCH: InputType.TOGGLE,
     InputCommand.GAME_SPRINT: InputType.TOGGLE,
     InputCommand.BUILD_MODE_TOGGLE: InputType.TOGGLE,
+
+    # Tool commands (instant unless continuous action)
+    InputCommand.TOOL_USE: InputType.INSTANT,  # Single click to place/use tool
+    InputCommand.TOOL_USE_SECONDARY: InputType.CONTINUOUS,  # Can be held (e.g., rotate)
+    InputCommand.TOOL_RELOAD: InputType.INSTANT,
+    InputCommand.TOOL_NEXT: InputType.INSTANT,
+    InputCommand.TOOL_PREVIOUS: InputType.INSTANT,
+    InputCommand.TOOL_CANCEL: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_1: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_2: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_3: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_4: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_5: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_6: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_7: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_8: InputType.INSTANT,
+    InputCommand.TOOL_HOTBAR_9: InputType.INSTANT,
+
+    # Editor commands
+    InputCommand.EDITOR_UNDO: InputType.INSTANT,
+    InputCommand.EDITOR_REDO: InputType.INSTANT,
+    InputCommand.EDITOR_SAVE_SCENE: InputType.INSTANT,
+    InputCommand.EDITOR_LOAD_SCENE: InputType.INSTANT,
+    InputCommand.EDITOR_TOGGLE_GRID: InputType.INSTANT,
+    InputCommand.EDITOR_TOGGLE_MODE: InputType.INSTANT,
+    InputCommand.EDITOR_ROTATE_CW: InputType.INSTANT,
+    InputCommand.EDITOR_ROTATE_CCW: InputType.INSTANT,
+    InputCommand.EDITOR_DELETE: InputType.INSTANT,
+    InputCommand.EDITOR_DUPLICATE: InputType.INSTANT,
+    InputCommand.EDITOR_OPEN_BROWSER: InputType.INSTANT,
+
+    # Tool model selection
+    InputCommand.TOOL_MODEL_NEXT: InputType.INSTANT,
+    InputCommand.TOOL_MODEL_PREVIOUS: InputType.INSTANT,
 }
 
 

@@ -121,6 +121,20 @@ class InputManager:
         # Remove from pressed keys
         self.pressed_keys.discard(key)
 
+        # Get command for this key
+        command = self.key_bindings.get_command(key, is_mouse=False)
+        if command is None:
+            return
+
+        # Reset speed multiplier when CAMERA_SPEED_INCREASE is released
+        if command == InputCommand.CAMERA_SPEED_INCREASE:
+            handler = self.handlers.get(command)
+            if handler and hasattr(handler, '__self__'):
+                # Get the camera controller instance and reset multiplier
+                camera_controller = handler.__self__
+                if hasattr(camera_controller, 'speed_multiplier'):
+                    camera_controller.speed_multiplier = 1.0
+
     def on_mouse_move(self, dx: float, dy: float):
         """
         Handle mouse movement event.

@@ -36,6 +36,7 @@ uniform vec3 emissiveFactor;
 uniform float emissiveStrength;// KHR_materials_emissive_strength
 uniform float occlusionStrength;
 uniform float normalScale;
+uniform vec4 previewTint = vec4(0.0, 0.0, 0.0, 0.0);  // Preview tint (RGB) + blend factor (A)
 
 // Camera position (world space)
 uniform vec3 cameraPos;
@@ -289,10 +290,15 @@ void main(){
     
     // Final color
     vec3 color=ambient+Lo+emissive;
-    
+
     float fog_factor=computeFogFactor(v_world_position);
     color=mix(color,fog_color,fog_factor);
-    
+
+    // Apply preview tint if active (previewTint.a > 0)
+    if(previewTint.a>0.){
+        color=mix(color,previewTint.rgb,previewTint.a);
+    }
+
     // Output with alpha for blending
     fragColor=vec4(color,albedo.a);
 }

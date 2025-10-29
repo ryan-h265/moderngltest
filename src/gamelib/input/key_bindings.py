@@ -93,11 +93,46 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.F9] = InputCommand.SYSTEM_TOGGLE_SMAA   # F9
 
         # ====================================================================
-        # Mouse Bindings (Future - examples)
+        # Tool System (Level Editor)
         # ====================================================================
-        # self.mouse_bindings[1] = InputCommand.OBJECT_SELECT         # Left click
-        # self.mouse_bindings[2] = InputCommand.GAME_ATTACK           # Right click
-        # self.mouse_bindings[3] = InputCommand.GAME_ATTACK_SECONDARY # Middle click
+        # Tool switching
+        self.keyboard_bindings[self.keys.NUMBER_1] = InputCommand.TOOL_HOTBAR_1  # 1
+        self.keyboard_bindings[self.keys.NUMBER_2] = InputCommand.TOOL_HOTBAR_2  # 2
+        self.keyboard_bindings[self.keys.NUMBER_3] = InputCommand.TOOL_HOTBAR_3  # 3
+        self.keyboard_bindings[self.keys.NUMBER_4] = InputCommand.TOOL_HOTBAR_4  # 4
+        self.keyboard_bindings[self.keys.NUMBER_5] = InputCommand.TOOL_HOTBAR_5  # 5
+        self.keyboard_bindings[self.keys.NUMBER_6] = InputCommand.TOOL_HOTBAR_6  # 6
+        self.keyboard_bindings[self.keys.NUMBER_7] = InputCommand.TOOL_HOTBAR_7  # 7
+        self.keyboard_bindings[self.keys.NUMBER_8] = InputCommand.TOOL_HOTBAR_8  # 8
+        self.keyboard_bindings[self.keys.NUMBER_9] = InputCommand.TOOL_HOTBAR_9  # 9
+
+        # Tool model selection (for ModelPlacementTool and other tools with model libraries)
+        # Note: These keys cycle through models within a tool, not between tools
+        # On most keyboards: [ and ] (not Shift+[ and Shift+] which are { and })
+        self.keyboard_bindings[self.keys.COMMA] = InputCommand.TOOL_MODEL_PREVIOUS
+        self.keyboard_bindings[self.keys.PERIOD] = InputCommand.TOOL_MODEL_NEXT
+
+        # Editor commands
+        self.keyboard_bindings[self.keys.TAB] = InputCommand.EDITOR_TOGGLE_MODE      # Tab
+        self.keyboard_bindings[self.keys.G] = InputCommand.EDITOR_TOGGLE_GRID        # G
+        self.keyboard_bindings[self.keys.R] = InputCommand.EDITOR_ROTATE_CW          # R
+        self.keyboard_bindings[self.keys.DELETE] = InputCommand.EDITOR_DELETE        # Delete
+        self.keyboard_bindings[self.keys.BACKSPACE] = InputCommand.EDITOR_DELETE     # Backspace (alternative)
+        self.keyboard_bindings[self.keys.B] = InputCommand.EDITOR_OPEN_BROWSER       # B
+
+        # Note: Ctrl+Z, Ctrl+Y, Ctrl+S, Ctrl+D require modifier key handling
+        # These will need to be handled in on_key_event with modifiers check
+        # For now, map Z/Y directly (will work without Ctrl, but better than nothing)
+        self.keyboard_bindings[self.keys.Z] = InputCommand.EDITOR_UNDO               # Z (ideally Ctrl+Z)
+        self.keyboard_bindings[self.keys.Y] = InputCommand.EDITOR_REDO               # Y (ideally Ctrl+Y)
+        # S is used for backward movement, so save will need special handling with Ctrl modifier
+        # D is used for right movement, so duplicate will need special handling with Ctrl modifier
+
+        # ====================================================================
+        # Mouse Bindings
+        # ====================================================================
+        self.mouse_bindings[1] = InputCommand.TOOL_USE                # Left click (tool primary)
+        self.mouse_bindings[2] = InputCommand.TOOL_USE_SECONDARY      # Right click (tool secondary)
 
     def _update_command_to_keys(self):
         """Update reverse lookup (command → keys)"""

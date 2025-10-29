@@ -663,3 +663,201 @@ class Scene:
             List of visible objects
         """
         return [obj for obj in self.objects if obj.is_visible(frustum)]
+
+    def to_dict(self, lights: Optional[List] = None) -> Dict[str, Any]:
+        """
+        Serialize scene to dictionary (for JSON export).
+
+        Args:
+            lights: Optional list of Light instances to include
+
+        Returns:
+            Dictionary representation of scene
+        """
+        import numpy as np
+
+        scene_dict = {
+            "name": "Exported Scene",
+            "version": "1.0",
+            "objects": [],
+            "lights": [],
+            "metadata": {}
+        }
+
+        # Serialize objects
+        for obj in self.objects:
+            # Check if this is a Model or SceneObject
+            is_model = hasattr(obj, 'is_model') and obj.is_model
+
+            if is_model:
+                # Model - store reference to file
+                obj_dict = {
+                    "name": obj.name,
+                    "type": "model",
+                    "path": getattr(obj, 'source_path', None),  # Path to GLTF/GLB file
+                    "position": list(obj.position),
+                    "rotation": list(obj.rotation) if hasattr(obj, 'rotation') else [0.0, 0.0, 0.0],
+                    "scale": list(obj.scale) if hasattr(obj, 'scale') else [1.0, 1.0, 1.0],
+                    "bounding_radius": obj.bounding_radius
+                }
+            else:
+                # Primitive SceneObject
+                # Determine primitive type from geometry
+                primitive_type = "cube"  # Default
+                if hasattr(obj, 'primitive_type'):
+                    primitive_type = obj.primitive_type
+                # Could also try to infer from geometry shape
+
+                obj_dict = {
+                    "name": obj.name,
+                    "type": "primitive",
+                    "primitive": primitive_type,
+                    "position": list(obj.position),
+                    "rotation": [float(obj.rotation.x), float(obj.rotation.y), float(obj.rotation.z), float(obj.rotation.w)] if isinstance(obj.rotation, Quaternion) else list(obj.rotation),
+                    "scale": list(obj.scale) if hasattr(obj, 'scale') else [1.0, 1.0, 1.0],
+                    "color": list(obj.color) if hasattr(obj, 'color') else [1.0, 1.0, 1.0],
+                    "bounding_radius": obj.bounding_radius
+                }
+
+            scene_dict["objects"].append(obj_dict)
+
+        # Serialize lights
+        if lights:
+            for light in lights:
+                light_dict = {
+                    "type": light.light_type,
+                    "position": list(light.position),
+                    "target": list(light.target) if hasattr(light, 'target') else [0.0, 0.0, 0.0],
+                    "color": list(light.color),
+                    "intensity": light.intensity
+                }
+                scene_dict["lights"].append(light_dict)
+
+        return scene_dict
+
+    def save_to_json(self, filepath: str, lights: Optional[List] = None):
+        """
+        Save scene to JSON file.
+
+        Args:
+            filepath: Path to save JSON file
+            lights: Optional list of Light instances to include
+        """
+        import json
+        from pathlib import Path
+
+        scene_dict = self.to_dict(lights)
+
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filepath, 'w') as f:
+            json.dump(scene_dict, f, indent=2)
+
+        print(f"Scene saved to: {filepath}")
+        print(f"  Objects: {len(scene_dict['objects'])}")
+        print(f"  Lights: {len(scene_dict['lights'])}")
+
+    def load_from_dict(self, scene_dict: Dict[str, Any]) -> Tuple[List, List]:
+        """
+        Load scene from dictionary.
+
+        Args:
+            scene_dict: Dictionary representation of scene
+
+        Returns:
+            Tuple of (objects_loaded, lights_data) where lights_data is list of dicts
+        """
+        from ..loaders import GltfLoader
+        from ..config.settings import PROJECT_ROOT
+        from moderngl_window import geometry
+
+        objects_loaded = []
+        loader = GltfLoader(self.ctx) if self.ctx else None
+
+        # Clear existing scene
+        self.clear()
+
+        # Load objects
+        for obj_data in scene_dict.get("objects", []):
+            obj_type = obj_data.get("type", "primitive")
+
+            if obj_type == "model":
+                # Load model from file
+                if not loader:
+                    print(f"Warning: Cannot load model '{obj_data['name']}' - no context available")
+                    continue
+
+                model_path = obj_data.get("path")
+                if not model_path:
+                    print(f"Warning: Model '{obj_data['name']}' has no path")
+                    continue
+
+                try:
+                    model = loader.load(str(PROJECT_ROOT / model_path))
+                    model.name = obj_data.get("name", "Model")
+                    model.position = Vector3(obj_data.get("position", [0.0, 0.0, 0.0]))
+                    model.rotation = Vector3(obj_data.get("rotation", [0.0, 0.0, 0.0]))
+                    model.scale = Vector3(obj_data.get("scale", [1.0, 1.0, 1.0]))
+                    model.bounding_radius = obj_data.get("bounding_radius", 2.0)
+                    model.source_path = model_path  # Store for re-export
+                    self.add_object(model)
+                    objects_loaded.append(model)
+                    print(f"Loaded model: {model.name}")
+                except Exception as e:
+                    print(f"Error loading model '{obj_data['name']}': {e}")
+
+            elif obj_type == "primitive":
+                # Create primitive SceneObject
+                primitive = obj_data.get("primitive", "cube")
+
+                # Create geometry based on primitive type
+                if primitive == "sphere":
+                    geom = geometry.sphere(radius=1.0)
+                elif primitive == "cube":
+                    geom = geometry.cube(size=(1.0, 1.0, 1.0))
+                else:
+                    print(f"Warning: Unknown primitive type '{primitive}', using cube")
+                    geom = geometry.cube(size=(1.0, 1.0, 1.0))
+
+                obj = SceneObject(
+                    geom=geom,
+                    position=Vector3(obj_data.get("position", [0.0, 0.0, 0.0])),
+                    color=tuple(obj_data.get("color", [1.0, 1.0, 1.0])),
+                    bounding_radius=obj_data.get("bounding_radius", 1.0),
+                    name=obj_data.get("name", "Object"),
+                    rotation=obj_data.get("rotation", [0.0, 0.0, 0.0]),
+                    scale=obj_data.get("scale", [1.0, 1.0, 1.0])
+                )
+                obj.primitive_type = primitive  # Store for re-export
+                self.add_object(obj)
+                objects_loaded.append(obj)
+                print(f"Loaded primitive: {obj.name}")
+
+        # Return lights data (caller will create Light instances)
+        lights_data = scene_dict.get("lights", [])
+
+        return objects_loaded, lights_data
+
+    def load_from_json(self, filepath: str) -> Tuple[List, List]:
+        """
+        Load scene from JSON file.
+
+        Args:
+            filepath: Path to JSON file
+
+        Returns:
+            Tuple of (objects_loaded, lights_data)
+        """
+        import json
+        from pathlib import Path
+
+        filepath = Path(filepath)
+        if not filepath.exists():
+            raise FileNotFoundError(f"Scene file not found: {filepath}")
+
+        with open(filepath, 'r') as f:
+            scene_dict = json.load(f)
+
+        print(f"Loading scene from: {filepath}")
+        return self.load_from_dict(scene_dict)

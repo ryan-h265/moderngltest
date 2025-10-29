@@ -162,7 +162,7 @@ class TransparentRenderer:
                 self.transparent_program[uniform_name].write(light_matrices[i].astype('f4').tobytes())
 
             # Bind shadow map
-            if i < len(shadow_maps):
+            if i < len(shadow_maps) and shadow_maps[i] is not None:
                 shadow_maps[i].use(location=10 + i)  # shadowMap0-3 at locations 10-13
                 shadow_uniform = f'shadowMap{i}'
                 if shadow_uniform in self.transparent_program:

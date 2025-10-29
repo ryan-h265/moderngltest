@@ -1,0 +1,72 @@
+{
+  "name": "Level Editor Tools",
+  "version": "1.0",
+  "tools": [
+    {
+      "id": "model_placer",
+      "name": "Model Placer",
+      "category": "EDITOR",
+      "type": "ModelPlacementTool",
+      "icon": "icons/model_placer.png",
+      "cursor": "crosshair_place",
+      "cooldown": 0.2,
+      "use_duration": 0.0,
+      "properties": {
+        "snap_to_grid": true,
+        "grid_size": 1.0,
+        "model_library_path": "assets/models/props/",
+        "default_scale": [1.0, 1.0, 1.0],
+        "rotation_speed": 0.01,
+        "raycast_range": 1000.0
+      }
+    },
+    {
+      "id": "object_editor",
+      "name": "Object Editor",
+      "category": "EDITOR",
+      "type": "ObjectEditorTool",
+      "icon": "icons/object_editor.png",
+      "cursor": "crosshair_select",
+      "cooldown": 0.0,
+      "use_duration": 0.0,
+      "properties": {
+        "snap_to_grid": true,
+        "grid_size": 1.0,
+        "rotation_speed": 0.01,
+        "raycast_range": 1000.0
+      }
+    },
+    {
+      "id": "light_editor",
+      "name": "Light Editor",
+      "category": "EDITOR",
+      "type": "LightEditorTool",
+      "icon": "icons/light_editor.png",
+      "cursor": "crosshair_light",
+      "cooldown": 0.1,
+      "use_duration": 0.0,
+      "properties": {
+        "snap_to_grid": true,
+        "grid_size": 1.0,
+        "default_light_type": "directional",
+        "default_color": [1.0, 1.0, 1.0],
+        "default_intensity": 1.0,
+        "default_height": 10.0,
+        "raycast_range": 1000.0
+      }
+    },
+    {
+      "id": "delete_tool",
+      "name": "Delete Tool",
+      "category": "EDITOR",
+      "type": "DeleteTool",
+      "icon": "icons/delete_tool.png",
+      "cursor": "crosshair_delete",
+      "cooldown": 0.1,
+      "use_duration": 0.0,
+      "properties": {
+        "raycast_range": 1000.0
+      }
+    }
+  ]
+}

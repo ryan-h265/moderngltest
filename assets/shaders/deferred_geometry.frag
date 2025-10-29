@@ -5,6 +5,7 @@
 
 // Material properties
 uniform vec3 object_color;
+uniform vec4 previewTint = vec4(0.0, 0.0, 0.0, 0.0);  // Preview tint (RGB) + blend factor (A)
 
 // Inputs from vertex shader
 in vec3 v_world_position;  // World space position
@@ -28,7 +29,12 @@ void main() {
     gNormal = normalize(v_view_normal);
 
     // Store albedo (base color) + ambient occlusion (unused = 1.0)
-    gAlbedo = vec4(object_color, 1.0);
+    // Apply preview tint if active (previewTint.a > 0)
+    vec3 final_color = object_color;
+    if (previewTint.a > 0.0) {
+        final_color = mix(object_color, previewTint.rgb, previewTint.a);
+    }
+    gAlbedo = vec4(final_color, 1.0);
 
     // Primitives use default PBR values (non-metallic, medium roughness)
     gMaterial = vec2(0.0, 0.5);  // metallic = 0, roughness = 0.5

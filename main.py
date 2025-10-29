@@ -34,7 +34,13 @@ from src.gamelib.core.skybox import Skybox
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
-from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController
+from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController, ToolController
+
+# Tool system
+from src.gamelib.tools import ToolManager
+from src.gamelib.tools.editor_history import EditorHistory
+from src.gamelib.tools.grid_overlay import GridOverlay
+from src.gamelib.config.settings import PROJECT_ROOT
 
 # Physics
 from src.gamelib.physics import PhysicsWorld
@@ -135,6 +141,51 @@ class Game(mglw.WindowConfig):
         # Toggle for debug camera context
         self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
 
+        # Tool system initialization
+        self.tool_manager = ToolManager(self.ctx)
+        self.editor_history = EditorHistory(max_history=100)
+        self.grid_overlay = GridOverlay(self.ctx, grid_size=1.0, grid_extent=50)
+        self.grid_overlay.set_visible(False)  # Hidden by default
+
+        # Load tools from JSON
+        tools_path = PROJECT_ROOT / "assets/config/tools/editor_tools.json"
+        self.tool_manager.load_tools_from_json(tools_path)
+
+        # Configure editor tools with scene references
+        for tool in self.tool_manager.tools.values():
+            # Set editor history for undo/redo
+            if hasattr(tool, 'editor_history'):
+                tool.editor_history = self.editor_history
+
+            # For LightEditorTool, set lights list reference
+            if hasattr(tool, 'lights_list'):
+                tool.lights_list = self.lights
+
+            # Set render_pipeline for shadow map initialization
+            if hasattr(tool, 'render_pipeline'):
+                tool.render_pipeline = self.render_pipeline
+
+            # Set input manager (for tools that need to register input handlers)
+            if hasattr(tool, 'input_manager'):
+                tool.input_manager = self.input_manager
+
+        # Create tool controller
+        self.tool_controller = ToolController(
+            self.tool_manager,
+            self.input_manager,
+            self.camera,
+            self.scene
+        )
+        self.tool_controller.editor_history = self.editor_history
+        self.tool_controller.lights = self.lights  # For scene saving
+
+        # Start with first tool equipped (if available)
+        if self.tool_manager.inventory.get_hotbar_tool(0):
+            self.tool_manager.equip_hotbar_slot(0)
+
+        # Register editor mode toggle
+        self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
+
         # Setup debug overlay (always create, but respect initial visibility setting)
         self.debug_overlay = DebugOverlay(self.render_pipeline, visible=DEBUG_OVERLAY_ENABLED)
 
@@ -144,6 +195,10 @@ class Game(mglw.WindowConfig):
             self.input_manager,
             debug_overlay=self.debug_overlay
         )
+
+        # Mouse button state tracking for tool drag operations
+        self.tool_left_held = False
+        self.tool_right_held = False
 
         # Time tracking
         self.time = 0.0
@@ -187,6 +242,74 @@ class Game(mglw.WindowConfig):
             self.camera_controller.enable_free_fly()
             self.camera_rig = self.camera_controller.rig
 
+    def toggle_editor_mode(self):
+        """Toggle between GAMEPLAY and LEVEL_EDITOR contexts."""
+        context_manager = self.input_manager.context_manager
+        current_context = context_manager.current_context
+        key_bindings = self.input_manager.key_bindings
+
+        if current_context == InputContext.LEVEL_EDITOR:
+            # Return to gameplay mode
+            context_manager.set_context(InputContext.GAMEPLAY)
+            self.grid_overlay.set_visible(False)
+
+            # Reset tool drag state
+            self.tool_left_held = False
+            self.tool_right_held = False
+
+            print("Entered GAMEPLAY mode")
+
+            # Rebind WASD back to PLAYER_MOVE commands
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_FORWARD, key_bindings.keys.W)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_BACKWARD, key_bindings.keys.S)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_LEFT, key_bindings.keys.A)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_RIGHT, key_bindings.keys.D)
+
+            # Rebind Space and Shift back to player actions
+            key_bindings.rebind_key(InputCommand.PLAYER_JUMP, key_bindings.keys.SPACE)
+            key_bindings.rebind_key(InputCommand.PLAYER_SPRINT, key_bindings.keys.LEFT_SHIFT)
+
+            # Reset camera speed multiplier
+            self.camera_controller.speed_multiplier = 1.0
+
+            # Restore appropriate camera rig
+            new_rig = self._create_camera_rig()
+            self.camera_rig = new_rig
+            if self.player is not None:
+                self.camera.position = self.player.get_eye_position()
+            self.camera_controller.disable_free_fly(new_rig)
+        else:
+            # Enter level editor mode
+            context_manager.set_context(InputContext.LEVEL_EDITOR)
+            self.grid_overlay.set_visible(True)
+            print("Entered LEVEL EDITOR mode")
+            print("Controls:")
+            print("  - Tab: Return to gameplay")
+            print("  - WASD: Move camera")
+            print("  - Space: Move camera up")
+            print("  - Shift: Move camera down")
+            print("  - X (hold): Double camera speed")
+            print("  - Mouse: Look around")
+            print("  - 1-9: Select tools")
+            print("  - G: Toggle grid snapping")
+            print("  - Ctrl+Z/Y: Undo/Redo")
+            print("  - Ctrl+S: Save scene")
+
+            # Rebind WASD to CAMERA_MOVE commands
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_FORWARD, key_bindings.keys.W)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_BACKWARD, key_bindings.keys.S)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_LEFT, key_bindings.keys.A)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_RIGHT, key_bindings.keys.D)
+
+            # Rebind Space/Shift for editor camera controls
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_UP, key_bindings.keys.SPACE)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_DOWN, key_bindings.keys.LEFT_SHIFT)
+            key_bindings.rebind_key(InputCommand.CAMERA_SPEED_INCREASE, key_bindings.keys.X)
+
+            # Enable free-fly camera for editor
+            self.camera_controller.enable_free_fly()
+            self.camera_rig = self.camera_controller.rig
+
     def on_update(self, time, frametime):
         """
         Update game logic.
@@ -227,6 +350,15 @@ class Game(mglw.WindowConfig):
                 if light.cast_shadows:
                     light.mark_shadow_dirty()
 
+        # Update tool system (only in LEVEL_EDITOR mode)
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            self.tool_manager.update(frametime, self.camera, self.scene)
+
+        # # Update debug overlay
+        if self.debug_overlay:
+            fps = 1.0 / frametime if frametime > 0 else 0
+            self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene, self.player)
+
         # Update HUD and debug overlay
         if self.player_hud:
             # Animate the health bar for demonstration purposes.
@@ -234,9 +366,6 @@ class Game(mglw.WindowConfig):
             self.player_hud.set_health(oscillating_health, 100.0)
             self.player_hud.update(self.camera, frametime)
 
-        # Update debug overlay (it handles visibility internally)
-        fps = 1.0 / frametime if frametime > 0 else 0
-        self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene)
 
     def on_render(self, time, frametime):
         """
@@ -249,8 +378,33 @@ class Game(mglw.WindowConfig):
         # Update logic
         self.on_update(time, frametime)
 
-        # Render frame
+        # Add tool preview to scene before rendering (if in editor mode)
+        preview_added = False
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            active_tool = self.tool_manager.get_active_tool()
+            if active_tool and hasattr(active_tool, 'preview') and active_tool.preview:
+                if hasattr(active_tool.preview, 'render_to_scene'):
+                    active_tool.preview.render_to_scene(self.scene)
+                    preview_added = True
+
+        # Render frame (includes preview if it was added)
         self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
+
+        # Remove preview from scene after rendering
+        if preview_added:
+            active_tool = self.tool_manager.get_active_tool()
+            if active_tool and hasattr(active_tool, 'preview'):
+                if hasattr(active_tool.preview, 'remove_from_scene'):
+                    active_tool.preview.remove_from_scene(self.scene)
+
+        # Render editor overlays (after main scene, before UI)
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            # Render grid overlay
+            self.grid_overlay.render(
+                self.camera.get_view_matrix(),
+                self.camera.get_projection_matrix(ASPECT_RATIO),
+                self.camera.position
+            )
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """
@@ -261,6 +415,69 @@ class Game(mglw.WindowConfig):
             dx, dy: Mouse delta
         """
         self.input_manager.on_mouse_move(dx, dy)
+
+        # Handle mouse drag for tool operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            # If a mouse button is held, this is a drag operation
+            if self.tool_right_held:
+                # Right-click drag: secondary tool action (usually rotate)
+                self.tool_manager.use_active_tool_secondary(
+                    self.camera,
+                    self.scene,
+                    mouse_held=True,
+                    mouse_delta_x=dx,
+                    mouse_delta_y=dy
+                )
+            elif self.tool_left_held:
+                # Left-click drag: primary tool action (usually move)
+                self.tool_manager.use_active_tool(
+                    self.camera,
+                    self.scene,
+                    mouse_held=True
+                )
+
+    def on_mouse_press_event(self, x: int, y: int, button: int):
+        """
+        Handle mouse button press.
+
+        Args:
+            x, y: Mouse position
+            button: Mouse button (1=left, 2=middle, 3=right)
+        """
+        self.input_manager.on_mouse_button_press(button)
+
+        # Track mouse button state for tool drag operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            if button == 1:  # Left button
+                self.tool_left_held = True
+            elif button == 2:  # Right button
+                self.tool_right_held = True
+
+    def on_mouse_release_event(self, x: int, y: int, button: int):
+        """
+        Handle mouse button release.
+
+        Args:
+            x, y: Mouse position
+            button: Mouse button (1=left, 2=middle, 3=right)
+        """
+        self.input_manager.on_mouse_button_release(button)
+
+        # Handle mouse button release for tool drag operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            active_tool = self.tool_manager.get_active_tool()
+
+            if button == 1:  # Left button
+                self.tool_left_held = False
+                # Finish move operation if tool supports it
+                if active_tool and hasattr(active_tool, 'finish_move'):
+                    active_tool.finish_move()
+
+            elif button == 2:  # Right button
+                self.tool_right_held = False
+                # Finish rotate operation if tool supports it
+                if active_tool and hasattr(active_tool, 'finish_rotate'):
+                    active_tool.finish_rotate()
 
     def resize(self, width: int, height: int):
         """Handle window resize events by updating render targets."""
