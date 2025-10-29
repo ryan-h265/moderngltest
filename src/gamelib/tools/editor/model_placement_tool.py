@@ -6,7 +6,6 @@ Includes model browser, placement preview, and grid snapping.
 """
 
 from typing import Optional, List, Dict, TYPE_CHECKING
-from pathlib import Path
 from pyrr import Vector3
 import math
 from ..tool_base import EditorTool
