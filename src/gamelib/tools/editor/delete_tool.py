@@ -4,7 +4,7 @@ Delete Tool
 Raycast-based tool for deleting objects and lights from the scene.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Dict, TYPE_CHECKING
 from pyrr import Vector3
 from ..tool_base import EditorTool
 from ..editor_history import DeleteObjectOperation, DeleteLightOperation
@@ -35,7 +35,13 @@ class DeleteTool(EditorTool):
         super().__init__(definition)
         self.ctx = ctx
         self.highlighted_object: Optional["SceneObject"] = None
+        self.previous_highlighted_object: Optional["SceneObject"] = None
         self.editor_history = None  # Set by game/editor
+
+        # Highlighting state (store original color and emissive for models)
+        self.highlight_color = (1.0, 1.0, 0.0)  # Yellow highlight for primitives
+        self.original_color: Optional[tuple] = None
+        self.original_emissive_factors: Dict[int, tuple] = {}  # Store original emissive per mesh
 
     def use(self, camera: "Camera", scene: "Scene", **kwargs) -> bool:
         """
@@ -101,10 +107,42 @@ class DeleteTool(EditorTool):
 
         # Update highlighted object (for visual feedback)
         hit = self._raycast_objects(camera, scene)
-        if hit:
-            self.highlighted_object = hit[0]
-        else:
-            self.highlighted_object = None
+        new_highlight = hit[0] if hit else None
+
+        # If highlight changed, update colors/emissive
+        if new_highlight != self.highlighted_object:
+            # Restore previous object's appearance
+            if self.previous_highlighted_object:
+                if hasattr(self.previous_highlighted_object, 'is_model') and self.previous_highlighted_object.is_model:
+                    # Model: restore emissive values
+                    for mesh_idx, original_emissive in self.original_emissive_factors.items():
+                        if mesh_idx < len(self.previous_highlighted_object.meshes):
+                            self.previous_highlighted_object.meshes[mesh_idx].material.emissive_factor = original_emissive
+                    self.original_emissive_factors.clear()
+                else:
+                    # SceneObject: restore color
+                    if self.original_color is not None:
+                        self.previous_highlighted_object.color = self.original_color
+
+            # Apply highlight to new object
+            if new_highlight:
+                if hasattr(new_highlight, 'is_model') and new_highlight.is_model:
+                    # Model: boost emissive to yellow glow
+                    self.original_emissive_factors.clear()
+                    for mesh_idx, mesh in enumerate(new_highlight.meshes):
+                        self.original_emissive_factors[mesh_idx] = mesh.material.emissive_factor
+                        mesh.material.emissive_factor = (1.0, 1.0, 0.0)  # Yellow glow
+                else:
+                    # SceneObject: change color to yellow
+                    self.original_color = new_highlight.color
+                    new_highlight.color = self.highlight_color
+                self.previous_highlighted_object = new_highlight
+            else:
+                self.original_color = None
+                self.original_emissive_factors.clear()
+                self.previous_highlighted_object = None
+
+            self.highlighted_object = new_highlight
 
     def on_equipped(self):
         """Called when tool is equipped."""
@@ -113,7 +151,22 @@ class DeleteTool(EditorTool):
 
     def on_unequipped(self):
         """Called when tool is unequipped."""
+        # Restore appearance of highlighted object
+        if self.previous_highlighted_object:
+            if hasattr(self.previous_highlighted_object, 'is_model') and self.previous_highlighted_object.is_model:
+                # Model: restore emissive values
+                for mesh_idx, original_emissive in self.original_emissive_factors.items():
+                    if mesh_idx < len(self.previous_highlighted_object.meshes):
+                        self.previous_highlighted_object.meshes[mesh_idx].material.emissive_factor = original_emissive
+            else:
+                # SceneObject: restore color
+                if self.original_color is not None:
+                    self.previous_highlighted_object.color = self.original_color
+
         self.highlighted_object = None
+        self.previous_highlighted_object = None
+        self.original_color = None
+        self.original_emissive_factors.clear()
 
     def _raycast_objects(self, camera: "Camera", scene: "Scene") -> Optional[tuple]:
         """
