@@ -4,7 +4,7 @@ Grid Overlay
 Renders a visual grid on surfaces for snapping feedback.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from pyrr import Vector3, Matrix44
 import moderngl
 import numpy as np
