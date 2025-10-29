@@ -23,7 +23,7 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
     # UI
-    PlayerHUD, UIManager, MainMenu, PauseMenu, SettingsMenu, ObjectInspector,
+    PlayerHUD, UIManager, MainMenu, PauseMenu, SettingsMenu, ObjectInspector, ThumbnailMenu,
     # Gameplay
     PlayerCharacter,
     # Input helpers
@@ -36,12 +36,18 @@ from src.gamelib.core.game_state import GameStateManager, GameState
 # New input system
 from src.gamelib.input.input_manager import InputManager
 from src.gamelib.input.controllers import CameraController, PlayerController, RenderingController, ToolController
+from src.gamelib.input.object_selector import ObjectSelector
 
 # Tool system
 from src.gamelib.tools import ToolManager
 from src.gamelib.tools.editor_history import EditorHistory
 from src.gamelib.tools.grid_overlay import GridOverlay
-from src.gamelib.config.settings import PROJECT_ROOT, UI_THEME, UI_PAUSE_DIM_ALPHA
+from src.gamelib.rendering.selection_highlight import SelectionHighlight
+from src.gamelib.config.settings import (
+    PROJECT_ROOT, UI_THEME, UI_PAUSE_DIM_ALPHA,
+    THUMBNAIL_SIZE, THUMBNAIL_VISIBLE_COUNT, BOTTOM_MENU_HEIGHT, TOOL_ICON_SIZE,
+    SELECTION_HIGHLIGHT_COLOR, SELECTION_OUTLINE_SCALE, OBJECT_RAYCAST_RANGE
+)
 
 # Physics
 from src.gamelib.physics import PhysicsWorld
@@ -135,6 +141,12 @@ class Game(mglw.WindowConfig):
         self.settings_menu = SettingsMenu(self.render_pipeline, self.input_manager.key_bindings, self.ui_manager)
         self.object_inspector = ObjectInspector()
         self.pause_menu.settings_menu = self.settings_menu
+
+        # Attribute mode menu and selection (initialized after scene loads)
+        self.thumbnail_menu = None
+        self.object_selector = None
+        self.selection_highlight = None
+        self.attribute_mode_active = False
 
         # Scene will be loaded after main menu selection
         self.scene = None
@@ -272,6 +284,24 @@ class Game(mglw.WindowConfig):
             if self.tool_manager.inventory.get_hotbar_tool(0):
                 self.tool_manager.equip_hotbar_slot(0)
 
+            # Initialize attribute mode components
+            self.thumbnail_menu = ThumbnailMenu(
+                self.tool_manager,
+                thumbnail_size=THUMBNAIL_SIZE,
+                visible_count=THUMBNAIL_VISIBLE_COUNT,
+                bottom_menu_height=BOTTOM_MENU_HEIGHT,
+                tool_icon_size=TOOL_ICON_SIZE,
+            )
+            self.object_selector = ObjectSelector(raycast_range=OBJECT_RAYCAST_RANGE)
+            self.selection_highlight = SelectionHighlight(self.ctx)
+            self.selection_highlight.set_outline_scale(SELECTION_OUTLINE_SCALE)
+
+            # Populate thumbnail menu from scene
+            self.thumbnail_menu.populate_from_scene(self.scene)
+
+            # Attribute mode disabled by default
+            self.attribute_mode_active = False
+
             # Switch input context to gameplay
             self.input_manager.context_manager.set_context(InputContext.GAMEPLAY)
 
@@ -407,6 +437,47 @@ class Game(mglw.WindowConfig):
             self.camera_rig = self.camera_controller.rig
 
     def toggle_attribute_mode(self):
+        """Toggle attribute editing mode (Tab key)."""
+        # Only allow in editor mode
+        if self.input_manager.current_context != InputContext.LEVEL_EDITOR:
+            return
+
+        self.attribute_mode_active = not self.attribute_mode_active
+
+        if self.attribute_mode_active:
+            # Enable attribute mode
+            print("Entered ATTRIBUTE MODE")
+            print("Controls:")
+            print("  - Click objects in scene to select and edit")
+            print("  - Use thumbnail menu to select assets")
+            print("  - WASD: Move camera (mouse look disabled)")
+            print("  - Adjust properties in right panel")
+
+            # Release mouse cursor
+            self.wnd.mouse_exclusivity = False
+            self.wnd.cursor = True
+
+            # Disable camera mouse look (keep WASD movement)
+            if self.camera_controller:
+                self.camera_controller.mouse_look_enabled = False
+        else:
+            # Disable attribute mode
+            print("Exited ATTRIBUTE MODE")
+
+            # Clear selection
+            self.object_selector.deselect()
+            self.selection_highlight.set_selected_object(None)
+            self.object_inspector.set_selected_object(None)
+            self.object_inspector.set_preview_item(None)
+
+            # Restore mouse capture (if in editor and not in attribute mode)
+            # Leave cursor visible for editor comfort
+            self.wnd.mouse_exclusivity = False
+            self.wnd.cursor = True
+
+            # Re-enable camera mouse look
+            if self.camera_controller:
+                self.camera_controller.mouse_look_enabled = True
 
     def on_update(self, time, frametime):
         """
@@ -546,8 +617,37 @@ class Game(mglw.WindowConfig):
                 self.camera.position
             )
 
+            # Render selection highlight in attribute mode
+            if self.attribute_mode_active and self.selection_highlight:
+                self.selection_highlight.render(
+                    self.camera.get_view_matrix(),
+                    self.camera.get_projection_matrix(ASPECT_RATIO)
+                )
+
         # Render pause dim overlay (if paused, before ImGui)
         self.ui_manager.render_pause_overlay()
+
+        # Draw attribute mode menus (editor mode only)
+        if self.attribute_mode_active and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            if self.thumbnail_menu:
+                # Draw thumbnail menu
+                category, item_id, tool_id = self.thumbnail_menu.draw(
+                    int(self.wnd.width), int(self.wnd.height)
+                )
+
+                # Handle thumbnail menu selections
+                if tool_id:
+                    # Tool was clicked - already handled by ThumbnailMenu
+                    pass
+                elif item_id:
+                    # Asset was clicked
+                    asset = self.thumbnail_menu.assets.get(category, [])
+                    for asset_item in asset:
+                        if asset_item.id == item_id:
+                            # Create preview item dict
+                            preview_item = asset_item.to_dict()
+                            self.object_inspector.set_preview_item(preview_item)
+                            break
 
         # Draw object inspector (editor mode)
         if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
@@ -603,6 +703,33 @@ class Game(mglw.WindowConfig):
         self.ui_manager.handle_mouse_button(imgui_button, True)
 
         self.input_manager.on_mouse_button_press(button)
+
+        # Handle object selection in attribute mode
+        if (self.attribute_mode_active and
+            self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR and
+            button == 1 and  # Left click only
+            self.scene and self.object_selector):
+
+            # Check if click is on UI (ImGui captures it)
+            if not self.ui_manager.is_input_captured_by_imgui():
+                # Raycast and select object
+                selected = self.object_selector.select_from_screen_position(
+                    self.camera,
+                    self.scene,
+                    float(x),
+                    float(y),
+                    int(self.wnd.width),
+                    int(self.wnd.height)
+                )
+
+                if selected:
+                    # Update inspector to show selected object
+                    self.object_inspector.set_selected_object(selected)
+                    self.selection_highlight.set_selected_object(selected)
+                else:
+                    # Deselect if clicking on empty space
+                    self.object_inspector.set_selected_object(None)
+                    self.selection_highlight.set_selected_object(None)
 
         # Track mouse button state for tool drag operations
         if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
