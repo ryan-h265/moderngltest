@@ -5,9 +5,10 @@ Multi-purpose tool for selecting, moving, rotating, and deleting scene objects.
 Supports both continuous drag operations and discrete transformations.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Dict, TYPE_CHECKING
 from pyrr import Vector3, Quaternion
 import math
+import numpy as np
 from ..tool_base import EditorTool
 from ..editor_history import (
     MoveObjectOperation,
@@ -54,6 +55,7 @@ class ObjectEditorTool(EditorTool):
         # Selection state
         self.selected_object: Optional["SceneObject"] = None
         self.highlighted_object: Optional["SceneObject"] = None
+        self.previous_highlighted_object: Optional["SceneObject"] = None
 
         # Move operation state
         self.is_moving: bool = False
@@ -65,6 +67,11 @@ class ObjectEditorTool(EditorTool):
         self.rotate_start_angle: float = 0.0
         self.rotate_original_rotation: Optional[Quaternion] = None
         self.cumulative_rotation: float = 0.0
+
+        # Highlighting state (store original color and emissive for models)
+        self.highlight_color = (1.0, 1.0, 0.0)  # Yellow highlight for primitives
+        self.original_color: Optional[tuple] = None
+        self.original_emissive_factors: Dict[int, tuple] = {}  # Store original emissive per mesh
 
     def use(self, camera: "Camera", scene: "Scene", **kwargs) -> bool:
         """
@@ -162,16 +169,50 @@ class ObjectEditorTool(EditorTool):
         # Update highlighted object (for visual feedback)
         if not self.is_moving and not self.is_rotating:
             hit = self._raycast_objects(camera, scene)
-            if hit:
-                self.highlighted_object = hit[0]
-            else:
-                self.highlighted_object = None
+            new_highlight = hit[0] if hit else None
+
+            # If highlight changed, update colors/emissive
+            if new_highlight != self.highlighted_object:
+                # Restore previous object's appearance
+                if self.previous_highlighted_object:
+                    if hasattr(self.previous_highlighted_object, 'is_model') and self.previous_highlighted_object.is_model:
+                        # Model: restore emissive values
+                        for mesh_idx, original_emissive in self.original_emissive_factors.items():
+                            if mesh_idx < len(self.previous_highlighted_object.meshes):
+                                self.previous_highlighted_object.meshes[mesh_idx].material.emissive_factor = original_emissive
+                        self.original_emissive_factors.clear()
+                    else:
+                        # SceneObject: restore color
+                        if self.original_color is not None:
+                            self.previous_highlighted_object.color = self.original_color
+
+                # Apply highlight to new object
+                if new_highlight:
+                    if hasattr(new_highlight, 'is_model') and new_highlight.is_model:
+                        # Model: boost emissive to yellow glow
+                        self.original_emissive_factors.clear()
+                        for mesh_idx, mesh in enumerate(new_highlight.meshes):
+                            self.original_emissive_factors[mesh_idx] = mesh.material.emissive_factor
+                            mesh.material.emissive_factor = (1.0, 1.0, 0.0)  # Yellow glow
+                    else:
+                        # SceneObject: change color to yellow
+                        self.original_color = new_highlight.color
+                        new_highlight.color = self.highlight_color
+                    self.previous_highlighted_object = new_highlight
+                else:
+                    self.original_color = None
+                    self.original_emissive_factors.clear()
+                    self.previous_highlighted_object = None
+
+                self.highlighted_object = new_highlight
 
     def finish_move(self):
         """Finish move operation and record in history."""
-        if self.is_moving and self.selected_object and self.move_original_position:
+        if self.is_moving and self.selected_object and self.move_original_position is not None:
             # Check if object actually moved
-            if not Vector3(self.selected_object.position).allclose(self.move_original_position, atol=0.001):
+            current_pos = np.array(self.selected_object.position)
+            original_pos = np.array(self.move_original_position)
+            if not np.allclose(current_pos, original_pos, atol=0.001):
                 # Record move operation for undo/redo
                 if self.editor_history:
                     operation = MoveObjectOperation(
@@ -281,8 +322,23 @@ class ObjectEditorTool(EditorTool):
         if self.is_rotating:
             self.finish_rotate()
 
+        # Restore appearance of highlighted object
+        if self.previous_highlighted_object:
+            if hasattr(self.previous_highlighted_object, 'is_model') and self.previous_highlighted_object.is_model:
+                # Model: restore emissive values
+                for mesh_idx, original_emissive in self.original_emissive_factors.items():
+                    if mesh_idx < len(self.previous_highlighted_object.meshes):
+                        self.previous_highlighted_object.meshes[mesh_idx].material.emissive_factor = original_emissive
+            else:
+                # SceneObject: restore color
+                if self.original_color is not None:
+                    self.previous_highlighted_object.color = self.original_color
+
         self.selected_object = None
         self.highlighted_object = None
+        self.previous_highlighted_object = None
+        self.original_color = None
+        self.original_emissive_factors.clear()
 
     def _update_move(self, camera: "Camera", scene: "Scene"):
         """

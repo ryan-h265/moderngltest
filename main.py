@@ -169,6 +169,10 @@ class Game(mglw.WindowConfig):
         # Debug overlay
         self.debug_overlay = DebugOverlay(self.render_pipeline) if DEBUG_OVERLAY_ENABLED else None
 
+        # Mouse button state tracking for tool drag operations
+        self.tool_left_held = False
+        self.tool_right_held = False
+
         # Time tracking
         self.time = 0.0
 
@@ -221,6 +225,11 @@ class Game(mglw.WindowConfig):
             # Return to gameplay mode
             context_manager.set_context(InputContext.GAMEPLAY)
             self.grid_overlay.set_visible(False)
+
+            # Reset tool drag state
+            self.tool_left_held = False
+            self.tool_right_held = False
+
             print("Entered GAMEPLAY mode")
 
             # Rebind WASD back to PLAYER_MOVE commands
@@ -372,6 +381,26 @@ class Game(mglw.WindowConfig):
         """
         self.input_manager.on_mouse_move(dx, dy)
 
+        # Handle mouse drag for tool operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            # If a mouse button is held, this is a drag operation
+            if self.tool_right_held:
+                # Right-click drag: secondary tool action (usually rotate)
+                self.tool_manager.use_active_tool_secondary(
+                    self.camera,
+                    self.scene,
+                    mouse_held=True,
+                    mouse_delta_x=dx,
+                    mouse_delta_y=dy
+                )
+            elif self.tool_left_held:
+                # Left-click drag: primary tool action (usually move)
+                self.tool_manager.use_active_tool(
+                    self.camera,
+                    self.scene,
+                    mouse_held=True
+                )
+
     def on_mouse_press_event(self, x: int, y: int, button: int):
         """
         Handle mouse button press.
@@ -382,6 +411,13 @@ class Game(mglw.WindowConfig):
         """
         self.input_manager.on_mouse_button_press(button)
 
+        # Track mouse button state for tool drag operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            if button == 1:  # Left button
+                self.tool_left_held = True
+            elif button == 2:  # Right button
+                self.tool_right_held = True
+
     def on_mouse_release_event(self, x: int, y: int, button: int):
         """
         Handle mouse button release.
@@ -391,6 +427,22 @@ class Game(mglw.WindowConfig):
             button: Mouse button (1=left, 2=middle, 3=right)
         """
         self.input_manager.on_mouse_button_release(button)
+
+        # Handle mouse button release for tool drag operations
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            active_tool = self.tool_manager.get_active_tool()
+
+            if button == 1:  # Left button
+                self.tool_left_held = False
+                # Finish move operation if tool supports it
+                if active_tool and hasattr(active_tool, 'finish_move'):
+                    active_tool.finish_move()
+
+            elif button == 2:  # Right button
+                self.tool_right_held = False
+                # Finish rotate operation if tool supports it
+                if active_tool and hasattr(active_tool, 'finish_rotate'):
+                    active_tool.finish_rotate()
 
     def resize(self, width: int, height: int):
         """Handle window resize events by updating render targets."""
