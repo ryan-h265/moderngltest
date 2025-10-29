@@ -17,7 +17,6 @@ from ...input.input_commands import InputCommand
 if TYPE_CHECKING:
     from ...core.camera import Camera
     from ...core.scene import Scene
-    from ...loaders.model import Model
     from ..tool_definition import ToolDefinition
 
 
