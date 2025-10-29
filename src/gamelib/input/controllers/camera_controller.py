@@ -17,6 +17,10 @@ class CameraController:
         self.rig: CameraRig = rig or FreeFlyRig(camera)
         self.free_fly_mode = isinstance(self.rig, FreeFlyRig)
 
+        # Speed modifier for editor mode
+        self.speed_multiplier = 1.0
+        self.base_speed = camera.speed
+
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -27,6 +31,7 @@ class CameraController:
         self.input_manager.register_handler(InputCommand.CAMERA_MOVE_UP, self.move_up)
         self.input_manager.register_handler(InputCommand.CAMERA_MOVE_DOWN, self.move_down)
         self.input_manager.register_handler(InputCommand.CAMERA_LOOK, self.rotate)
+        self.input_manager.register_handler(InputCommand.CAMERA_SPEED_INCREASE, self.set_speed_boost)
         self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_MOUSE, self.toggle_mouse_capture)
 
     # ------------------------------------------------------------------
@@ -50,41 +55,51 @@ class CameraController:
     def move_forward(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position += self.camera._front * movement
 
     def move_backward(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position -= self.camera._front * movement
 
     def move_left(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position -= self.camera._right * movement
 
     def move_right(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position += self.camera._right * movement
 
     def move_up(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position.y += movement
 
     def move_down(self, delta_time: float) -> None:
         if not self.free_fly_mode:
             return
-        movement = self.camera.speed * delta_time
+        movement = self.camera.speed * self.speed_multiplier * delta_time
         self.camera.position.y -= movement
 
     def rotate(self, dx: float, dy: float) -> None:
         self.rig.apply_look_input(dx, dy)
+
+    def set_speed_boost(self, delta_time: float) -> None:
+        """
+        Apply speed boost for camera movement while key is held.
+        When held, camera moves 2x faster.
+
+        Args:
+            delta_time: Time delta (unused, but required for continuous commands)
+        """
+        self.speed_multiplier = 5.0
 
     def toggle_mouse_capture(self):
         return self.input_manager.toggle_mouse_capture()

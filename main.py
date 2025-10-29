@@ -211,12 +211,26 @@ class Game(mglw.WindowConfig):
         """Toggle between GAMEPLAY and LEVEL_EDITOR contexts."""
         context_manager = self.input_manager.context_manager
         current_context = context_manager.current_context
+        key_bindings = self.input_manager.key_bindings
 
         if current_context == InputContext.LEVEL_EDITOR:
             # Return to gameplay mode
             context_manager.set_context(InputContext.GAMEPLAY)
             self.grid_overlay.set_visible(False)
             print("Entered GAMEPLAY mode")
+
+            # Rebind WASD back to PLAYER_MOVE commands
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_FORWARD, key_bindings.keys.W)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_BACKWARD, key_bindings.keys.S)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_LEFT, key_bindings.keys.A)
+            key_bindings.rebind_key(InputCommand.PLAYER_MOVE_RIGHT, key_bindings.keys.D)
+
+            # Rebind Space and Shift back to player actions
+            key_bindings.rebind_key(InputCommand.PLAYER_JUMP, key_bindings.keys.SPACE)
+            key_bindings.rebind_key(InputCommand.PLAYER_SPRINT, key_bindings.keys.LEFT_SHIFT)
+
+            # Reset camera speed multiplier
+            self.camera_controller.speed_multiplier = 1.0
 
             # Restore appropriate camera rig
             new_rig = self._create_camera_rig()
@@ -231,10 +245,26 @@ class Game(mglw.WindowConfig):
             print("Entered LEVEL EDITOR mode")
             print("Controls:")
             print("  - Tab: Return to gameplay")
+            print("  - WASD: Move camera")
+            print("  - Space: Move camera up")
+            print("  - Shift: Move camera down")
+            print("  - X (hold): Double camera speed")
+            print("  - Mouse: Look around")
             print("  - 1-9: Select tools")
             print("  - G: Toggle grid snapping")
             print("  - Ctrl+Z/Y: Undo/Redo")
             print("  - Ctrl+S: Save scene")
+
+            # Rebind WASD to CAMERA_MOVE commands
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_FORWARD, key_bindings.keys.W)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_BACKWARD, key_bindings.keys.S)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_LEFT, key_bindings.keys.A)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_RIGHT, key_bindings.keys.D)
+
+            # Rebind Space/Shift for editor camera controls
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_UP, key_bindings.keys.SPACE)
+            key_bindings.rebind_key(InputCommand.CAMERA_MOVE_DOWN, key_bindings.keys.LEFT_SHIFT)
+            key_bindings.rebind_key(InputCommand.CAMERA_SPEED_INCREASE, key_bindings.keys.X)
 
             # Enable free-fly camera for editor
             self.camera_controller.enable_free_fly()
@@ -308,7 +338,8 @@ class Game(mglw.WindowConfig):
             # Render grid overlay
             self.grid_overlay.render(
                 self.camera.get_view_matrix(),
-                self.camera.get_projection_matrix()
+                self.camera.get_projection_matrix(ASPECT_RATIO),
+                self.camera.position
             )
 
             # Render tool previews (e.g., ModelPlacementTool preview)

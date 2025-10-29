@@ -163,6 +163,7 @@ class InputContextManager:
                 InputCommand.CAMERA_LOOK,
                 InputCommand.CAMERA_ZOOM_IN,
                 InputCommand.CAMERA_ZOOM_OUT,
+                InputCommand.CAMERA_SPEED_INCREASE,
 
                 # Tool commands
                 InputCommand.TOOL_USE,

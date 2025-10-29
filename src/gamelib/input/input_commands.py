@@ -33,6 +33,9 @@ class InputCommand(Enum):
     CAMERA_ZOOM_IN = auto()
     CAMERA_ZOOM_OUT = auto()
 
+    # Camera Speed (for editor mode)
+    CAMERA_SPEED_INCREASE = auto()
+
     # ========================================================================
     # Player Movement (Physics-driven character controller)
     # ========================================================================
@@ -200,6 +203,7 @@ COMMAND_TYPES = {
     InputCommand.CAMERA_LOOK: InputType.AXIS,
     InputCommand.CAMERA_ZOOM_IN: InputType.CONTINUOUS,
     InputCommand.CAMERA_ZOOM_OUT: InputType.CONTINUOUS,
+    InputCommand.CAMERA_SPEED_INCREASE: InputType.CONTINUOUS,
 
     # Player movement
     InputCommand.PLAYER_MOVE_FORWARD: InputType.CONTINUOUS,

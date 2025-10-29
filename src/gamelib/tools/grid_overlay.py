@@ -24,14 +24,14 @@ class GridOverlay:
     - Fades at distance
     """
 
-    def __init__(self, ctx: moderngl.Context, grid_size: float = 1.0, grid_extent: int = 50):
+    def __init__(self, ctx: moderngl.Context, grid_size: float = 1.0, grid_extent: int = 500):
         """
         Initialize grid overlay.
 
         Args:
             ctx: ModernGL context
             grid_size: Size of each grid cell
-            grid_extent: Number of grid lines in each direction from center
+            grid_extent: Number of grid lines in each direction from center (default 500 for near-infinite coverage)
         """
         self.ctx = ctx
         self.grid_size = grid_size
@@ -41,14 +41,14 @@ class GridOverlay:
         # Generate grid geometry
         self._generate_grid_geometry()
 
-        # Create shader program (simple line shader)
+        # Create shader program (simple line shader with distance fade)
         self._create_shader_program()
 
     def _generate_grid_geometry(self):
-        """Generate grid line vertices."""
+        """Generate grid line vertices with much larger extent."""
         vertices = []
 
-        # Calculate grid bounds
+        # Calculate grid bounds - much larger extent for visible grid
         half_extent = self.grid_extent * self.grid_size
 
         # Vertical lines (along Z axis)
@@ -111,13 +111,14 @@ class GridOverlay:
             [(self.vbo, '3f', 'in_position')]
         )
 
-    def render(self, view_matrix: Matrix44, projection_matrix: Matrix44):
+    def render(self, view_matrix: Matrix44, projection_matrix: Matrix44, camera_pos: Vector3 | None = None):
         """
         Render the grid overlay.
 
         Args:
             view_matrix: Camera view matrix
             projection_matrix: Camera projection matrix
+            camera_pos: Camera position (optional, not used in simple shader)
         """
         if not self.visible:
             return
@@ -130,20 +131,17 @@ class GridOverlay:
         self.program['mvp'].write(mvp.astype('f4').tobytes())
         self.program['grid_color'].value = (0.5, 0.5, 0.5, 0.3)  # Semi-transparent gray
 
-        # Enable blending for transparency
+        # Save and modify GL state for grid rendering
         self.ctx.enable(moderngl.BLEND)
-        old_blend_func = self.ctx.blend_func
         self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
-
-        # Disable depth writing (but keep depth testing)
-        self.ctx.depth_mask = False
+        self.ctx.depth_mask = False  # Don't write to depth buffer
 
         # Render grid lines
         self.vao.render(moderngl.LINES)
 
-        # Restore render state
-        self.ctx.depth_mask = True
-        self.ctx.blend_func = old_blend_func
+        # Restore GL state
+        self.ctx.disable(moderngl.BLEND)
+        self.ctx.depth_mask = True  # Re-enable depth writing
 
     def set_visible(self, visible: bool):
         """
