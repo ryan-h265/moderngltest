@@ -177,11 +177,18 @@ class GridOverlay:
         self.grid_extent = extent
         self._generate_grid_geometry()
 
-    def __del__(self):
-        """Clean up resources."""
+    def close(self):
+        """Explicitly release GL resources."""
         if hasattr(self, 'vbo'):
             self.vbo.release()
         if hasattr(self, 'vao'):
             self.vao.release()
         if hasattr(self, 'program'):
             self.program.release()
+
+    def __del__(self):
+        """Destructor: attempt to release resources safely."""
+        try:
+            self.close()
+        except Exception:
+            pass
