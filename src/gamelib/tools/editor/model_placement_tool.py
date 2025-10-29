@@ -12,6 +12,7 @@ import math
 from ..tool_base import EditorTool
 from ..placement_preview import PlacementPreview
 from ..editor_history import PlaceObjectOperation
+from ...input.input_commands import InputCommand
 
 if TYPE_CHECKING:
     from ...core.camera import Camera
@@ -50,6 +51,7 @@ class ModelPlacementTool(EditorTool):
         super().__init__(definition)
         self.ctx = ctx
         self.editor_history = None  # Set by game/editor
+        self.input_manager = None  # Set by game when tool is equipped
 
         # Preview system
         self.preview = PlacementPreview(ctx) if ctx else None
@@ -309,10 +311,28 @@ class ModelPlacementTool(EditorTool):
         if self.preview:
             self.preview.visible = True
 
+        # Register model cycling input handlers (if input manager is available)
+        # The input manager is typically set by the game when the tool controller is initialized
+        if self.input_manager:
+            self.input_manager.register_handler(InputCommand.TOOL_MODEL_NEXT, self.select_next_model)
+            self.input_manager.register_handler(InputCommand.TOOL_MODEL_PREVIOUS, self.select_previous_model)
+
     def on_unequipped(self):
         """Called when tool is unequipped."""
         if self.preview:
             self.preview.hide()
+
+        # Unregister input handlers when tool is switched away
+        if self.input_manager:
+            # Clear handlers for these commands (only this tool's handlers)
+            # Note: This approach works because each tool registers its own handlers
+            try:
+                # Remove the handlers
+                self.input_manager.unregister_handler(InputCommand.TOOL_MODEL_NEXT)
+                self.input_manager.unregister_handler(InputCommand.TOOL_MODEL_PREVIOUS)
+            except (AttributeError, KeyError):
+                # Input manager might not have unregister method, that's ok
+                pass
 
     def render_preview(self, program, textured_program=None):
         """

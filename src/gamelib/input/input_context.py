@@ -170,6 +170,8 @@ class InputContextManager:
                 InputCommand.TOOL_USE_SECONDARY,
                 InputCommand.TOOL_NEXT,
                 InputCommand.TOOL_PREVIOUS,
+                InputCommand.TOOL_MODEL_NEXT,
+                InputCommand.TOOL_MODEL_PREVIOUS,
                 InputCommand.TOOL_CANCEL,
                 InputCommand.TOOL_HOTBAR_1,
                 InputCommand.TOOL_HOTBAR_2,

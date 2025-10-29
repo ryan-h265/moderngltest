@@ -105,9 +105,11 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.NUMBER_8] = InputCommand.TOOL_HOTBAR_8  # 8
         self.keyboard_bindings[self.keys.NUMBER_9] = InputCommand.TOOL_HOTBAR_9  # 9
 
-        # Tool cycling (for ModelPlacementTool model selection)
-        self.keyboard_bindings[self.keys.LEFT_BRACKET] = InputCommand.TOOL_PREVIOUS  # [
-        self.keyboard_bindings[self.keys.RIGHT_BRACKET] = InputCommand.TOOL_NEXT     # ]
+        # Tool model selection (for ModelPlacementTool and other tools with model libraries)
+        # Note: These keys cycle through models within a tool, not between tools
+        # On most keyboards: [ and ] (not Shift+[ and Shift+] which are { and })
+        self.keyboard_bindings[self.keys.LEFT_BRACKET] = InputCommand.TOOL_MODEL_PREVIOUS  # [
+        self.keyboard_bindings[self.keys.RIGHT_BRACKET] = InputCommand.TOOL_MODEL_NEXT     # ]
 
         # Editor commands
         self.keyboard_bindings[self.keys.TAB] = InputCommand.EDITOR_TOGGLE_MODE      # Tab

@@ -145,6 +145,10 @@ class Game(mglw.WindowConfig):
             if hasattr(tool, 'lights_list'):
                 tool.lights_list = self.lights
 
+            # Set input manager (for tools that need to register input handlers)
+            if hasattr(tool, 'input_manager'):
+                tool.input_manager = self.input_manager
+
         # Create tool controller
         self.tool_controller = ToolController(
             self.tool_manager,

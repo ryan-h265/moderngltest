@@ -188,14 +188,22 @@ class ToolManager:
     def next_tool(self):
         """Cycle to next tool in hotbar (scroll wheel up)."""
         next_slot = self.inventory.find_next_hotbar_slot(self.active_slot, direction=1)
+        print(next_slot)
         if next_slot is not None:
             self.equip_hotbar_slot(next_slot)
+            print(f"Equipped next tool: {self.active_tool.name}")
+        else:
+            print("No next tool found in hotbar.")
 
     def previous_tool(self):
         """Cycle to previous tool in hotbar (scroll wheel down)."""
         prev_slot = self.inventory.find_next_hotbar_slot(self.active_slot, direction=-1)
+        print(prev_slot)
         if prev_slot is not None:
             self.equip_hotbar_slot(prev_slot)
+            print(f"Equipped previous tool: {self.active_tool.name}")
+        else:
+            print("No previous tool found in hotbar.")
 
     def use_active_tool(self, camera: "Camera", scene: "Scene", **kwargs) -> bool:
         """

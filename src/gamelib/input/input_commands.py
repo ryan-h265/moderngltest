@@ -160,7 +160,6 @@ class InputCommand(Enum):
     TOOL_HOTBAR_8 = auto()           # Select hotbar slot 8
     TOOL_HOTBAR_9 = auto()           # Select hotbar slot 9
 
-    # ========================================================================
     # Level Editor Commands
     # ========================================================================
     EDITOR_UNDO = auto()             # Undo last action (Ctrl+Z)
@@ -174,6 +173,12 @@ class InputCommand(Enum):
     EDITOR_DELETE = auto()           # Delete selected object (Delete/Backspace)
     EDITOR_DUPLICATE = auto()        # Duplicate selected object (Ctrl+D)
     EDITOR_OPEN_BROWSER = auto()     # Open model/asset browser (B)
+
+    # ========================================================================
+    # Tool-Specific Model Selection (ModelPlacementTool)
+    # ========================================================================
+    TOOL_MODEL_NEXT = auto()         # Cycle to next model in tool library ([)
+    TOOL_MODEL_PREVIOUS = auto()     # Cycle to previous model in tool library (])
 
 
 class InputType(Enum):
@@ -266,6 +271,10 @@ COMMAND_TYPES = {
     InputCommand.EDITOR_DELETE: InputType.INSTANT,
     InputCommand.EDITOR_DUPLICATE: InputType.INSTANT,
     InputCommand.EDITOR_OPEN_BROWSER: InputType.INSTANT,
+
+    # Tool model selection
+    InputCommand.TOOL_MODEL_NEXT: InputType.INSTANT,
+    InputCommand.TOOL_MODEL_PREVIOUS: InputType.INSTANT,
 }
 
 
