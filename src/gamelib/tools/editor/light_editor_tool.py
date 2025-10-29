@@ -45,6 +45,7 @@ class LightEditorTool(EditorTool):
         super().__init__(definition)
         self.ctx = ctx
         self.editor_history = None  # Set by game/editor
+        self.render_pipeline = None  # Set by game/editor
 
         # Lights list reference (set by game/editor)
         self.lights_list: Optional[List["Light"]] = None
@@ -110,11 +111,14 @@ class LightEditorTool(EditorTool):
 
         # Record in history
         if self.editor_history:
-            operation = PlaceLightOperation(new_light, self.lights_list)
+            operation = PlaceLightOperation(new_light, self.lights_list, self.render_pipeline, camera)
             self.editor_history.execute(operation, scene)
         else:
             # Direct add
             self.lights_list.append(new_light)
+            # Initialize shadow map for the new light
+            if self.render_pipeline:
+                self.render_pipeline.initialize_lights([new_light], camera)
 
         print(f"Placed {self.light_type} light at {light_position}")
         self._start_use()

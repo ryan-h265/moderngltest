@@ -161,6 +161,10 @@ class Game(mglw.WindowConfig):
             if hasattr(tool, 'lights_list'):
                 tool.lights_list = self.lights
 
+            # Set render_pipeline for shadow map initialization
+            if hasattr(tool, 'render_pipeline'):
+                tool.render_pipeline = self.render_pipeline
+
             # Set input manager (for tools that need to register input handlers)
             if hasattr(tool, 'input_manager'):
                 tool.input_manager = self.input_manager

@@ -209,21 +209,28 @@ class ScaleObjectOperation(EditorOperation):
 class PlaceLightOperation(EditorOperation):
     """Place a new light in the scene."""
 
-    def __init__(self, light: "Light", lights_list: List["Light"]):
+    def __init__(self, light: "Light", lights_list: List["Light"], render_pipeline=None, camera=None):
         """
         Initialize place light operation.
 
         Args:
             light: Light to place
             lights_list: Reference to scene's lights list
+            render_pipeline: Reference to RenderPipeline for shadow map initialization
+            camera: Camera for adaptive shadow resolution
         """
         self.light = light
         self.lights_list = lights_list
+        self.render_pipeline = render_pipeline
+        self.camera = camera
         self.was_placed = False
 
     def execute(self, scene: "Scene") -> bool:
-        """Add light to lights list."""
+        """Add light to lights list and initialize shadow map."""
         self.lights_list.append(self.light)
+        # Initialize shadow map for the new light
+        if self.render_pipeline:
+            self.render_pipeline.initialize_lights([self.light], self.camera)
         self.was_placed = True
         return True
 
