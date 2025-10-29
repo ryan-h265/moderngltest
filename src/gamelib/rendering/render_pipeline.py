@@ -86,6 +86,9 @@ class RenderPipeline:
         # Forward transparent shader (for alpha BLEND mode)
         self.shader_manager.load_program("transparent", "forward_transparent.vert", "forward_transparent.frag")
 
+        # Editor preview shader (lightweight ambient lighting for placement preview)
+        self.shader_manager.load_program("preview", "preview.vert", "preview.frag")
+
         # Debug visualization shader
         self.shader_manager.load_program("light_debug", "light_debug.vert", "light_debug.frag")
 

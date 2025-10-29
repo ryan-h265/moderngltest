@@ -305,7 +305,7 @@ class ModelPlacementTool(EditorTool):
         print(f"  - Left click: Place model")
         print(f"  - Right click + drag: Rotate")
         print(f"  - R: Rotate 45°")
-        print(f"  - [ / ]: Cycle models")
+        print(f"  - , / .: Cycle models")
         print(f"  - G: Toggle grid snap")
 
         if self.preview:
@@ -334,16 +334,20 @@ class ModelPlacementTool(EditorTool):
                 # Input manager might not have unregister method, that's ok
                 pass
 
-    def render_preview(self, program, textured_program=None):
+    def render_preview(self, program, textured_program=None, preview_program=None, camera=None, lights=None, shadow_maps=None):
         """
         Render placement preview.
 
         Args:
-            program: Shader program for primitives
-            textured_program: Shader program for textured models
+            program: Shader program for primitives (unused, kept for compatibility)
+            textured_program: Shader program for textured models (unused, kept for compatibility)
+            preview_program: Lightweight preview shader program
+            camera: Camera object for preview rendering
+            lights: Unused (preview uses ambient lighting only)
+            shadow_maps: Unused (preview uses ambient lighting only)
         """
         if self.preview:
-            self.preview.render(program, textured_program)
+            self.preview.render(program, textured_program, preview_program, camera=camera)
 
     def get_current_model_name(self) -> str:
         """Get the name of the currently selected model."""

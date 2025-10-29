@@ -231,7 +231,7 @@ Once integrated, the tool system works as follows:
    - **Right click + drag**: Rotate preview/object
    - **R**: Rotate 45° (discrete)
    - **G**: Toggle grid snapping
-   - **[ / ]**: Cycle models (ModelPlacementTool)
+   - **, / .**: Cycle models (ModelPlacementTool)
 4. Press **Ctrl+Z/Y** for undo/redo
 5. Press **Ctrl+S** to save scene
 6. Press **Tab** to return to GAMEPLAY mode

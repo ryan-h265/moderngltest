@@ -334,8 +334,24 @@ class Game(mglw.WindowConfig):
         # Update logic
         self.on_update(time, frametime)
 
-        # Render frame
+        # Add tool preview to scene before rendering (if in editor mode)
+        preview_added = False
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            active_tool = self.tool_manager.get_active_tool()
+            if active_tool and hasattr(active_tool, 'preview') and active_tool.preview:
+                if hasattr(active_tool.preview, 'render_to_scene'):
+                    active_tool.preview.render_to_scene(self.scene)
+                    preview_added = True
+
+        # Render frame (includes preview if it was added)
         self.render_pipeline.render_frame(self.scene, self.camera, self.lights, time=time)
+
+        # Remove preview from scene after rendering
+        if preview_added:
+            active_tool = self.tool_manager.get_active_tool()
+            if active_tool and hasattr(active_tool, 'preview'):
+                if hasattr(active_tool.preview, 'remove_from_scene'):
+                    active_tool.preview.remove_from_scene(self.scene)
 
         # Render editor overlays (after main scene, before UI)
         if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
@@ -345,22 +361,6 @@ class Game(mglw.WindowConfig):
                 self.camera.get_projection_matrix(ASPECT_RATIO),
                 self.camera.position
             )
-
-            # Render tool previews (e.g., ModelPlacementTool preview)
-            active_tool = self.tool_manager.get_active_tool()
-            if active_tool and hasattr(active_tool, 'render_preview'):
-                # Get shader programs from render pipeline
-                # Note: render_preview needs primitive and textured shaders
-                # This is a placeholder - may need adjustment based on RenderPipeline structure
-                try:
-                    active_tool.render_preview(
-                        self.render_pipeline.geometry_renderer.program,
-                        self.render_pipeline.geometry_renderer.textured_program
-                    )
-                except AttributeError:
-                    # If shaders aren't accessible this way, tool preview won't render
-                    # Can be fixed later when we know the exact RenderPipeline structure
-                    pass
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """

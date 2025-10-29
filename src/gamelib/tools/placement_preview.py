@@ -81,13 +81,15 @@ class PlacementPreview:
         """Hide the preview."""
         self.visible = False
 
-    def render(self, program, textured_program=None):
+    def render_to_scene(self, scene: "Scene"):
         """
-        Render the preview with color tint and transparency.
+        Add preview model to scene for rendering via normal pipeline.
+
+        This is the simplest approach - let the main rendering pipeline
+        handle the preview just like any other object.
 
         Args:
-            program: Shader program for primitives
-            textured_program: Optional shader program for textured models
+            scene: Scene to add preview model to
         """
         if not self.visible:
             return
@@ -95,100 +97,77 @@ class PlacementPreview:
         if self.model is None and self.scene_object is None:
             return
 
-        # Enable blending for transparency
-        self.ctx.enable(moderngl.BLEND)
-        old_blend_func = self.ctx.blend_func
-        self.ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
-
-        # Disable depth writing (but keep depth testing)
-        self.ctx.depth_mask = False
-
-        # Set color tint (green if valid, red if invalid)
-        if self.is_valid:
-            tint_color = Vector3([0.2, 1.0, 0.2])  # Green
-        else:
-            tint_color = Vector3([1.0, 0.2, 0.2])  # Red
-
-        # Render model or scene object
+        # Temporarily add preview to scene with modified alpha/color
         if self.model:
-            self._render_model(program, textured_program, tint_color)
-        elif self.scene_object:
-            self._render_scene_object(program, tint_color)
+            # Add model to scene with reduced alpha for transparency
+            self.model.position = Vector3(self.position)
+            self.model.rotation = self.rotation
+            self.model.scale = Vector3(self.scale)
 
-        # Restore render state
-        self.ctx.depth_mask = True
-        self.ctx.blend_func = old_blend_func
-
-    def _render_model(self, program, textured_program, tint_color: Vector3):
-        """
-        Render a Model with preview tint.
-
-        Args:
-            program: Primitive shader program
-            textured_program: Textured shader program
-            tint_color: RGB tint color
-        """
-        # Create transform matrix
-        transform = Matrix44.from_translation(self.position)
-
-        # Apply rotation (yaw, pitch, roll)
-        if self.rotation is not None:
-            from pyrr import Quaternion
-            quat = Quaternion.from_eulers(self.rotation)
-            transform = transform * Matrix44.from_quaternion(quat)
-
-        # Apply scale
-        if self.scale is not None:
-            transform = transform * Matrix44.from_scale(self.scale)
-
-        # Render each mesh
-        for mesh in self.model.meshes:
-            # Use textured program if available and mesh has textures
-            if textured_program and mesh.material.base_color_texture:
-                active_program = textured_program
+            # Determine tint color based on validity
+            if self.is_valid:
+                tint_color = Vector3([0.2, 1.0, 0.2])  # Green for valid
             else:
-                active_program = program
+                tint_color = Vector3([1.0, 0.2, 0.2])  # Red for invalid
 
-            # Set tint uniform if shader supports it
-            if 'previewTint' in active_program:
-                active_program['previewTint'].value = tuple(tint_color) + (self.alpha,)
+            # Store original colors to restore later
+            original_colors = []
+            for mesh in self.model.meshes:
+                if hasattr(mesh.material, 'base_color_factor'):
+                    original_colors.append(mesh.material.base_color_factor)
+                    # Multiply the base color by the tint color
+                    current_color = mesh.material.base_color_factor
+                    tinted = Vector3([
+                        current_color[0] * tint_color[0],
+                        current_color[1] * tint_color[1],
+                        current_color[2] * tint_color[2]
+                    ])
+                    # Keep alpha at 0.5 for semi-transparency
+                    mesh.material.base_color_factor = (tinted[0], tinted[1], tinted[2], 0.5)
 
-            # Render mesh
-            mesh.render(active_program, parent_transform=transform, ctx=self.ctx)
+                    # Store the original color for restoration
+                    self._original_colors = original_colors
+                else:
+                    original_colors.append(None)
 
-    def _render_scene_object(self, program, tint_color: Vector3):
+                # Set alpha mode to BLEND for transparency
+                if hasattr(mesh.material, 'alpha_mode'):
+                    mesh.material.alpha_mode = 2  # BLEND mode
+
+            # Add to scene (caller will render and then remove)
+            scene.add_object(self.model)
+
+        elif self.scene_object:
+            # For primitives, modify color
+            if self.is_valid:
+                self.scene_object.color = (0.2, 1.0, 0.2)  # Green
+            else:
+                self.scene_object.color = (1.0, 0.2, 0.2)  # Red
+
+            # Add to scene
+            scene.add_object(self.scene_object)
+
+    def remove_from_scene(self, scene: "Scene"):
         """
-        Render a SceneObject with preview tint.
+        Remove preview model from scene after rendering.
 
         Args:
-            program: Shader program
-            tint_color: RGB tint color
+            scene: Scene to remove preview model from
         """
-        # Create transform matrix
-        transform = Matrix44.from_translation(self.position)
+        if self.model:
+            # Restore original colors before removing
+            if hasattr(self, '_original_colors'):
+                for i, mesh in enumerate(self.model.meshes):
+                    if i < len(self._original_colors) and self._original_colors[i] is not None:
+                        if hasattr(mesh.material, 'base_color_factor'):
+                            mesh.material.base_color_factor = self._original_colors[i]
 
-        # Apply rotation
-        if self.rotation is not None:
-            from pyrr import Quaternion
-            quat = Quaternion.from_eulers(self.rotation)
-            transform = transform * Matrix44.from_quaternion(quat)
+            if self.model in scene.objects:
+                scene.objects.remove(self.model)
 
-        # Apply scale
-        if self.scale is not None:
-            transform = transform * Matrix44.from_scale(self.scale)
-
-        # Set uniforms
-        if 'model' in program:
-            program['model'].write(transform.astype('f4').tobytes())
-
-        # Set color with tint and transparency
-        if 'object_color' in program:
-            color = Vector3(self.scene_object.color) * tint_color
-            # Note: Shader would need to support alpha for full transparency
-            program['object_color'].write(color.astype('f4').tobytes())
-
-        # Render geometry
-        self.scene_object.geometry.render(program)
+        elif self.scene_object:
+            if self.scene_object in scene.objects:
+                scene.objects.remove(self.scene_object)
 
     def get_transform_matrix(self) -> Matrix44:
         """
