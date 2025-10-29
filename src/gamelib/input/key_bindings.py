@@ -83,6 +83,7 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.SYSTEM_TOGGLE_MOUSE  # ESC
         self.keyboard_bindings[self.keys.F1] = InputCommand.SYSTEM_SCREENSHOT    # F1
         self.keyboard_bindings[self.keys.F2] = InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA  # F2
+        self.keyboard_bindings[self.keys.F3] = InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY  # F3
         self.keyboard_bindings[self.keys.F4] = InputCommand.SYSTEM_TOGGLE_DEBUG  # F4
         # self.keyboard_bindings[self.keys.F5] = InputCommand.SYSTEM_QUICK_SAVE  # F5
         self.keyboard_bindings[self.keys.T] = InputCommand.SYSTEM_TOGGLE_SSAO   # T

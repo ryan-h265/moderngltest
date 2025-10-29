@@ -36,20 +36,40 @@ class DebugOverlay:
     Collects engine statistics and updates TextManager with formatted output.
     """
 
-    def __init__(self, pipeline: "RenderPipeline"):
+    def __init__(self, pipeline: "RenderPipeline", visible: bool = True):
         """
         Initialize debug overlay.
 
         Args:
             pipeline: RenderPipeline for accessing text manager and render stats
+            visible: Initial visibility state
         """
         self.pipeline = pipeline
         self.text_manager = pipeline.text_manager
         self.text_ids = []  # Track text IDs for updates
+        self._visible = visible
 
         # Frame time tracking for averaging
         self.frame_times = []
         self.max_frame_samples = 60  # Average over 60 frames
+
+    @property
+    def visible(self) -> bool:
+        """Get visibility state."""
+        return self._visible
+
+    @visible.setter
+    def visible(self, value: bool):
+        """Set visibility state."""
+        if value != self._visible:
+            self._visible = value
+            if not value:
+                # Clear display when hiding
+                self.clear()
+
+    def toggle(self):
+        """Toggle visibility on/off."""
+        self.visible = not self._visible
 
     def update(self, fps: float, frametime: float, camera: Camera,
                lights: List[Light], scene: Optional[Scene] = None, player: Optional["PlayerCharacter"] = None):
@@ -64,6 +84,10 @@ class DebugOverlay:
             scene: Optional scene for object count
             player: Optional PlayerCharacter for movement debugging
         """
+        # Don't update if not visible
+        if not self._visible:
+            return
+
         # Track frame times
         self.frame_times.append(frametime * 1000)  # Convert to ms
         if len(self.frame_times) > self.max_frame_samples:
@@ -142,7 +166,7 @@ class DebugOverlay:
 
         # Controls hint
         lines.append("")
-        lines.append("ESC: Release mouse | T: Toggle SSAO")
+        lines.append("F3: Toggle overlay | ESC: Release mouse | T: Toggle SSAO")
 
         return lines
 

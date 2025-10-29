@@ -5,7 +5,7 @@ ModernGL 3D Engine - Main Entry Point
 A modular 3D game engine with multi-light shadow mapping.
 """
 
-from __future__ import annotations
+import math
 
 import logging
 
@@ -22,6 +22,8 @@ from src.gamelib import (
     CameraRig, FreeFlyRig, FirstPersonRig, ThirdPersonRig,
     # Rendering
     RenderPipeline,
+    # UI
+    PlayerHUD,
     # Gameplay
     PlayerCharacter,
     # Input helpers
@@ -45,7 +47,7 @@ from src.gamelib.physics import PhysicsWorld
 
 # Debug overlay
 from src.gamelib.debug import DebugOverlay
-from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED
+from src.gamelib.config.settings import DEBUG_OVERLAY_ENABLED, HUD_ENABLED
 
 
 logger = logging.getLogger(__name__)
@@ -84,9 +86,8 @@ class Game(mglw.WindowConfig):
 
         # Rendering pipeline and controllers
         self.render_pipeline = RenderPipeline(self.ctx, self.wnd)
-        self.rendering_controller = RenderingController(self.render_pipeline, self.input_manager)
 
-        # Physics world (optional if PyBullet missing)
+        # Setup physics world (PyBullet)
         try:
             self.physics_world = PhysicsWorld()
         except RuntimeError as exc:  # pragma: no cover - environment dependent
@@ -118,6 +119,21 @@ class Game(mglw.WindowConfig):
         if self.player is not None:
             self.scene.add_object(self.player.model)
 
+        # Setup HUD
+        if HUD_ENABLED:
+            self.player_hud = PlayerHUD(self.render_pipeline)
+            self.player_hud.set_health(86, 100)
+            self.player_hud.set_minimap_status("no map")
+            self.player_hud.set_equipped_tool("None")
+            self.player_hud.set_hints([
+                "WASD to move",
+                "Space to jump",
+            ])
+        else:
+            self.player_hud = None
+
+        # Time tracking
+        self.time = 0
         self.camera_rig: CameraRig = self._create_camera_rig()
         self.camera_controller = CameraController(self.camera, self.input_manager, rig=self.camera_rig)
         self.player_controller = PlayerController(self.player, self.input_manager) if self.player else None
@@ -166,8 +182,15 @@ class Game(mglw.WindowConfig):
         # Register editor mode toggle
         self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
 
-        # Debug overlay
-        self.debug_overlay = DebugOverlay(self.render_pipeline) if DEBUG_OVERLAY_ENABLED else None
+        # Setup debug overlay (always create, but respect initial visibility setting)
+        self.debug_overlay = DebugOverlay(self.render_pipeline, visible=DEBUG_OVERLAY_ENABLED)
+
+        # Setup rendering controller for SSAO toggle, debug overlay, etc.
+        self.rendering_controller = RenderingController(
+            self.render_pipeline,
+            self.input_manager,
+            debug_overlay=self.debug_overlay
+        )
 
         # Mouse button state tracking for tool drag operations
         self.tool_left_held = False
@@ -327,10 +350,18 @@ class Game(mglw.WindowConfig):
         if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             self.tool_manager.update(frametime, self.camera, self.scene)
 
-        # Update debug overlay
+        # # Update debug overlay
         if self.debug_overlay:
             fps = 1.0 / frametime if frametime > 0 else 0
             self.debug_overlay.update(fps, frametime, self.camera, self.lights, self.scene, self.player)
+
+        # Update HUD and debug overlay
+        if self.player_hud:
+            # Animate the health bar for demonstration purposes.
+            oscillating_health = 70.0 + 30.0 * (0.5 + 0.5 * math.sin(time * 0.35))
+            self.player_hud.set_health(oscillating_health, 100.0)
+            self.player_hud.update(self.camera, frametime)
+
 
     def on_render(self, time, frametime):
         """
