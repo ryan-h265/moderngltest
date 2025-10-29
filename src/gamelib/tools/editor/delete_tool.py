@@ -7,7 +7,7 @@ Raycast-based tool for deleting objects and lights from the scene.
 from typing import Optional, Dict, TYPE_CHECKING
 from pyrr import Vector3
 from ..tool_base import EditorTool
-from ..editor_history import DeleteObjectOperation, DeleteLightOperation
+from ..editor_history import DeleteObjectOperation
 
 if TYPE_CHECKING:
     from ...core.camera import Camera
