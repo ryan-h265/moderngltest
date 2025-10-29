@@ -277,22 +277,17 @@ class ObjectEditorTool(EditorTool):
 
         print(f"Rotated {self.selected_object.name} by {angle_degrees}°")
 
-    def delete_selected(self):
+    def delete_selected(self, scene: "Scene"):
         """Delete the currently selected object."""
         if not self.selected_object:
             print("No object selected")
             return
 
-        # Record delete operation
+        # Record and execute delete operation
         if self.editor_history:
-            from ...core.scene import Scene
             operation = DeleteObjectOperation(self.selected_object)
-            # Note: Scene will be passed when executing
-            self.editor_history.undo_stack.append(operation)
-            # Execute delete
-            if self.selected_object in scene.objects:
-                scene.objects.remove(self.selected_object)
-                print(f"Deleted: {self.selected_object.name}")
+            self.editor_history.execute(operation, scene)
+            print(f"Deleted: {self.selected_object.name}")
 
         self.selected_object = None
 
