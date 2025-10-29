@@ -6,7 +6,7 @@ Uses command pattern to track and reverse editor actions.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, TYPE_CHECKING, Any, Optional
+from typing import List, TYPE_CHECKING, Optional
 from pyrr import Vector3
 import copy
 
