@@ -113,7 +113,8 @@ class KeyBindings:
         self.keyboard_bindings[self.keys.PERIOD] = InputCommand.TOOL_MODEL_NEXT
 
         # Editor commands
-        self.keyboard_bindings[self.keys.TAB] = InputCommand.EDITOR_TOGGLE_MODE      # Tab
+        self.keyboard_bindings[self.keys.ENTER] = InputCommand.EDITOR_TOGGLE_MODE
+        self.keyboard_bindings[self.keys.TAB] = InputCommand.EDITOR_ATTRIBUTE_MODE
         self.keyboard_bindings[self.keys.G] = InputCommand.EDITOR_TOGGLE_GRID        # G
         self.keyboard_bindings[self.keys.R] = InputCommand.EDITOR_ROTATE_CW          # R
         self.keyboard_bindings[self.keys.DELETE] = InputCommand.EDITOR_DELETE        # Delete

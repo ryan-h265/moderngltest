@@ -14,7 +14,9 @@ from imgui.integrations.opengl import ProgrammablePipelineRenderer
 import moderngl
 
 from ..input.input_context import InputContext, InputContextManager
+from ..config.settings import UI_PAUSE_DIM_ALPHA
 from .theme import ThemeManager
+from ..rendering.pause_effects import PauseEffects
 
 if TYPE_CHECKING:
     from ..input.input_manager import InputManager
@@ -61,6 +63,10 @@ class UIManager:
 
         # Theme system
         self.theme_manager = ThemeManager(theme_name)
+
+        # Pause effects (dim overlay)
+        self.pause_effects = PauseEffects(ctx, window_size)
+        self.dim_alpha = UI_PAUSE_DIM_ALPHA
 
         # UI state
         self.is_paused = False
@@ -133,6 +139,7 @@ class UIManager:
         self.window_size = (width, height)
         io = imgui.get_io()
         io.display_size = (width, height)
+        self.pause_effects.resize(width, height)
 
     def pause_game(self) -> None:
         """Pause the game and show pause menu."""
@@ -199,8 +206,14 @@ class UIManager:
         imgui.render()
         self.renderer.render(imgui.get_draw_data())
 
+    def render_pause_overlay(self) -> None:
+        """Render dim overlay when paused."""
+        if self.is_paused:
+            self.pause_effects.render_dim_overlay(self.dim_alpha)
+
     def shutdown(self) -> None:
         """Clean up ImGui resources."""
+        self.pause_effects.shutdown()
         self.renderer.shutdown()
 
     def switch_theme(self, theme_name: str) -> None:

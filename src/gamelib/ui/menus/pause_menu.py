@@ -27,7 +27,9 @@ class PauseMenu:
         self.scene_manager = scene_manager
         self.show = False
         self.show_scene_picker = False
+        self.show_settings = False
         self.selected_scene: Optional[str] = None
+        self.settings_menu = None  # Will be set by main.py
 
     def draw(
         self, screen_width: int, screen_height: int
@@ -100,8 +102,9 @@ class PauseMenu:
 
         # Settings button
         if imgui.button("Settings", button_width, button_height):
-            imgui.end()
-            return self.show, "settings"
+            if self.settings_menu:
+                self.settings_menu.show = True
+            self.show_settings = True
 
         if button_x > 0:
             imgui.set_cursor_pos_x(button_x)
@@ -131,6 +134,12 @@ class PauseMenu:
                     # Scene was selected
                     self.show = False
                     return False, action
+
+        # Draw settings menu if shown
+        if self.show_settings and self.settings_menu:
+            show_settings, action = self.settings_menu.draw(screen_width, screen_height)
+            if not show_settings:
+                self.show_settings = False
 
         return self.show, None
 

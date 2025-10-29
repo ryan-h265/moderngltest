@@ -168,7 +168,8 @@ class InputCommand(Enum):
     EDITOR_SAVE_SCENE = auto()       # Save scene to JSON (Ctrl+S)
     EDITOR_LOAD_SCENE = auto()       # Load scene from JSON (Ctrl+O)
     EDITOR_TOGGLE_GRID = auto()      # Toggle grid snapping (G)
-    EDITOR_TOGGLE_MODE = auto()      # Toggle GAMEPLAY ↔ LEVEL_EDITOR (Tab)
+    EDITOR_TOGGLE_MODE = auto()      # Toggle GAMEPLAY ↔ LEVEL_EDITOR (Enter)
+    EDITOR_ATTRIBUTE_MODE = auto()   # Toggle attribute edit mode (Tab)
     EDITOR_ROTATE_CW = auto()        # Rotate object clockwise (R)
     EDITOR_ROTATE_CCW = auto()       # Rotate object counter-clockwise (Shift+R)
     EDITOR_DELETE = auto()           # Delete selected object (Delete/Backspace)
@@ -268,6 +269,7 @@ COMMAND_TYPES = {
     InputCommand.EDITOR_LOAD_SCENE: InputType.INSTANT,
     InputCommand.EDITOR_TOGGLE_GRID: InputType.INSTANT,
     InputCommand.EDITOR_TOGGLE_MODE: InputType.INSTANT,
+    InputCommand.EDITOR_ATTRIBUTE_MODE: InputType.INSTANT,
     InputCommand.EDITOR_ROTATE_CW: InputType.INSTANT,
     InputCommand.EDITOR_ROTATE_CCW: InputType.INSTANT,
     InputCommand.EDITOR_DELETE: InputType.INSTANT,

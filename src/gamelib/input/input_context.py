@@ -123,7 +123,6 @@ class InputContextManager:
 
                 # Editor mode toggle (to enter LEVEL_EDITOR mode)
                 InputCommand.EDITOR_TOGGLE_MODE,
-
             },
 
             # ================================================================
@@ -148,6 +147,7 @@ class InputContextManager:
 
                 # Editor mode toggle (to enter LEVEL_EDITOR mode from debug)
                 InputCommand.EDITOR_TOGGLE_MODE,
+                InputCommand.EDITOR_ATTRIBUTE_MODE,
             },
 
             # ================================================================
@@ -191,6 +191,7 @@ class InputContextManager:
                 InputCommand.EDITOR_LOAD_SCENE,
                 InputCommand.EDITOR_TOGGLE_GRID,
                 InputCommand.EDITOR_TOGGLE_MODE,
+                InputCommand.EDITOR_ATTRIBUTE_MODE,
                 InputCommand.EDITOR_ROTATE_CW,
                 InputCommand.EDITOR_ROTATE_CCW,
                 InputCommand.EDITOR_DELETE,
@@ -220,9 +221,10 @@ class InputContextManager:
                 InputCommand.UI_TAB_PREVIOUS,
                 InputCommand.UI_CLOSE,
 
-                # System
+                # System (can pause/unpause from menu)
                 InputCommand.SYSTEM_SCREENSHOT,
                 InputCommand.SYSTEM_TOGGLE_DEBUG,
+                InputCommand.SYSTEM_PAUSE,
             },
 
             # ================================================================

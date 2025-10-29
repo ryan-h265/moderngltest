@@ -23,7 +23,7 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
     # UI
-    PlayerHUD, UIManager, MainMenu, PauseMenu,
+    PlayerHUD, UIManager, MainMenu, PauseMenu, SettingsMenu, ObjectInspector,
     # Gameplay
     PlayerCharacter,
     # Input helpers
@@ -132,6 +132,9 @@ class Game(mglw.WindowConfig):
         # Initialize menus
         self.main_menu = MainMenu(self.scene_manager)
         self.pause_menu = PauseMenu(self.scene_manager)
+        self.settings_menu = SettingsMenu(self.render_pipeline, self.input_manager.key_bindings, self.ui_manager)
+        self.object_inspector = ObjectInspector()
+        self.pause_menu.settings_menu = self.settings_menu
 
         # Scene will be loaded after main menu selection
         self.scene = None
@@ -175,6 +178,8 @@ class Game(mglw.WindowConfig):
 
         # Register editor mode toggle
         self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
+
+        self.input_manager.register_handler(InputCommand.EDITOR_ATTRIBUTE_MODE, self.toggle_attribute_mode)
 
     def _on_game_state_changed(self, old_state: GameState, new_state: GameState):
         """Called when game state changes."""
@@ -401,6 +406,8 @@ class Game(mglw.WindowConfig):
             self.camera_controller.enable_free_fly()
             self.camera_rig = self.camera_controller.rig
 
+    def toggle_attribute_mode(self):
+
     def on_update(self, time, frametime):
         """
         Update game logic.
@@ -538,6 +545,13 @@ class Game(mglw.WindowConfig):
                 self.camera.get_projection_matrix(ASPECT_RATIO),
                 self.camera.position
             )
+
+        # Render pause dim overlay (if paused, before ImGui)
+        self.ui_manager.render_pause_overlay()
+
+        # Draw object inspector (editor mode)
+        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+            self.object_inspector.draw(int(self.wnd.width), int(self.wnd.height))
 
         # End ImGui frame and render
         self.ui_manager.end_frame()
