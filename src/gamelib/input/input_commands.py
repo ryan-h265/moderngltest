@@ -243,7 +243,7 @@ COMMAND_TYPES = {
     InputCommand.BUILD_MODE_TOGGLE: InputType.TOGGLE,
 
     # Tool commands (instant unless continuous action)
-    InputCommand.TOOL_USE: InputType.CONTINUOUS,  # Can be held down for continuous use
+    InputCommand.TOOL_USE: InputType.INSTANT,  # Single click to place/use tool
     InputCommand.TOOL_USE_SECONDARY: InputType.CONTINUOUS,  # Can be held (e.g., rotate)
     InputCommand.TOOL_RELOAD: InputType.INSTANT,
     InputCommand.TOOL_NEXT: InputType.INSTANT,

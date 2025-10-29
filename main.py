@@ -372,6 +372,26 @@ class Game(mglw.WindowConfig):
         """
         self.input_manager.on_mouse_move(dx, dy)
 
+    def on_mouse_press_event(self, x: int, y: int, button: int):
+        """
+        Handle mouse button press.
+
+        Args:
+            x, y: Mouse position
+            button: Mouse button (1=left, 2=middle, 3=right)
+        """
+        self.input_manager.on_mouse_button_press(button)
+
+    def on_mouse_release_event(self, x: int, y: int, button: int):
+        """
+        Handle mouse button release.
+
+        Args:
+            x, y: Mouse position
+            button: Mouse button (1=left, 2=middle, 3=right)
+        """
+        self.input_manager.on_mouse_button_release(button)
+
     def resize(self, width: int, height: int):
         """Handle window resize events by updating render targets."""
         super().resize(width, height)
