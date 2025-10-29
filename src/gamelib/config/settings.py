@@ -401,3 +401,16 @@ HUD_SECTION_ORDER = (
     "health",
     "compass",  # Furthest from anchor
 )
+
+# ============================================================================
+# UI Settings (ImGui)
+# ============================================================================
+
+# ImGui theme to use
+UI_THEME = "sage_green"  # Options: "sage_green", "dark", "light", "cyberpunk"
+
+# UI scaling (auto-scales with resolution)
+UI_SCALE_FACTOR = 1.0
+
+# Menu background dimming when paused
+UI_PAUSE_DIM_ALPHA = 0.6  # Opacity of dim overlay (0.0-1.0)

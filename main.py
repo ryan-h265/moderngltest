@@ -23,7 +23,7 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
     # UI
-    PlayerHUD,
+    PlayerHUD, UIManager, MainMenu, PauseMenu,
     # Gameplay
     PlayerCharacter,
     # Input helpers
@@ -31,6 +31,7 @@ from src.gamelib import (
     InputCommand,
 )
 from src.gamelib.core.skybox import Skybox
+from src.gamelib.core.game_state import GameStateManager, GameState
 
 # New input system
 from src.gamelib.input.input_manager import InputManager
@@ -40,7 +41,7 @@ from src.gamelib.input.controllers import CameraController, PlayerController, Re
 from src.gamelib.tools import ToolManager
 from src.gamelib.tools.editor_history import EditorHistory
 from src.gamelib.tools.grid_overlay import GridOverlay
-from src.gamelib.config.settings import PROJECT_ROOT
+from src.gamelib.config.settings import PROJECT_ROOT, UI_THEME, UI_PAUSE_DIM_ALPHA
 
 # Physics
 from src.gamelib.physics import PhysicsWorld
@@ -79,9 +80,9 @@ class Game(mglw.WindowConfig):
         # Input system
         self.input_manager = InputManager(self.wnd.keys)
 
-        # Capture mouse by default
-        self.wnd.mouse_exclusivity = True
-        self.wnd.cursor = False
+        # Release mouse for menus
+        self.wnd.mouse_exclusivity = False
+        self.wnd.cursor = True
         self.wnd.exit_key = self.wnd.keys.Q
 
         # Rendering pipeline and controllers
@@ -94,97 +95,66 @@ class Game(mglw.WindowConfig):
             logger.warning("Physics world disabled: %s", exc)
             self.physics_world = None
 
+        # Game state management
+        self.game_state = GameStateManager(physics_world=self.physics_world)
+        self.game_state.register_state_change_callback(self._on_game_state_changed)
+
+        # UI Manager (ImGui)
+        self.ui_manager = UIManager(self.ctx, self.wnd.size, theme_name=UI_THEME)
+        self.ui_manager.set_input_manager(self.input_manager)
+
         # Scene management
         self.scene_manager = SceneManager(
             self.ctx,
             self.render_pipeline,
             physics_world=self.physics_world,
         )
-        self.scene_manager.register_scene("default", "assets/scenes/default_scene.json")
-        self.scene_manager.register_scene("donut_terrain", "assets/scenes/donut_terrain_scene.json")
-        # self.scene_manager.register_scene("fractal_mountainous", "assets/scenes/fractal_terrain_scene.json")
-        self.scene_manager.register_scene("incline_test", "assets/scenes/incline_test_scene.json")
+        # Register scenes with metadata
+        self.scene_manager.register_scene(
+            "default",
+            "assets/scenes/default_scene.json",
+            display_name="Default Scene",
+            description="Basic test scene",
+        )
+        self.scene_manager.register_scene(
+            "donut_terrain",
+            "assets/scenes/donut_terrain_scene.json",
+            display_name="Donut Terrain",
+            description="Procedural donut-shaped terrain with physics",
+        )
+        self.scene_manager.register_scene(
+            "incline_test",
+            "assets/scenes/incline_test_scene.json",
+            display_name="Incline Test",
+            description="Test scene for slope physics",
+        )
 
-        loaded_scene = self.scene_manager.load("donut_terrain", camera=self.camera)
-        self.scene = loaded_scene.scene
-        self.lights = loaded_scene.lights
+        # Initialize menus
+        self.main_menu = MainMenu(self.scene_manager)
+        self.pause_menu = PauseMenu(self.scene_manager)
 
-        # Skybox
-        skybox = Skybox.aurora(self.ctx, name="Aurora Skybox")
-        skybox.intensity = 1.0
-        self.scene.set_skybox(skybox)
-
-        # Player character and controllers
-        self.player = self._spawn_player()
-        if self.player is not None:
-            self.scene.add_object(self.player.model)
-
-        # Setup HUD
-        if HUD_ENABLED:
-            self.player_hud = PlayerHUD(self.render_pipeline)
-            self.player_hud.set_health(86, 100)
-            self.player_hud.set_minimap_status("no map")
-            self.player_hud.set_equipped_tool("None")
-            self.player_hud.set_hints([
-                "WASD to move",
-                "Space to jump",
-            ])
-        else:
-            self.player_hud = None
+        # Scene will be loaded after main menu selection
+        self.scene = None
+        self.lights = []
+        self.player = None
+        self.player_hud = None
 
         # Time tracking
-        self.time = 0
-        self.camera_rig: CameraRig = self._create_camera_rig()
-        self.camera_controller = CameraController(self.camera, self.input_manager, rig=self.camera_rig)
-        self.player_controller = PlayerController(self.player, self.input_manager) if self.player else None
+        self.time = 0.0
+        self.camera_rig = None
+        self.camera_controller = None
+        self.player_controller = None
 
-        # Toggle for debug camera context
-        self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
+        # Tool system (initialized after scene loads)
+        self.tool_manager = None
+        self.editor_history = None
+        self.grid_overlay = None
+        self.tool_controller = None
+        self.tool_left_held = False
+        self.tool_right_held = False
 
-        # Tool system initialization
-        self.tool_manager = ToolManager(self.ctx)
-        self.editor_history = EditorHistory(max_history=100)
-        self.grid_overlay = GridOverlay(self.ctx, grid_size=1.0, grid_extent=50)
-        self.grid_overlay.set_visible(False)  # Hidden by default
-
-        # Load tools from JSON
-        tools_path = PROJECT_ROOT / "assets/config/tools/editor_tools.json"
-        self.tool_manager.load_tools_from_json(tools_path)
-
-        # Configure editor tools with scene references
-        for tool in self.tool_manager.tools.values():
-            # Set editor history for undo/redo
-            if hasattr(tool, 'editor_history'):
-                tool.editor_history = self.editor_history
-
-            # For LightEditorTool, set lights list reference
-            if hasattr(tool, 'lights_list'):
-                tool.lights_list = self.lights
-
-            # Set render_pipeline for shadow map initialization
-            if hasattr(tool, 'render_pipeline'):
-                tool.render_pipeline = self.render_pipeline
-
-            # Set input manager (for tools that need to register input handlers)
-            if hasattr(tool, 'input_manager'):
-                tool.input_manager = self.input_manager
-
-        # Create tool controller
-        self.tool_controller = ToolController(
-            self.tool_manager,
-            self.input_manager,
-            self.camera,
-            self.scene
-        )
-        self.tool_controller.editor_history = self.editor_history
-        self.tool_controller.lights = self.lights  # For scene saving
-
-        # Start with first tool equipped (if available)
-        if self.tool_manager.inventory.get_hotbar_tool(0):
-            self.tool_manager.equip_hotbar_slot(0)
-
-        # Register editor mode toggle
-        self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
+        # Register pause command
+        self.input_manager.register_handler(InputCommand.SYSTEM_PAUSE, self.toggle_pause)
 
         # Setup debug overlay (always create, but respect initial visibility setting)
         self.debug_overlay = DebugOverlay(self.render_pipeline, visible=DEBUG_OVERLAY_ENABLED)
@@ -196,12 +166,133 @@ class Game(mglw.WindowConfig):
             debug_overlay=self.debug_overlay
         )
 
-        # Mouse button state tracking for tool drag operations
-        self.tool_left_held = False
-        self.tool_right_held = False
+        # Show main menu
+        self.game_state.set_state(GameState.MAIN_MENU)
+        self.ui_manager.show_main_menu_screen()
 
-        # Time tracking
-        self.time = 0.0
+        # Toggle for debug camera context
+        self.input_manager.register_handler(InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA, self.toggle_debug_camera)
+
+        # Register editor mode toggle
+        self.input_manager.register_handler(InputCommand.EDITOR_TOGGLE_MODE, self.toggle_editor_mode)
+
+    def _on_game_state_changed(self, old_state: GameState, new_state: GameState):
+        """Called when game state changes."""
+        if new_state == GameState.PLAYING:
+            # Capture mouse and hide cursor
+            self.wnd.mouse_exclusivity = True
+            self.wnd.cursor = False
+        elif new_state == GameState.PAUSED:
+            # Release mouse and show cursor
+            self.wnd.mouse_exclusivity = False
+            self.wnd.cursor = True
+        elif new_state == GameState.MAIN_MENU:
+            # Release mouse for menu
+            self.wnd.mouse_exclusivity = False
+            self.wnd.cursor = True
+
+    def _load_scene_from_menu(self, scene_id: str) -> bool:
+        """
+        Load a scene after selection from main menu.
+
+        Args:
+            scene_id: ID of scene to load
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            loaded_scene = self.scene_manager.load(scene_id, camera=self.camera)
+            self.scene = loaded_scene.scene
+            self.lights = loaded_scene.lights
+
+            # Skybox
+            skybox = Skybox.aurora(self.ctx, name="Aurora Skybox")
+            skybox.intensity = 1.0
+            self.scene.set_skybox(skybox)
+
+            # Player character and controllers
+            self.player = self._spawn_player()
+            if self.player is not None:
+                self.scene.add_object(self.player.model)
+
+            # Setup HUD
+            if HUD_ENABLED:
+                self.player_hud = PlayerHUD(self.render_pipeline)
+                self.player_hud.set_health(86, 100)
+                self.player_hud.set_minimap_status("no map")
+                self.player_hud.set_equipped_tool("None")
+                self.player_hud.set_hints([
+                    "WASD to move",
+                    "Space to jump",
+                ])
+
+            # Create camera rig and controllers
+            self.camera_rig = self._create_camera_rig()
+            self.camera_controller = CameraController(self.camera, self.input_manager, rig=self.camera_rig)
+            self.player_controller = PlayerController(self.player, self.input_manager) if self.player else None
+
+            # Tool system initialization
+            self.tool_manager = ToolManager(self.ctx)
+            self.editor_history = EditorHistory(max_history=100)
+            self.grid_overlay = GridOverlay(self.ctx, grid_size=1.0, grid_extent=50)
+            self.grid_overlay.set_visible(False)  # Hidden by default
+
+            # Load tools from JSON
+            tools_path = PROJECT_ROOT / "assets/config/tools/editor_tools.json"
+            self.tool_manager.load_tools_from_json(tools_path)
+
+            # Configure editor tools with scene references
+            for tool in self.tool_manager.tools.values():
+                if hasattr(tool, 'editor_history'):
+                    tool.editor_history = self.editor_history
+                if hasattr(tool, 'lights_list'):
+                    tool.lights_list = self.lights
+                if hasattr(tool, 'render_pipeline'):
+                    tool.render_pipeline = self.render_pipeline
+                if hasattr(tool, 'input_manager'):
+                    tool.input_manager = self.input_manager
+
+            # Create tool controller
+            self.tool_controller = ToolController(
+                self.tool_manager,
+                self.input_manager,
+                self.camera,
+                self.scene
+            )
+            self.tool_controller.editor_history = self.editor_history
+            self.tool_controller.lights = self.lights
+
+            # Start with first tool equipped
+            if self.tool_manager.inventory.get_hotbar_tool(0):
+                self.tool_manager.equip_hotbar_slot(0)
+
+            # Switch input context to gameplay
+            self.input_manager.context_manager.set_context(InputContext.GAMEPLAY)
+
+            self.game_state.set_state(GameState.PLAYING)
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load scene '{scene_id}': {e}")
+            return False
+
+    def toggle_pause(self):
+        """Toggle pause state."""
+        if self.game_state.is_playing():
+            self.game_state.pause()
+            self.ui_manager.pause_game()
+            self.pause_menu.show = True
+            # Release mouse for menu interaction
+            self.wnd.mouse_exclusivity = False
+            self.wnd.cursor = True
+        elif self.game_state.is_paused():
+            self.game_state.resume()
+            self.ui_manager.resume_game()
+            self.pause_menu.show = False
+            # Capture mouse for gameplay
+            self.wnd.mouse_exclusivity = True
+            self.wnd.cursor = False
 
     def _spawn_player(self) -> PlayerCharacter | None:
         if self.physics_world is None:
@@ -323,6 +414,24 @@ class Game(mglw.WindowConfig):
         # Update input system (processes continuous commands + mouse movement)
         self.input_manager.update(frametime)
 
+        # Handle main menu
+        if self.game_state.is_in_menu():
+            show_menu, selected_scene = self.main_menu.draw(
+                int(self.wnd.width), int(self.wnd.height)
+            )
+            if selected_scene:
+                # Scene selected from menu
+                self._load_scene_from_menu(selected_scene)
+            elif not show_menu:
+                # Exit requested
+                raise SystemExit(0)
+            return
+
+        # Skip gameplay updates if no scene loaded
+        if self.scene is None:
+            return
+
+        # Gameplay updates
         if self.player_controller is not None:
             self.player_controller.update()
 
@@ -351,8 +460,22 @@ class Game(mglw.WindowConfig):
                     light.mark_shadow_dirty()
 
         # Update tool system (only in LEVEL_EDITOR mode)
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             self.tool_manager.update(frametime, self.camera, self.scene)
+
+        # Handle pause menu
+        if self.game_state.is_paused():
+            show_pause, action = self.pause_menu.draw(
+                int(self.wnd.width), int(self.wnd.height)
+            )
+            if action == "resume":
+                self.toggle_pause()
+            elif action == "main_menu":
+                self.game_state.return_to_main_menu()
+                self.ui_manager.show_main_menu_screen()
+            elif action == "exit":
+                raise SystemExit(0)
+            return
 
         # # Update debug overlay
         if self.debug_overlay:
@@ -375,12 +498,22 @@ class Game(mglw.WindowConfig):
             time: Total elapsed time (seconds)
             frametime: Time since last frame (seconds)
         """
+        # Start ImGui frame
+        self.ui_manager.start_frame()
+
         # Update logic
         self.on_update(time, frametime)
 
+        # Skip rendering if in main menu
+        if self.game_state.is_in_menu() or self.scene is None:
+            # Just render the menu with ImGui
+            self.ui_manager.end_frame()
+            self.ui_manager.render()
+            return
+
         # Add tool preview to scene before rendering (if in editor mode)
         preview_added = False
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             active_tool = self.tool_manager.get_active_tool()
             if active_tool and hasattr(active_tool, 'preview') and active_tool.preview:
                 if hasattr(active_tool.preview, 'render_to_scene'):
@@ -398,13 +531,17 @@ class Game(mglw.WindowConfig):
                     active_tool.preview.remove_from_scene(self.scene)
 
         # Render editor overlays (after main scene, before UI)
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             # Render grid overlay
             self.grid_overlay.render(
                 self.camera.get_view_matrix(),
                 self.camera.get_projection_matrix(ASPECT_RATIO),
                 self.camera.position
             )
+
+        # End ImGui frame and render
+        self.ui_manager.end_frame()
+        self.ui_manager.render()
 
     def on_mouse_position_event(self, _x: int, _y: int, dx: int, dy: int):
         """
@@ -414,10 +551,13 @@ class Game(mglw.WindowConfig):
             _x, _y: Absolute mouse position (unused)
             dx, dy: Mouse delta
         """
+        # Update ImGui mouse position
+        self.ui_manager.handle_mouse_position(_x, _y)
+
         self.input_manager.on_mouse_move(dx, dy)
 
         # Handle mouse drag for tool operations
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             # If a mouse button is held, this is a drag operation
             if self.tool_right_held:
                 # Right-click drag: secondary tool action (usually rotate)
@@ -444,10 +584,14 @@ class Game(mglw.WindowConfig):
             x, y: Mouse position
             button: Mouse button (1=left, 2=middle, 3=right)
         """
+        # Map button numbers: 1=left, 2=right, 3=middle to ImGui: 0=left, 1=right, 2=middle
+        imgui_button = button - 1 if button > 0 else 0
+        self.ui_manager.handle_mouse_button(imgui_button, True)
+
         self.input_manager.on_mouse_button_press(button)
 
         # Track mouse button state for tool drag operations
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             if button == 1:  # Left button
                 self.tool_left_held = True
             elif button == 2:  # Right button
@@ -461,10 +605,14 @@ class Game(mglw.WindowConfig):
             x, y: Mouse position
             button: Mouse button (1=left, 2=middle, 3=right)
         """
+        # Map button numbers: 1=left, 2=right, 3=middle to ImGui: 0=left, 1=right, 2=middle
+        imgui_button = button - 1 if button > 0 else 0
+        self.ui_manager.handle_mouse_button(imgui_button, False)
+
         self.input_manager.on_mouse_button_release(button)
 
         # Handle mouse button release for tool drag operations
-        if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
+        if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             active_tool = self.tool_manager.get_active_tool()
 
             if button == 1:  # Left button
@@ -483,6 +631,7 @@ class Game(mglw.WindowConfig):
         """Handle window resize events by updating render targets."""
         super().resize(width, height)
         self.render_pipeline.resize((width, height))
+        self.ui_manager.resize(width, height)
 
     def on_key_event(self, key, action, modifiers):
         """
@@ -499,13 +648,6 @@ class Game(mglw.WindowConfig):
         if action == keys.ACTION_PRESS:
             # print(f"Key pressed: {key}")
             self.input_manager.on_key_press(key)
-
-            # Check if ESC was pressed (for mouse capture toggle)
-            # Update window state if mouse capture changed
-            if key == keys.ESCAPE:
-                captured = self.input_manager.mouse_captured
-                self.wnd.mouse_exclusivity = captured
-                self.wnd.cursor = not captured
 
         elif action == keys.ACTION_RELEASE:
             self.input_manager.on_key_release(key)

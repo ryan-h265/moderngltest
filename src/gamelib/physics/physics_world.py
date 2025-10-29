@@ -212,6 +212,7 @@ class PhysicsWorld:
         self._bodies: Dict[int, PhysicsBodyHandle] = {}
         self._angular_factor_overrides: Dict[int, Tuple[float, float, float]] = {}
         self._accumulator = 0.0
+        self._paused = False
         self._configure_world()
 
     # ------------------------------------------------------------------
@@ -245,6 +246,19 @@ class PhysicsWorld:
         _pb.resetSimulation(physicsClientId=self._client)
         self._configure_world()
         self._accumulator = 0.0
+        self._paused = False
+
+    def pause(self) -> None:
+        """Pause the physics simulation."""
+        self._paused = True
+
+    def resume(self) -> None:
+        """Resume the physics simulation."""
+        self._paused = False
+
+    def is_paused(self) -> bool:
+        """Check if physics simulation is paused."""
+        return self._paused
 
     # ------------------------------------------------------------------
     # Configuration
@@ -514,7 +528,7 @@ class PhysicsWorld:
     def step_simulation(self, delta_time: float) -> None:
         """Advance the simulation and push transforms back to the scene."""
 
-        if self._client is None:
+        if self._client is None or self._paused:
             return
 
         self._accumulator += delta_time

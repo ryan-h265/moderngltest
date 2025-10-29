@@ -18,6 +18,17 @@ from ..physics import PhysicsBodyHandle, PhysicsWorld
 
 
 @dataclass
+class SceneMetadata:
+    """Metadata for a registered scene."""
+
+    id: str                          # Unique scene identifier
+    display_name: str                # Human-readable name
+    path: Path                       # Path to scene JSON
+    description: str = ""            # Scene description
+    thumbnail_path: Optional[Path] = None  # Path to thumbnail image
+
+
+@dataclass
 class ActiveScene:
     """Container representing the currently loaded scene."""
 
@@ -42,6 +53,7 @@ class SceneManager:
         self.physics_world = physics_world
         self._scene_loader = SceneLoader(ctx, physics_world=physics_world)
         self._registry: Dict[str, Path] = {}
+        self._scene_metadata: Dict[str, SceneMetadata] = {}
         self._active: Optional[ActiveScene] = None
         self._camera_position: Optional[Vector3] = None
         self._camera_target: Optional[Vector3] = None
@@ -79,14 +91,58 @@ class SceneManager:
     def player_spawn_position(self) -> Optional[Vector3]:
         return self._player_spawn_position
 
-    def register_scene(self, name: str, path: Path | str):
+    def register_scene(
+        self,
+        name: str,
+        path: Path | str,
+        display_name: Optional[str] = None,
+        description: str = "",
+        thumbnail_path: Optional[Path | str] = None,
+    ):
+        """
+        Register a scene.
+
+        Args:
+            name: Unique scene identifier
+            path: Path to scene JSON file
+            display_name: Human-readable name (defaults to name if not provided)
+            description: Scene description
+            thumbnail_path: Path to thumbnail image (optional)
+        """
         scene_path = Path(path)
         if not scene_path.is_absolute():
             scene_path = PROJECT_ROOT / scene_path
-        self._registry[name] = scene_path.resolve()
+        scene_path = scene_path.resolve()
+
+        self._registry[name] = scene_path
+
+        # Create metadata
+        thumb_path = None
+        if thumbnail_path:
+            thumb_path = Path(thumbnail_path)
+            if not thumb_path.is_absolute():
+                thumb_path = PROJECT_ROOT / thumb_path
+            thumb_path = thumb_path.resolve()
+
+        self._scene_metadata[name] = SceneMetadata(
+            id=name,
+            display_name=display_name or name.replace("_", " ").title(),
+            path=scene_path,
+            description=description,
+            thumbnail_path=thumb_path,
+        )
 
     def unregister_scene(self, name: str):
         self._registry.pop(name, None)
+        self._scene_metadata.pop(name, None)
+
+    def get_scene_metadata(self, name: str) -> Optional[SceneMetadata]:
+        """Get metadata for a registered scene."""
+        return self._scene_metadata.get(name)
+
+    def get_all_scenes(self) -> Dict[str, SceneMetadata]:
+        """Get all registered scenes with their metadata."""
+        return self._scene_metadata.copy()
 
     def load(self, name: str, camera=None) -> SceneLoadResult:
         if name not in self._registry:

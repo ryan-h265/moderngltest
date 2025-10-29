@@ -80,7 +80,7 @@ class KeyBindings:
         # ====================================================================
         # System Commands
         # ====================================================================
-        self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.SYSTEM_TOGGLE_MOUSE  # ESC
+        self.keyboard_bindings[self.keys.ESCAPE] = InputCommand.SYSTEM_PAUSE  # ESC
         self.keyboard_bindings[self.keys.F1] = InputCommand.SYSTEM_SCREENSHOT    # F1
         self.keyboard_bindings[self.keys.F2] = InputCommand.SYSTEM_TOGGLE_DEBUG_CAMERA  # F2
         self.keyboard_bindings[self.keys.F3] = InputCommand.SYSTEM_TOGGLE_DEBUG_OVERLAY  # F3
