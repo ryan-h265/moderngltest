@@ -13,6 +13,8 @@ import imgui
 if TYPE_CHECKING:
     from ...core.scene_manager import SceneManager
 
+from ...config.settings import WINDOW_SIZE
+
 
 class MainMenu:
     """Main menu for scene selection and game start."""
@@ -48,9 +50,9 @@ class MainMenu:
         if not self.show:
             return False, None
 
-        # Center window (larger to accommodate scaled text)
-        window_width = 1200
-        window_height = 800
+        # Use game window size for menu
+        window_width = int(WINDOW_SIZE[0] * 0.85)  # 85% of screen width
+        window_height = int(WINDOW_SIZE[1] * 0.90)  # 90% of screen height
         imgui.set_next_window_position(
             (screen_width - window_width) / 2,
             (screen_height - window_height) / 2,
@@ -87,7 +89,6 @@ class MainMenu:
 
                 # Show description below each item
                 if metadata.description:
-                    imgui.same_line(150)
                     imgui.text_colored(
                         f"  {metadata.description}", 0.75, 0.75, 0.75, 1.0
                     )
@@ -104,25 +105,34 @@ class MainMenu:
 
             imgui.separator()
 
-            # Action buttons
-            button_width = 150
-            button_height = 40
+            # Action buttons - auto-size based on text content
+            button_height = 70
+            button_padding = 30  # Padding around text
             imgui.spacing()
+
+            # Calculate button widths based on text content
+            start_game_text = "Start Game"
+            quit_text = "Quit"
+
+            start_game_width = imgui.calc_text_size(start_game_text)[0] + button_padding
+            quit_width = imgui.calc_text_size(quit_text)[0] + button_padding
+            button_spacing = 15
+            total_button_width = start_game_width + quit_width + button_spacing
 
             # Center buttons horizontally
             available_width = imgui.get_content_region_available_width()
-            button_x = (available_width - button_width * 2 - 10) / 2
+            button_x = (available_width - total_button_width) / 2
             if button_x > 0:
                 imgui.set_cursor_pos_x(button_x)
 
-            if imgui.button("Start Game", button_width, button_height):
+            if imgui.button(start_game_text, start_game_width, button_height):
                 if self.selected_scene:
                     self.show = False
                     imgui.end()
                     return False, self.selected_scene
 
-            imgui.same_line(spacing=10)
-            if imgui.button("Quit", button_width, button_height):
+            imgui.same_line(spacing=button_spacing)
+            if imgui.button(quit_text, quit_width, button_height):
                 imgui.end()
                 return False, None  # Special signal to quit
 
