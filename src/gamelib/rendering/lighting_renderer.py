@@ -16,7 +16,9 @@ from .gbuffer import GBuffer
 from ..config.settings import (
     AMBIENT_STRENGTH,
     MAX_LIGHTS_PER_FRAME,
-    ENABLE_LIGHT_SORTING
+    ENABLE_LIGHT_SORTING,
+    SHADOW_BIAS,
+    POINT_SHADOW_BIAS,
 )
 from ..config import settings
 
@@ -53,6 +55,17 @@ class LightingRenderer:
 
         # Create full-screen quad for rendering
         self._create_fullscreen_quad()
+
+        # Fallback textures for lights without shadows or differing shadow types
+        self._dummy_shadow_map = self.ctx.depth_texture((1, 1))
+        self._dummy_shadow_map.compare_func = ''
+        self._dummy_shadow_map.repeat_x = False
+        self._dummy_shadow_map.repeat_y = False
+
+        self._dummy_shadow_cube = self.ctx.depth_texture_cube((1, 1))
+        self._dummy_shadow_cube.compare_func = ''
+        self._dummy_shadow_cube.repeat_x = False
+        self._dummy_shadow_cube.repeat_y = False
 
     def _create_fullscreen_quad(self):
         """
@@ -422,29 +435,53 @@ class LightingRenderer:
             self.lighting_program['spot_inner_cos'].value = inner_cos
             self.lighting_program['spot_outer_cos'].value = outer_cos
 
-        # Set shadow map (use higher texture units to avoid G-Buffer conflict)
-        # For non-shadow-casting lights, we still need to bind something to avoid shader errors
-        if light.cast_shadows and light.shadow_map is not None:
-            shadow_texture_unit = 10 + light_index
-            light.shadow_map.use(location=shadow_texture_unit)
-            if 'shadow_map' in self.lighting_program:
-                self.lighting_program['shadow_map'].value = shadow_texture_unit
+        shadow_mode = 0
+        tex_unit_2d = 10 + light_index
+        tex_unit_cube = 20 + light_index
 
-            # Set light matrix for shadow mapping
-            if 'light_matrix' in self.lighting_program:
-                light_matrix = light.get_light_matrix()
-                self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+        if light.cast_shadows and light.shadow_map is not None:
+            if light.light_type == 'point' and light.shadow_map_type == 'cube':
+                shadow_mode = 2
+                light.shadow_map.use(location=tex_unit_cube)
+                if 'shadow_cube_map' in self.lighting_program:
+                    self.lighting_program['shadow_cube_map'].value = tex_unit_cube
+                self._dummy_shadow_map.use(location=tex_unit_2d)
+                if 'shadow_map' in self.lighting_program:
+                    self.lighting_program['shadow_map'].value = tex_unit_2d
+            else:
+                shadow_mode = 1
+                light.shadow_map.use(location=tex_unit_2d)
+                if 'shadow_map' in self.lighting_program:
+                    self.lighting_program['shadow_map'].value = tex_unit_2d
+                self._dummy_shadow_cube.use(location=tex_unit_cube)
+                if 'shadow_cube_map' in self.lighting_program:
+                    self.lighting_program['shadow_cube_map'].value = tex_unit_cube
         else:
-            # Non-shadow-casting light: bind a dummy texture or use a zero matrix
-            # The shader will see shadow factor = 0 (no shadow)
+            self._dummy_shadow_map.use(location=tex_unit_2d)
             if 'shadow_map' in self.lighting_program:
-                # Bind first shadow map or create dummy (shader won't use it effectively)
-                shadow_texture_unit = 10
-                if 'light_matrix' in self.lighting_program:
-                    import numpy as np
-                    # Identity matrix will cause all shadow tests to fail gracefully
-                    identity = np.eye(4, dtype='f4')
-                    self.lighting_program['light_matrix'].write(identity.tobytes())
+                self.lighting_program['shadow_map'].value = tex_unit_2d
+            self._dummy_shadow_cube.use(location=tex_unit_cube)
+            if 'shadow_cube_map' in self.lighting_program:
+                self.lighting_program['shadow_cube_map'].value = tex_unit_cube
+
+        if 'shadow_map_type' in self.lighting_program:
+            self.lighting_program['shadow_map_type'].value = shadow_mode
+
+        if 'shadow_bias' in self.lighting_program:
+            self.lighting_program['shadow_bias'].value = SHADOW_BIAS
+        if 'point_shadow_bias' in self.lighting_program:
+            self.lighting_program['point_shadow_bias'].value = POINT_SHADOW_BIAS
+
+        if 'shadow_clip' in self.lighting_program:
+            near_plane, far_plane = light.get_shadow_clip_planes()
+            self.lighting_program['shadow_clip'].value = (float(near_plane), float(far_plane))
+
+        if 'light_matrix' in self.lighting_program:
+            if shadow_mode == 1:
+                light_matrix = light.get_shadow_matrices()[0]
+            else:
+                light_matrix = np.eye(4, dtype='f4')
+            self.lighting_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
 
         # Set camera position
         if 'camera_pos' in self.lighting_program:

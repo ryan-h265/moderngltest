@@ -404,6 +404,73 @@ class ObjectInspector:
                 if isinstance(active_tool, LightEditorTool):
                     active_tool.set_light_intensity(new_intensity)
 
+        # Light type selection
+        light_type = item.get("type", "directional")
+        if imgui.begin_combo("Type", light_type.title()):
+            for label, value in [("Directional", "directional"), ("Point", "point"), ("Spot", "spot")]:
+                is_selected = light_type == value
+                if imgui.selectable(label, is_selected)[0]:
+                    light_type = value
+                    item["type"] = value
+                    if self.tool_manager:
+                        active_tool = self.tool_manager.get_active_tool()
+                        if isinstance(active_tool, LightEditorTool):
+                            active_tool.set_light_type(value)
+                if is_selected:
+                    imgui.set_item_default_focus()
+            imgui.end_combo()
+
+        # Range and shadow settings for non-directional lights
+        if light_type in ("point", "spot"):
+            light_range = float(item.get("range", 15.0))
+            changed, new_range = imgui.slider_float("Range##light_range", light_range, 0.1, 200.0, "%.1f")
+            if changed:
+                item["range"] = new_range
+                if self.tool_manager:
+                    active_tool = self.tool_manager.get_active_tool()
+                    if isinstance(active_tool, LightEditorTool):
+                        active_tool.set_light_range(new_range)
+
+            shadow_near = float(item.get("shadow_near", 0.1))
+            shadow_far = float(item.get("shadow_far", 30.0))
+            changed_clip, new_near, new_far = imgui.drag_float_range2(
+                "Shadow Clip##light_clip",
+                shadow_near,
+                shadow_far,
+                0.01,
+                0.01,
+                300.0,
+                "Near %.2f",
+                "Far %.1f",
+            )
+            if changed_clip:
+                new_far = max(new_far, new_near + 0.1)
+                item["shadow_near"] = new_near
+                item["shadow_far"] = new_far
+                if self.tool_manager:
+                    active_tool = self.tool_manager.get_active_tool()
+                    if isinstance(active_tool, LightEditorTool):
+                        active_tool.set_shadow_planes(new_near, new_far)
+
+        if light_type == "spot":
+            inner_angle = float(item.get("inner_cone_angle", 20.0))
+            outer_angle = float(item.get("outer_cone_angle", 30.0))
+            outer_angle = max(outer_angle, inner_angle)
+            changed_inner, new_inner = imgui.slider_float("Inner Angle##spot_inner", inner_angle, 0.0, max(outer_angle, 0.1), "%.1f")
+            if changed_inner:
+                inner_angle = new_inner
+                outer_angle = max(outer_angle, inner_angle)
+            changed_outer, new_outer = imgui.slider_float("Outer Angle##spot_outer", outer_angle, inner_angle, 120.0, "%.1f")
+            if changed_outer:
+                outer_angle = max(new_outer, inner_angle)
+            if changed_inner or changed_outer:
+                item["inner_cone_angle"] = inner_angle
+                item["outer_cone_angle"] = outer_angle
+                if self.tool_manager:
+                    active_tool = self.tool_manager.get_active_tool()
+                    if isinstance(active_tool, LightEditorTool):
+                        active_tool.set_spot_angles(inner_angle, outer_angle)
+
         # Cast shadows checkbox
         cast_shadows = item.get("cast_shadows", True)
         changed, new_cast_shadows = imgui.checkbox("Cast Shadows##light_cast_shadows", cast_shadows)

@@ -41,6 +41,35 @@ def test_light_matrix():
     assert matrix.shape == (4, 4)
 
 
+def test_shadow_matrices_by_type():
+    """Directional/spot lights have one matrix, point lights expose six faces."""
+    directional = Light(
+        position=Vector3([0.0, 10.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='directional'
+    )
+    assert len(directional.get_shadow_matrices()) == 1
+
+    spot = Light(
+        position=Vector3([0.0, 5.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='spot',
+        range=20.0
+    )
+    assert len(spot.get_shadow_matrices()) == 1
+
+    point = Light(
+        position=Vector3([0.0, 5.0, 0.0]),
+        target=Vector3([0.0, 0.0, 0.0]),
+        light_type='point',
+        range=10.0
+    )
+    matrices = point.get_shadow_matrices()
+    assert len(matrices) == 6
+    for mat in matrices:
+        assert mat.shape == (4, 4)
+
+
 def test_light_animate_rotation():
     """Test light rotation animation"""
     light = Light(

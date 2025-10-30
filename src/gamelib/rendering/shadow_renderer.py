@@ -4,7 +4,8 @@ Shadow Renderer
 Handles shadow map generation for all lights.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
+
 import moderngl
 import numpy as np
 
@@ -74,6 +75,26 @@ class ShadowRenderer:
 
         return shadow_map, shadow_fbo
 
+    def create_shadow_cube_map(
+        self, resolution: Optional[int] = None
+    ) -> Tuple[moderngl.Texture, List[moderngl.Framebuffer]]:
+        """Create a cube depth texture and framebuffer per face."""
+
+        if resolution is None:
+            resolution = self.shadow_size
+
+        cube_map = self.ctx.depth_texture_cube((resolution, resolution))
+        cube_map.compare_func = ''
+        cube_map.repeat_x = False
+        cube_map.repeat_y = False
+
+        fbos = [
+            self.ctx.framebuffer(depth_attachment=(cube_map, face))
+            for face in range(6)
+        ]
+
+        return cube_map, fbos
+
     def _calculate_shadow_resolution(self, light: Light, camera_position=None) -> int:
         """
         Calculate appropriate shadow map resolution for a light based on importance.
@@ -123,13 +144,35 @@ class ShadowRenderer:
         """
         for light in lights:
             # Only create shadow maps for shadow-casting lights
-            if light.cast_shadows and (light.shadow_map is None or light.shadow_fbo is None):
-                # Calculate appropriate resolution
+            if not light.cast_shadows:
+                continue
+
+            needs_rebuild = False
+            if light.light_type == 'point':
+                needs_rebuild = (
+                    light.shadow_map is None
+                    or not light.shadow_face_fbos
+                    or light.shadow_map_type != 'cube'
+                )
+            else:
+                needs_rebuild = (
+                    light.shadow_map is None
+                    or light.shadow_fbo is None
+                    or light.shadow_map_type not in (None, '2d')
+                )
+
+            if needs_rebuild:
                 resolution = self._calculate_shadow_resolution(light, camera_position)
                 light.shadow_resolution = resolution
 
-                # Create shadow map with calculated resolution
-                light.shadow_map, light.shadow_fbo = self.create_shadow_map(resolution)
+                if light.light_type == 'point':
+                    light.shadow_map, light.shadow_face_fbos = self.create_shadow_cube_map(resolution)
+                    light.shadow_fbo = None
+                    light.shadow_map_type = 'cube'
+                else:
+                    light.shadow_map, light.shadow_fbo = self.create_shadow_map(resolution)
+                    light.shadow_face_fbos = []
+                    light.shadow_map_type = '2d'
 
     def render_shadow_maps(self, lights: List[Light], scene: Scene):
         """
@@ -205,29 +248,35 @@ class ShadowRenderer:
             light: Light to render shadow for
             scene: Scene to render
         """
-        # Bind light's shadow framebuffer
-        light.shadow_fbo.use()
-        light.shadow_fbo.clear()
-
-        # Set viewport to light's shadow map resolution (supports adaptive sizing)
         resolution = light.shadow_resolution if light.shadow_resolution else self.shadow_size
-        self.ctx.viewport = (0, 0, resolution, resolution)
 
-        # IMPORTANT: Enable depth testing for shadow map generation
         self.ctx.enable(moderngl.DEPTH_TEST)
 
-        # Get light matrix
-        light_matrix = light.get_light_matrix()
+        def _render_with_matrix(matrix: np.ndarray, target_fbo: moderngl.Framebuffer, face_index: int | None = None):
+            target_fbo.use()
+            target_fbo.clear()
+            self.ctx.viewport = (0, 0, resolution, resolution)
 
-        # Set shader uniform
-        self.shadow_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+            self.shadow_program['light_matrix'].write(matrix.astype('f4').tobytes())
+            if 'light_type' in self.shadow_program:
+                self.shadow_program['light_type'].value = light.get_light_type_id()
+            if 'shadow_face' in self.shadow_program and face_index is not None:
+                self.shadow_program['shadow_face'].value = face_index
 
-        # Get frustum for light's view (for culling objects outside light's view)
-        from ..config.settings import ENABLE_FRUSTUM_CULLING
-        frustum = None
-        if ENABLE_FRUSTUM_CULLING:
-            from ..core.frustum import Frustum
-            frustum = Frustum(light_matrix)
+            from ..config.settings import ENABLE_FRUSTUM_CULLING
+            frustum = None
+            if ENABLE_FRUSTUM_CULLING:
+                from ..core.frustum import Frustum
+                frustum = Frustum(matrix)
 
-        # Render scene from light's perspective with frustum culling
-        scene.render_all(self.shadow_program, frustum=frustum, debug_label="Shadow Pass")
+            scene.render_all(self.shadow_program, frustum=frustum, debug_label="Shadow Pass")
+
+        if light.light_type == 'point':
+            matrices: Sequence[np.ndarray] = light.get_shadow_matrices()
+            for face_index, matrix in enumerate(matrices):
+                target_fbo = light.shadow_face_fbos[face_index]
+                _render_with_matrix(matrix, target_fbo, face_index)
+        else:
+            matrix = light.get_shadow_matrices()[0]
+            target_fbo = light.shadow_fbo
+            _render_with_matrix(matrix, target_fbo, None)
