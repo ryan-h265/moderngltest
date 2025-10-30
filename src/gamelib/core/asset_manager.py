@@ -7,7 +7,6 @@ Implements industry-standard asset lifecycle management (Unity/Godot pattern).
 
 from pathlib import Path
 from typing import Dict, Optional
-import sys
 from collections import OrderedDict
 from dataclasses import dataclass
 import moderngl
