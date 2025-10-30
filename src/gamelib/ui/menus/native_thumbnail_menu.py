@@ -207,6 +207,18 @@ class NativeThumbnailMenu:
             self.selected_category = "Models"
         # Other tools keep current category
 
+    def clear_cached_ui_elements(self) -> None:
+        """
+        Clear internal caching of UI elements.
+
+        Called when exiting attribute mode to ensure thumbnails and tool buttons
+        are re-created fresh when attribute mode is re-enabled, synchronizing with
+        IconManager and TextManager layer clearing.
+        """
+        self.icon_ids.clear()
+        self.tool_label_text_ids.clear()
+        self.loaded_textures.clear()
+
     def render(self, icon_manager, screen_width: int, screen_height: int) -> Tuple[Optional[str], Optional[str]]:
         """
         Render the thumbnail menu.

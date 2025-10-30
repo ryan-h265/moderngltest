@@ -101,6 +101,15 @@ class IconManager:
     def remove_icon(self, icon_id: int) -> None:
         self._instances.pop(icon_id, None)
 
+    def clear_layer(self, layer: str) -> None:
+        """Remove all icons from a specific layer."""
+        icon_ids_to_remove = [
+            icon_id for icon_id, instance in self._instances.items()
+            if instance.layer == layer
+        ]
+        for icon_id in icon_ids_to_remove:
+            self._instances.pop(icon_id, None)
+
     def update_position(self, icon_id: int, position: Tuple[float, float]) -> None:
         instance = self._instances.get(icon_id)
         if instance:

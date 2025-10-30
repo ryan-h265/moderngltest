@@ -531,6 +531,10 @@ class Game(mglw.WindowConfig):
             self.wnd.mouse_exclusivity = False
             self.wnd.cursor = True
 
+            # Show thumbnail menu
+            if self.thumbnail_menu:
+                self.thumbnail_menu.show = True
+
             # Disable camera mouse look (keep WASD movement)
             if self.camera_controller:
                 self.camera_controller.mouse_look_enabled = False
@@ -544,10 +548,18 @@ class Game(mglw.WindowConfig):
             self.object_inspector.set_selected_object(None)
             self.object_inspector.set_preview_item(None)
 
+            # Hide thumbnail menu and clear its icons
+            if self.thumbnail_menu:
+                self.thumbnail_menu.show = False
+                # Clear cached UI element tracking to ensure fresh re-creation
+                self.thumbnail_menu.clear_cached_ui_elements()
+            # Clear all thumbnail icons and tool labels from renderer
+            self.render_pipeline.icon_manager.clear_layer("thumbnails")
+            self.render_pipeline.text_manager.clear_layer("tool_labels")
+
             # Restore mouse capture (if in editor and not in attribute mode)
-            # Leave cursor visible for editor comfort
-            self.wnd.mouse_exclusivity = False
-            self.wnd.cursor = True
+            self.wnd.mouse_exclusivity = True
+            self.wnd.cursor = False
 
             # Re-enable camera mouse look
             if self.camera_controller:
