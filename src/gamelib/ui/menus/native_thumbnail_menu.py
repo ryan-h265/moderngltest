@@ -35,7 +35,7 @@ class NativeThumbnailMenu:
         tool_manager=None,
         text_manager=None,
         thumbnail_size: int = 192,
-        grid_cols: int = 4,
+        grid_cols: int = 6,
         grid_rows: int = 1,
         bottom_menu_height: int = 300,
         padding: int = 8,
@@ -235,9 +235,48 @@ class NativeThumbnailMenu:
 
     def _render_background(self, icon_manager) -> None:
         """Render semi-transparent background for menu area."""
-        # TODO: Could create a quad with alpha = 0.8, color = gray
-        # For now, just render the thumbnails
-        pass
+        # Render a semi-transparent gray quad as background
+        x = self.menu_x
+        y = self.menu_y
+        width = self.menu_width
+        height = self.bottom_menu_height
+
+        # Gray color with 50% alpha
+        color = (0.3, 0.3, 0.3, 0.5)
+
+        vertices = np.array(
+            [
+                x, y, 0.0, 0.0, *color,
+                x + width, y, 1.0, 0.0, *color,
+                x + width, y + height, 1.0, 1.0, *color,
+                x, y + height, 0.0, 1.0, *color,
+            ],
+            dtype="f4",
+        )
+        indices = np.array([0, 1, 2, 0, 2, 3], dtype="i4")
+
+        vbo = self.ctx.buffer(vertices.tobytes())
+        ibo = self.ctx.buffer(indices.tobytes())
+
+        # Create simple white texture for solid color rendering
+        white_texture = self.ctx.texture((1, 1), 4, b'\xff\xff\xff\xff')
+
+        vao = self.ctx.vertex_array(
+            self.ui_shader,
+            [
+                (vbo, "2f 2f 4f", "in_position", "in_uv", "in_color"),
+            ],
+            index_buffer=ibo,
+        )
+
+        white_texture.use(location=0)
+        self.ui_shader["sprite_texture"].value = 0
+        vao.render(moderngl.TRIANGLES)
+
+        vao.release()
+        vbo.release()
+        ibo.release()
+        white_texture.release()
 
     def _render_tool_buttons(self, icon_manager) -> None:
         """
