@@ -416,15 +416,14 @@ class Model:
         cloned_mesh = Mesh(
             vao=mesh.vao,  # SHARED - same GPU vertex data
             material=mesh.material,  # SHARED - same textures and properties
-            local_transform=Matrix44(mesh.base_local_transform),  # Deep copy of bind pose
+            local_transform=Matrix44(mesh.base_local_transform),  # Copy of base local transform
             node_name=mesh.node_name,  # Shared - same node reference
             parent_transform=Matrix44.identity()  # Reset parent (will be calculated at render time)
         )
 
         # Copy animation-related state
-        cloned_mesh.base_local_transform = Matrix44(mesh.base_local_transform)
         cloned_mesh.base_translation = Vector3(mesh.base_translation)
-        cloned_mesh.base_rotation = Quaternion(mesh.base_rotation)
+        cloned_mesh.base_rotation = mesh.base_rotation.copy()
         cloned_mesh.base_scale = Vector3(mesh.base_scale)
 
         # Copy skinning data

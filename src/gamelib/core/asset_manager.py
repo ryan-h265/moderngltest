@@ -277,19 +277,17 @@ class AssetManager:
         """Evict LRU cached models if memory budget exceeded."""
         total_memory = sum(a.memory_bytes for a in self._cache.values())
 
-        while total_memory > self.memory_budget and len(self._cache) > 1:
-            # Get LRU (first item in OrderedDict)
-            lru_key = next(iter(self._access_order))
-
-            # Only evict if it has no active references
-            if self._cache[lru_key].ref_count <= 0:
-                memory_freed = self._cache[lru_key].memory_bytes
+        # Iterate through all items in LRU order, evicting those with ref_count <= 0
+        lru_keys = list(self._access_order.keys())
+        for lru_key in lru_keys:
+            if total_memory <= self.memory_budget or len(self._cache) <= 1:
+                break
+            cached_asset = self._cache.get(lru_key)
+            if cached_asset and cached_asset.ref_count <= 0:
+                memory_freed = cached_asset.memory_bytes
                 self._remove_from_cache(lru_key)
                 total_memory -= memory_freed
                 self._stats['evictions'] += 1
-            else:
-                # Can't evict models with active references
-                break
 
     def _remove_from_cache(self, cache_key: str) -> None:
         """
