@@ -22,7 +22,7 @@ from .rendering.render_pipeline import RenderPipeline
 from .ui.player_hud import PlayerHUD
 from .ui.ui_manager import UIManager
 from .ui.theme import ThemeManager, ThemeConfig, ColorPalette
-from .ui.menus import MainMenu, PauseMenu, SettingsMenu, ObjectInspector, ThumbnailMenu, NativeThumbnailMenu
+from .ui.menus import MainMenu, PauseMenu, SettingsMenu, ObjectInspector, NativeThumbnailMenu
 
 # Loaders
 from .loaders import SceneLoader, SceneLoadResult
@@ -79,7 +79,6 @@ __all__ = [
     "PauseMenu",
     "SettingsMenu",
     "ObjectInspector",
-    "ThumbnailMenu",
     "NativeThumbnailMenu",
     "PlayerHUD",
     # Input

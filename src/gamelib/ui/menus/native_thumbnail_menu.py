@@ -177,6 +177,36 @@ class NativeThumbnailMenu:
             )
             self.add_asset("Models", asset)
 
+    def _update_category_from_tool(self) -> None:
+        """
+        Automatically switch category based on active tool.
+
+        - LightEditorTool active → show "Lights" category and auto-select first preset
+        - ModelPlacementTool active → show "Models" category
+        - Other tools → keep current category
+        """
+        if not self.tool_manager:
+            return
+
+        active_tool = self.tool_manager.get_active_tool()
+        if not active_tool:
+            return
+
+        tool_id = active_tool.id if hasattr(active_tool, 'id') else None
+        prev_category = self.selected_category
+
+        # Map tool IDs to categories
+        if tool_id == "light_editor":
+            self.selected_category = "Lights"
+            # Auto-select first light preset if we just switched to Lights category
+            if prev_category != "Lights" and self.assets.get("Lights"):
+                first_light = self.assets["Lights"][0]
+                self.selected_asset_id = first_light.asset_id
+                self._frame_selection_handled = True  # Signal that we have a selection
+        elif tool_id == "model_placer":
+            self.selected_category = "Models"
+        # Other tools keep current category
+
     def render(self, icon_manager, screen_width: int, screen_height: int) -> Tuple[Optional[str], Optional[str]]:
         """
         Render the thumbnail menu.
@@ -196,6 +226,9 @@ class NativeThumbnailMenu:
         self.menu_x = 0.0
         self.menu_y = float(screen_height - self.bottom_menu_height)
         self.menu_width = float(screen_width)
+
+        # Update category based on active tool
+        self._update_category_from_tool()
 
         # Get default category (first with assets)
         if self.selected_category is None:

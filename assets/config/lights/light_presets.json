@@ -8,6 +8,7 @@
       "name": "White",
       "color": [1.0, 1.0, 1.0],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [1.0, 1.0, 1.0]
     },
     {
@@ -15,6 +16,7 @@
       "name": "Red",
       "color": [1.0, 0.2, 0.2],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [1.0, 0.0, 0.0]
     },
     {
@@ -22,6 +24,7 @@
       "name": "Green",
       "color": [0.2, 1.0, 0.2],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [0.0, 1.0, 0.0]
     },
     {
@@ -29,6 +32,7 @@
       "name": "Blue",
       "color": [0.2, 0.2, 1.0],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [0.0, 0.0, 1.0]
     },
     {
@@ -36,6 +40,7 @@
       "name": "Yellow",
       "color": [1.0, 1.0, 0.2],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [1.0, 1.0, 0.0]
     },
     {
@@ -43,6 +48,7 @@
       "name": "Orange",
       "color": [1.0, 0.6, 0.2],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [1.0, 0.6, 0.0]
     },
     {
@@ -50,6 +56,7 @@
       "name": "Purple",
       "color": [0.8, 0.2, 1.0],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [1.0, 0.0, 1.0]
     },
     {
@@ -57,6 +64,7 @@
       "name": "Cyan",
       "color": [0.2, 1.0, 1.0],
       "intensity": 1.0,
+      "cast_shadows": true,
       "icon_color": [0.0, 1.0, 1.0]
     }
   ]

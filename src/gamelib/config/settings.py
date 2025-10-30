@@ -458,6 +458,7 @@ def _load_light_presets() -> dict:
             presets[name] = {
                 "color": tuple(preset.get("color", [1.0, 1.0, 1.0])),
                 "intensity": preset.get("intensity", 1.0),
+                "cast_shadows": preset.get("cast_shadows", True),
                 "icon_color": tuple(preset.get("icon_color", [1.0, 1.0, 1.0])),
             }
 

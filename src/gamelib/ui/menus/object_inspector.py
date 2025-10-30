@@ -23,14 +23,16 @@ if TYPE_CHECKING:
 class ObjectInspector:
     """Inspector panel for editing selected object properties."""
 
-    def __init__(self, layout_manager: Optional[LayoutManager] = None):
+    def __init__(self, layout_manager: Optional[LayoutManager] = None, tool_manager=None):
         """
         Initialize object inspector.
 
         Args:
             layout_manager: LayoutManager for panel positioning (optional)
+            tool_manager: Tool manager for updating active tools (optional)
         """
         self.layout_manager = layout_manager
+        self.tool_manager = tool_manager
         self.selected_object: Optional[SceneObject] = None
         self.preview_item: Optional[dict] = None  # Preview item from thumbnail menu
         self.editor_history: Optional[EditorHistory] = None
@@ -347,19 +349,71 @@ class ObjectInspector:
         if not item:
             return
 
-        # Color picker
-        color = item.get("color", [1.0, 1.0, 1.0, 1.0])
-        if not isinstance(color, (list, tuple)):
-            color = [1.0, 1.0, 1.0, 1.0]
-        if len(color) == 3:
-            color = list(color) + [1.0]
+        category = item.get("category", "Unknown")
 
-        changed, new_color = imgui.color_edit4("Color##preview_color", *color)
+        # Show different controls for lights vs other items
+        if category == "Lights":
+            self._draw_preview_light_section()
+        else:
+            # Color picker for models/other items
+            color = item.get("color", [1.0, 1.0, 1.0, 1.0])
+            if not isinstance(color, (list, tuple)):
+                color = [1.0, 1.0, 1.0, 1.0]
+            if len(color) == 3:
+                color = list(color) + [1.0]
+
+            changed, new_color = imgui.color_edit4("Color##preview_color", *color)
+            if changed:
+                item["color"] = list(new_color)
+
+            # Tint (same as color for now)
+            imgui.text("(Color acts as tint)")
+
+    def _draw_preview_light_section(self) -> None:
+        """Draw light-specific controls for light presets."""
+        from ..tools.editor.light_editor_tool import LightEditorTool
+
+        item = self.preview_item
+        if not item:
+            return
+
+        # Color picker
+        color = item.get("color", [1.0, 1.0, 1.0])
+        if isinstance(color, (tuple, list)) and len(color) >= 3:
+            color = list(color[:3])  # Use RGB only for color picker
+        else:
+            color = [1.0, 1.0, 1.0]
+
+        changed, new_color = imgui.color_edit3("Color##light_color", *color)
         if changed:
             item["color"] = list(new_color)
+            # Update tool if available
+            if self.tool_manager:
+                active_tool = self.tool_manager.get_active_tool()
+                if isinstance(active_tool, LightEditorTool):
+                    active_tool.set_light_color(Vector3(new_color))
 
-        # Tint (same as color for now)
-        imgui.text("(Color acts as tint)")
+        # Intensity slider
+        intensity = item.get("intensity", 1.0)
+        changed, new_intensity = imgui.slider_float("Intensity", float(intensity), 0.0, 3.0, "%.2f")
+        if changed:
+            item["intensity"] = new_intensity
+            # Update tool if available
+            if self.tool_manager:
+                active_tool = self.tool_manager.get_active_tool()
+                if isinstance(active_tool, LightEditorTool):
+                    active_tool.set_light_intensity(new_intensity)
+
+        # Cast shadows checkbox
+        cast_shadows = item.get("cast_shadows", True)
+        changed, new_cast_shadows = imgui.checkbox("Cast Shadows##light_cast_shadows", cast_shadows)
+        if changed:
+            item["cast_shadows"] = new_cast_shadows
+            # Update tool if available
+            if self.tool_manager:
+                active_tool = self.tool_manager.get_active_tool()
+                if isinstance(active_tool, LightEditorTool):
+                    active_tool.set_cast_shadows(new_cast_shadows)
 
     def _draw_preview_physics_section(self) -> None:
         """Draw physics settings for preview item."""

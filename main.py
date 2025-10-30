@@ -163,7 +163,7 @@ class Game(mglw.WindowConfig):
         self.main_menu = MainMenu(self.scene_manager)
         self.pause_menu = PauseMenu(self.scene_manager)
         self.settings_menu = SettingsMenu(self.render_pipeline, self.input_manager.key_bindings, self.ui_manager)
-        self.object_inspector = ObjectInspector(layout_manager=self.layout_manager)
+        self.object_inspector = ObjectInspector(layout_manager=self.layout_manager, tool_manager=None)
         self.pause_menu.settings_menu = self.settings_menu
 
         # Attribute mode menu and selection (initialized after scene loads)
@@ -335,6 +335,9 @@ class Game(mglw.WindowConfig):
             )
             self.tool_controller.editor_history = self.editor_history
             self.tool_controller.lights = self.lights
+
+            # Connect tool manager to object inspector for live light editing
+            self.object_inspector.tool_manager = self.tool_manager
 
             # Start with first tool equipped
             if self.tool_manager.inventory.get_hotbar_tool(0):
@@ -580,35 +583,22 @@ class Game(mglw.WindowConfig):
 
     def _set_light_preset(self, preset_name: str):
         """
-        Set the light color from a preset name.
+        Set the light preset (color, intensity, cast_shadows) from a preset name.
 
         Args:
             preset_name: Name of the light preset (e.g., "Purple", "Blue", "Red")
         """
         from src.gamelib.tools.editor.light_editor_tool import LightEditorTool
+        from src.gamelib.config.settings import LIGHT_PRESETS
         from pyrr import Vector3
 
         if not self.tool_manager:
             return
 
-        # Color name to RGB mapping
-        COLOR_PRESETS = {
-            "purple": Vector3([0.8, 0.0, 1.0]),
-            "blue": Vector3([0.0, 0.5, 1.0]),
-            "white": Vector3([1.0, 1.0, 1.0]),
-            "yellow": Vector3([1.0, 1.0, 0.0]),
-            "cyan": Vector3([0.0, 1.0, 1.0]),
-            "orange": Vector3([1.0, 0.65, 0.0]),
-            "green": Vector3([0.0, 1.0, 0.0]),
-            "red": Vector3([1.0, 0.0, 0.0]),
-        }
-
-        # Get the color for this preset
-        color_name = preset_name.lower()
-        color = COLOR_PRESETS.get(color_name)
-
-        if not color:
-            print(f"[Game] Unknown light color preset: {preset_name}")
+        # Get the preset data
+        preset = LIGHT_PRESETS.get(preset_name)
+        if not preset:
+            print(f"[Game] Unknown light preset: {preset_name}")
             return
 
         active_tool = self.tool_manager.get_active_tool()
@@ -618,10 +608,31 @@ class Game(mglw.WindowConfig):
             self.tool_manager.equip_tool("light_editor")
             active_tool = self.tool_manager.get_active_tool()
 
-        # Set the light color
+        # Set all preset properties
         if isinstance(active_tool, LightEditorTool):
+            # Convert color tuple to Vector3
+            color = Vector3(preset["color"])
             active_tool.set_light_color(color)
-            print(f"[Game] Set light color to: {preset_name}")
+            active_tool.set_light_intensity(preset["intensity"])
+            active_tool.set_cast_shadows(preset["cast_shadows"])
+
+            # Update ObjectInspector preview
+            preview_dict = {
+                "id": preset_name.lower(),
+                "name": preset_name,
+                "category": "Lights",
+                "color": list(preset["color"]),
+                "intensity": preset["intensity"],
+                "cast_shadows": preset["cast_shadows"],
+                "icon_color": list(preset["icon_color"]),
+            }
+            if self.object_inspector:
+                self.object_inspector.set_preview_item(preview_dict)
+
+            print(f"[Game] Set light preset to: {preset_name}")
+            print(f"  - Color: {preset['color']}")
+            print(f"  - Intensity: {preset['intensity']}")
+            print(f"  - Cast Shadows: {preset['cast_shadows']}")
         else:
             print(f"[Game] Light editor tool not available")
 
