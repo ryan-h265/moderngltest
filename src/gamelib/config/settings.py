@@ -5,6 +5,7 @@ All configuration constants for the game engine.
 Modify these values to change engine behavior.
 """
 
+import json
 from pathlib import Path
 
 # ============================================================================
@@ -431,48 +432,39 @@ SELECTION_OUTLINE_SCALE = 0.01  # Outline thickness (0.005-0.02 recommended)
 OBJECT_RAYCAST_RANGE = 1000.0  # Maximum distance for raycasting
 
 # ============================================================================
-# Light Presets (Editor)
+# Light Presets (Editor) - Loaded from JSON Config
 # ============================================================================
 
-LIGHT_PRESETS = {
-    "White": {
-        "color": (1.0, 1.0, 1.0),
-        "intensity": 1.0,
-        "icon_color": (1.0, 1.0, 1.0),
-    },
-    "Red": {
-        "color": (1.0, 0.2, 0.2),
-        "intensity": 1.0,
-        "icon_color": (1.0, 0.0, 0.0),
-    },
-    "Green": {
-        "color": (0.2, 1.0, 0.2),
-        "intensity": 1.0,
-        "icon_color": (0.0, 1.0, 0.0),
-    },
-    "Blue": {
-        "color": (0.2, 0.2, 1.0),
-        "intensity": 1.0,
-        "icon_color": (0.0, 0.0, 1.0),
-    },
-    "Yellow": {
-        "color": (1.0, 1.0, 0.2),
-        "intensity": 1.0,
-        "icon_color": (1.0, 1.0, 0.0),
-    },
-    "Orange": {
-        "color": (1.0, 0.6, 0.2),
-        "intensity": 1.0,
-        "icon_color": (1.0, 0.6, 0.0),
-    },
-    "Purple": {
-        "color": (0.8, 0.2, 1.0),
-        "intensity": 1.0,
-        "icon_color": (1.0, 0.0, 1.0),
-    },
-    "Cyan": {
-        "color": (0.2, 1.0, 1.0),
-        "intensity": 1.0,
-        "icon_color": (0.0, 1.0, 1.0),
-    },
-}
+def _load_light_presets() -> dict:
+    """
+    Load light presets from JSON configuration file.
+
+    Returns:
+        Dictionary mapping preset names to preset data
+    """
+    config_path = PROJECT_ROOT / "assets" / "config" / "lights" / "light_presets.json"
+
+    if not config_path.exists():
+        print(f"Warning: Light presets config not found at {config_path}")
+        return {}
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        presets = {}
+        for preset in config.get("presets", []):
+            name = preset.get("name", preset.get("id", "Unknown"))
+            presets[name] = {
+                "color": tuple(preset.get("color", [1.0, 1.0, 1.0])),
+                "intensity": preset.get("intensity", 1.0),
+                "icon_color": tuple(preset.get("icon_color", [1.0, 1.0, 1.0])),
+            }
+
+        return presets
+    except Exception as e:
+        print(f"Error loading light presets: {e}")
+        return {}
+
+# Load light presets from JSON configuration
+LIGHT_PRESETS = _load_light_presets()

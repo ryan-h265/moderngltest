@@ -222,4 +222,6 @@ Comprehensive docs in `docs/`:
 
 ## Notes
 
+Dont git add and commit after you've not confirmed something as working or further changes required.
+
 ModernGL/OpenGL expects column-major layout where the translation components are in the bottom row, not the right column

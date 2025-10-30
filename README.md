@@ -1,244 +1,105 @@
 # ModernGL 3D Game Engine
 
-A modular 3D game engine with multi-light shadow mapping using ModernGL. Features clean architecture, comprehensive documentation, and extensible design.
+An actively developed Python 3.12 engine built on ModernGL. It ships with a deferred/forward hybrid render pipeline, a PyBullet-backed player controller, an in-engine level editor, and a configurable ImGui interface.
 
-## Features
+## Feature Highlights
+- **Rendering pipeline** – Forward and deferred paths with multi-light PCF shadows, SSAO, bloom, transparent pass, skybox rendering, thumbnail generation, and runtime toggles for FXAA/SMAA/MSAA plus light gizmos and debug overlays.
+- **Scene & asset system** – JSON-driven scenes (`assets/scenes/*.json`), procedural primitives (donut, cone, heightmap terrain), GLTF/GLB loader with PBR materials, skeletal animation support, skybox helpers, and selection highlighting.
+- **Tooling & UI** – ImGui main/pause/settings menus, a HUD, thumbnail browser, object inspector, undo/redo history, grid overlay, and bundled editor tools (model placement, object edit, light edit, delete) defined in `assets/config/tools/editor_tools.json`.
+- **Input system** – Command-pattern `InputManager` with stackable contexts (gameplay, editor, debug), rebindable key bindings persisted to `keybindings.json`, and controllers for camera, player, rendering toggles, UI, and tools.
+- **Physics integration** – PyBullet world with kinematic capsule player, collision mesh pipeline (`tools/export_collision_meshes.py`), slope/incline test content, and graceful fallback when PyBullet is unavailable.
+- **Procedural content** – Fractal/Perlin terrain generation utilities, donut terrain builder, OBJ exporters, and scripts for generating scenes, thumbnails, and debug visualisations.
+- **Tests & documentation** – Pytest suite covering core maths and terrain helpers plus extensive docs under `docs/` (rendering, input, lighting, tool system, optimisation roadmaps).
 
-✅ **Multi-Light Shadows** - Multiple shadow-casting lights with compounding darkness
-✅ **Modular Architecture** - Clean separation: core, rendering, input
-✅ **Shadow Mapping** - PCF soft shadows with configurable quality
-✅ **FPS Camera** - WASD movement + mouse look
-✅ **Shader Files** - External .vert/.frag files with syntax highlighting
-✅ **Well Documented** - Comprehensive docs and examples
-✅ **Tested** - Unit tests for core components
-✅ **M1 Compatible** - Uses OpenGL 4.1 (max for macOS)
+## Requirements
+- Python >=3.12
+- I could only get PyBullet working with conda on arm macos:
+   - `conda 
+- GPU and drivers with OpenGL 4.1 support (ModernGL windowing uses GLFW via moderngl-window).
+- `pip install -r requirements.txt` ensures ModernGL, moderngl-window, pyrr, numpy, Pillow, pygltflib, pybullet, and imgui are available. Optional developer extras live in `requirements-dev.txt`.
 
-## Quick Start
-
-### Installation
-
+## Setup
 ```bash
-# Make sure you're using native ARM Python (not Rosetta)
-python3 --version  # Should show arm64 architecture
+# optional virtualenv
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-# Install dependencies
+pip install --upgrade pip
 pip install -r requirements.txt
+# optional: linting/tests
+pip install -r requirements-dev.txt
+```
 
-# Run the engine
+On first launch the engine writes `keybindings.json` in the project root so you can customise bindings without touching code.
+
+## Running
+```bash
 python main.py
 ```
+- The app boots into the ImGui main menu. Select a scene such as **Default Scene**, **Donut Terrain**, or **Incline Test** to start.
+- Scenes mix primitives, GLTF assets, procedural terrain, and light definitions. Files live in `assets/scenes`.
+- If PyBullet fails to initialise (e.g., headless machine) the engine logs a warning and continues with rendering/editor features minus physics-driven movement.
 
-### Controls
+## Default Controls
+Gameplay:
+- `W/A/S/D` move the player capsule; `Space` jump; `Left Shift` sprint; `Left Ctrl` crouch; `C` toggles walk speed.
+- Mouse look controls the active camera rig; `F2` toggles the free-fly debug camera; `Esc` opens the pause menu.
+- Rendering toggles: `T` switches SSAO, `L` toggles light gizmos, `F3` shows the debug overlay, `F7` cycles AA modes, `F8` toggles MSAA, `F9` toggles SMAA, `F1` saves a screenshot.
 
-**Camera Movement:**
-- `W/A/S/D` - Move forward/left/backward/right
-- `Q/E` - Move down/up
-- Mouse - Look around (if implemented)
+Level editor (press `Enter` to switch from gameplay):
+- `W/A/S/D` plus mouse for free-fly movement; `Space`/`Shift` adjust altitude; hold `X` to temporarily boost camera speed.
+- Number keys `1-9` switch tools on the hotbar (model placement, object editor, light editor, delete by default).
+- `Left click` uses the current tool, `Right click` triggers the secondary action (e.g., rotate, adjust lights).
+- `G` toggles the grid overlay, `R` rotates selections, `Delete/Backspace` removes objects, `Z`/`Y` undo/redo, `B` opens the asset browser, `Tab` enables attribute mode for the thumbnail menu and inspector.
+- Tap `Enter` again to return to gameplay. Context switching updates key bindings automatically (e.g., WASD back to player movement).
 
-**Light Movement:**
-- `Arrow Keys` - Move light horizontally
-- `Z/X` - Move light down/up
+Controls are context-aware; if you modify `keybindings.json` a restart rebuilds the mapping.
 
-**Exit:**
-- `ESC` - Close window
-
-## Project Structure
-
+## Project Layout
 ```
-3dlibtesting/
-├── assets/
-│   └── shaders/            # GLSL shader files
-├── src/gamelib/            # Main engine package
-│   ├── config/             # Configuration
-│   ├── core/               # Camera, Light, Scene
-│   ├── rendering/          # Rendering pipeline
-│   └── input/              # Input handling
-├── tests/                  # Unit tests
-├── examples/               # Example scenes
-├── docs/                   # Documentation
-└── main.py                 # Entry point
+assets/                # shaders, models, scenes, collision meshes, textures, UI assets, configs
+docs/                  # architecture, rendering, input, lighting, tool system, terrain guides
+examples/              # scene/terrain generation scripts
+src/gamelib/           # engine modules (config, core, rendering, input, physics, gameplay, tools, ui)
+tests/                 # pytest suite
+tools/                 # content pipeline helpers (collision mesh export, incline generator)
+main.py                # ModernGL WindowConfig entry point
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+Key modules:
+- `src/gamelib/rendering/render_pipeline.py` orchestrates shadow, geometry, lighting, SSAO, bloom, transparent, UI, and post-process passes.
+- `src/gamelib/core/scene_manager.py` and `scene.py` load JSON scenes, create objects/lights, attach physics bodies, and manage skyboxes.
+- `src/gamelib/input` implements the command-pattern input stack with controllers for camera, player, rendering switches, tools, and UI.
+- `src/gamelib/tools` contains editor tool logic, undo/redo history, grid overlay renderer, placement previews, and thumbnail menu handling.
+- `src/gamelib/physics` wraps PyBullet APIs, collision mesh resolution, and the kinematic player controller.
+- `src/gamelib/ui` integrates ImGui themes (`assets/config/themes/*.json`), menus, HUD, thumbnail browser, and debug overlay.
 
-## How It Works
+## Utilities & Content Pipeline
+- `examples/generate_fractal_scene.py` builds heightmaps and scene JSON from fractal noise presets (see `docs/FRACTAL_TERRAIN_GENERATION.md`).
+- `tools/export_collision_meshes.py` resolves `collision_mesh` definitions in scenes and refreshes OBJ files under `assets/collision`.
+- `generate_thumbnails.py` and `src/gamelib/rendering/thumbnail_generator.py` prepare preview sprites for the editor’s asset browser.
+- `examples` and `docs/DONUT_TERRAIN_USAGE.md` cover donut terrain creation; `debug_frustum.py` and `check_shadow_resolutions.py` assist when tuning culling and shadow cascades.
+- Lighting presets live in `assets/config/lights/light_presets.json`; adjust `src/gamelib/config/settings.py` for global defaults (window size, shaders, player tuning, UI theme, AA mode, etc.).
 
-### Shadow Mapping Overview
-
-The project uses **two-pass rendering**:
-
-1. **Pass 1 - Shadow Map Generation:**
-   - Render scene from light's perspective
-   - Store depth values in a texture (shadow map)
-   - Uses orthographic projection for directional light
-
-2. **Pass 2 - Main Render:**
-   - Render scene from camera's perspective
-   - For each fragment, check if it's in shadow by comparing with shadow map
-   - Apply lighting calculations with shadow factor
-
-### Key Components
-
-**Shadow Map Setup (`setup_shadow_map`):**
-```python
-# Creates 2048x2048 depth texture
-self.shadow_depth = self.ctx.depth_texture((2048, 2048))
-self.shadow_fbo = self.ctx.framebuffer(depth_attachment=self.shadow_depth)
-```
-
-**Shader Programs:**
-- `shadow_program` - Renders depth from light's POV
-- `main_program` - Main render with lighting and shadows
-
-**PCF (Percentage Closer Filtering):**
-- Samples 9 points around each shadow map pixel
-- Creates soft shadow edges instead of hard shadows
-
-## Extending the Project
-
-### Adding New Objects
-
-```python
-# In create_scene() method:
-self.my_object = geometry.cube(size=(2.0, 2.0, 2.0))
-self.my_object_pos = Vector3([x, y, z])
-self.my_object_color = (r, g, b)
-
-# Add to objects list:
-self.objects.append(
-    (self.my_object, self.my_object_pos, self.my_object_color)
-)
-```
-
-### Fractal Perlin Terrain
-
-
-```
-PYTHONPATH=. python examples/generate_fractal_scene.py --preset mountainous --res 64 --seed 4205 --world-size 100 --out assets/heightmaps --json
-```
-
-
-### Changing Shadow Quality
-
-```python
-# In class definition:
-SHADOW_SIZE = 4096  # Higher = sharper shadows, lower performance
-```
-
-### Modifying Lighting
-
-```python
-# In shader fragment shader:
-ambient_strength = 0.3  # Increase for brighter ambient
-bias = 0.005            # Adjust to fix shadow artifacts
-```
-
-### Loading Custom Models
-
-Replace `geometry.cube()` with custom mesh loading:
-```python
-# Using wavefront obj loader (install: pip install moderngl-window[pywavefront])
-self.model = self.load_scene('models/mymodel.obj')
-```
-
-## Common Issues & Fixes
-
-### Shadows not appearing
-- Check light position with arrow keys
-- Verify objects are within light's view frustum
-- Increase orthographic projection bounds in `get_light_matrix()`
-
-### Shadow acne (striped patterns)
-```python
-# Increase bias in fragment shader:
-float bias = 0.01;  # Was 0.005
-```
-
-### Peter panning (shadows detached from objects)
-```python
-# Decrease bias:
-float bias = 0.001;  # Was 0.005
-```
-
-### Performance issues
-- Reduce shadow map size: `SHADOW_SIZE = 1024`
-- Disable PCF soft shadows (use single sample)
-- Reduce number of objects
-
-## Next Steps
-
-### Recommended Additions:
-
-1. **Mouse Look Camera**
-   ```python
-   def mouse_position_event(self, x, y, dx, dy):
-       self.camera_yaw += dx * self.mouse_sensitivity
-       self.camera_pitch -= dy * self.mouse_sensitivity
-       # Update camera target based on yaw/pitch
-   ```
-
-2. **Load Custom 3D Models**
-   - Use `moderngl-window`'s scene loaders
-   - Support for .obj, .gltf formats
-
-3. **Texture Mapping**
-   - Load textures with `self.load_texture_2d('texture.png')`
-   - Add texture coordinates to geometry
-   - Sample textures in fragment shader
-
-4. **Point Lights & Spotlights**
-   - Modify lighting calculations
-   - Use perspective projection for shadows (not orthographic)
-
-5. **Skybox**
-   - Cube map texture
-   - Render after clearing depth
-
-6. **Post-processing**
-   - Render to texture
-   - Apply effects (bloom, SSAO, etc.)
-
-## Performance Tips
-
-- ModernGL performs well for Minecraft-level complexity
-- Keep draw calls reasonable (<10K per frame)
-- Use instancing for repeated objects
-- Profile with `self.wnd.print_context_info()`
-
-## Collision Mesh Pipeline
-
-- Author physics-enabled objects with a `collision_mesh` block (e.g. `{"type": "gltf", "source": "assets/models/…/scene.gltf"}`).
-- For procedural geometry, point at any callable that writes an OBJ: `{"type": "generator", "generator": "tools.export_collision_meshes:export_donut_collision", "params": {...}}`.
-- Generate or refresh OBJ collision meshes by running `python tools/export_collision_meshes.py`.
-- The tool scans every scene in `assets/scenes`, builds missing meshes under `assets/collision`, and skips files that are already up to date.
-- At runtime the physics system resolves those definitions automatically, so no hard-coded OBJ paths are required.
-
-## Troubleshooting
-
-### Installation fails on M1
+## Testing
 ```bash
-# Force ARM architecture
-arch -arm64 pip install -r requirements.txt
-
-# If still issues, try creating a venv
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python -m pytest
 ```
+Requires packages from `requirements-dev.txt`. The suite exercises camera maths, light setup, scene loading, fractal terrain, and integration helpers. Rendering-heavy tests rely on ModernGL contexts; run them on a machine with GPU access.
 
-### OpenGL version errors
-macOS caps at OpenGL 4.1. The project is configured for this, but if you copied shaders from elsewhere, ensure they use `#version 410` or lower.
+## Documentation
+Primary references:
+- `docs/ARCHITECTURE.md` – high-level structure (core/input/rendering).
+- `docs/DEFERRED_RENDERING.md`, `docs/MULTI_LIGHT_IMPLEMENTATION.md`, `docs/ANTIALIASING_IMPLEMENTATION.md`, `docs/SMAA_IMPLEMENTATION.md` – rendering deep dives.
+- `docs/INPUT_SYSTEM.md` and `docs/TOOL_SYSTEM_INTEGRATION.md` – control flow and editor tooling.
+- `docs/FRACTAL_TERRAIN_GENERATION.md`, `docs/ROADMAP.md`, `docs/OPTIMIZATIONS.md`, `docs/LIGHTING.md` – content pipelines and future work.
 
-### Window doesn't open
-```bash
-# Check if dependencies installed correctly
-python -c "import moderngl; print(moderngl.__version__)"
-python -c "import moderngl_window; print('OK')"
-```
+Older quickstart notes may still mention `game.py`; treat this README and `main.py` as the canonical source.
 
-## Resources
+## Status & Contribution Notes
+The engine is functional but still evolving. Gameplay-specific controllers (`GameController`), advanced UI flows, and some editor niceties are scoped for future passes. When adding features:
+- Update or create docs under `docs/`.
+- Add tests in `tests/` where practical.
+- Keep configs in `assets/config` in sync with new tools, lights, or themes.
 
-- [ModernGL Documentation](https://moderngl.readthedocs.io/)
-- [ModernGL Examples](https://github.com/moderngl/moderngl/tree/master/examples)
-- [LearnOpenGL Shadow Mapping](https://learnopengl.com/Advanced-Lighting/Shadows/Shadow-Mapping)
-- [Pyrr Documentation](https://pyrr.readthedocs.io/)
+Roadmaps and known issues live in `TODO.md`, `docs/ROADMAP.md`, and per-feature plans inside `docs/`. Issues, ideas, and regressions are easiest to track there or alongside pull requests.

@@ -1,0 +1,63 @@
+{
+  "name": "Light Presets",
+  "version": "1.0",
+  "description": "Preset light configurations for the level editor. Add new presets here without modifying Python code.",
+  "presets": [
+    {
+      "id": "white",
+      "name": "White",
+      "color": [1.0, 1.0, 1.0],
+      "intensity": 1.0,
+      "icon_color": [1.0, 1.0, 1.0]
+    },
+    {
+      "id": "red",
+      "name": "Red",
+      "color": [1.0, 0.2, 0.2],
+      "intensity": 1.0,
+      "icon_color": [1.0, 0.0, 0.0]
+    },
+    {
+      "id": "green",
+      "name": "Green",
+      "color": [0.2, 1.0, 0.2],
+      "intensity": 1.0,
+      "icon_color": [0.0, 1.0, 0.0]
+    },
+    {
+      "id": "blue",
+      "name": "Blue",
+      "color": [0.2, 0.2, 1.0],
+      "intensity": 1.0,
+      "icon_color": [0.0, 0.0, 1.0]
+    },
+    {
+      "id": "yellow",
+      "name": "Yellow",
+      "color": [1.0, 1.0, 0.2],
+      "intensity": 1.0,
+      "icon_color": [1.0, 1.0, 0.0]
+    },
+    {
+      "id": "orange",
+      "name": "Orange",
+      "color": [1.0, 0.6, 0.2],
+      "intensity": 1.0,
+      "icon_color": [1.0, 0.6, 0.0]
+    },
+    {
+      "id": "purple",
+      "name": "Purple",
+      "color": [0.8, 0.2, 1.0],
+      "intensity": 1.0,
+      "icon_color": [1.0, 0.0, 1.0]
+    },
+    {
+      "id": "cyan",
+      "name": "Cyan",
+      "color": [0.2, 1.0, 1.0],
+      "intensity": 1.0,
+      "icon_color": [0.0, 1.0, 1.0]
+    }
+  ]
+}

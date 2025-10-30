@@ -36,10 +36,13 @@ class ThumbnailGenerator:
 
     out vec3 out_normal;
     out vec3 out_position;
+    out vec3 out_world_pos;
 
     void main() {
-        gl_Position = projection * view * model * vec4(in_position, 1.0);
-        out_position = (model * vec4(in_position, 1.0)).xyz;
+        vec4 world_pos = model * vec4(in_position, 1.0);
+        gl_Position = projection * view * world_pos;
+        out_position = world_pos.xyz;
+        out_world_pos = world_pos.xyz;
         out_normal = normalize((model * vec4(in_normal, 0.0)).xyz);
     }
     """
@@ -49,21 +52,33 @@ class ThumbnailGenerator:
 
     in vec3 out_normal;
     in vec3 out_position;
+    in vec3 out_world_pos;
 
     out vec4 out_color;
 
     uniform vec3 light_dir;
     uniform vec3 object_color;
+    uniform vec3 camera_pos;
 
     void main() {
         vec3 norm = normalize(out_normal);
         vec3 light_direction = normalize(light_dir);
 
+        // Diffuse
         float diff = max(dot(norm, light_direction), 0.0);
-        vec3 diffuse = diff * object_color;
+        vec3 diffuse = diff * object_color * 0.8;
 
-        vec3 ambient = 0.3 * object_color;
-        out_color = vec4(ambient + diffuse, 1.0);
+        // Ambient
+        vec3 ambient = 0.4 * object_color;
+
+        // Specular
+        vec3 view_dir = normalize(camera_pos - out_world_pos);
+        vec3 reflect_dir = reflect(-light_direction, norm);
+        float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 16.0);
+        vec3 specular = spec * vec3(0.3, 0.3, 0.3);
+
+        vec3 final_color = ambient + diffuse + specular;
+        out_color = vec4(final_color, 1.0);
     }
     """
 
@@ -75,6 +90,7 @@ class ThumbnailGenerator:
             ctx: ModernGL context
             thumbnail_size: Size of generated thumbnails (width and height)
         """
+        print(f"[ThumbnailGenerator] __init__: Starting initialization")
         self.ctx = ctx
         self.thumbnail_size = thumbnail_size
         self.thumbs_dir = Path(__file__).parent.parent.parent.parent / "assets" / "ui" / "thumbs"
@@ -86,17 +102,25 @@ class ThumbnailGenerator:
         self.models_dir.mkdir(parents=True, exist_ok=True)
         self.lights_dir.mkdir(parents=True, exist_ok=True)
 
+        print(f"[ThumbnailGenerator] Initialized successfully")
+        print(f"  Thumbnails directory: {self.thumbs_dir}")
+        print(f"  Models directory: {self.models_dir}")
+        print(f"  Lights directory: {self.lights_dir}")
+
         # Compile shader program
+        print(f"[ThumbnailGenerator] Compiling shader programs...")
         try:
             self.program = self.ctx.program(
                 vertex_shader=self.THUMB_VERTEX_SHADER,
                 fragment_shader=self.THUMB_FRAGMENT_SHADER
             )
+            print(f"[ThumbnailGenerator] Shader program compiled successfully")
         except Exception as e:
-            print(f"Warning: Failed to compile thumbnail shader: {e}")
+            print(f"[ThumbnailGenerator] WARNING: Failed to compile thumbnail shader: {e}")
             self.program = None
 
         # Create framebuffer for rendering
+        print(f"[ThumbnailGenerator] Creating framebuffer...")
         self.fbo = None
         self.texture = None
         self._create_framebuffer()
@@ -104,6 +128,7 @@ class ThumbnailGenerator:
     def _create_framebuffer(self) -> None:
         """Create framebuffer and texture for thumbnail rendering."""
         try:
+            print(f"[ThumbnailGenerator] Creating framebuffer ({self.thumbnail_size}x{self.thumbnail_size})...")
             # Create color texture
             self.texture = self.ctx.texture(
                 (self.thumbnail_size, self.thumbnail_size),
@@ -111,21 +136,31 @@ class ThumbnailGenerator:
                 dtype='f1'
             )
 
-            # Create depth texture
-            depth_texture = self.ctx.texture(
-                (self.thumbnail_size, self.thumbnail_size),
-                1,
-                dtype='f4'
-            )
+            # Create depth renderbuffer for depth testing
+            depth_rb = self.ctx.renderbuffer((self.thumbnail_size, self.thumbnail_size))
 
             # Create framebuffer
             self.fbo = self.ctx.framebuffer(
                 color_attachments=[self.texture],
-                depth_attachment=depth_texture
+                depth_attachment=depth_rb
             )
+            print(f"[ThumbnailGenerator] Framebuffer created successfully")
         except Exception as e:
-            print(f"Warning: Failed to create thumbnail framebuffer: {e}")
-            self.fbo = None
+            print(f"[ThumbnailGenerator] ERROR: Failed to create framebuffer: {e}")
+            import traceback
+            traceback.print_exc()
+            # Try fallback without depth attachment
+            try:
+                print(f"[ThumbnailGenerator] Trying framebuffer without depth attachment...")
+                self.fbo = self.ctx.framebuffer(
+                    color_attachments=[self.texture]
+                )
+                print(f"[ThumbnailGenerator] Framebuffer created successfully (no depth)")
+            except Exception as e2:
+                print(f"[ThumbnailGenerator] ERROR: Failed to create framebuffer (no depth): {e2}")
+                import traceback
+                traceback.print_exc()
+                self.fbo = None
 
     def generate_model_thumbnail(
         self,
@@ -145,6 +180,7 @@ class ThumbnailGenerator:
             Path to thumbnail image or None if generation failed
         """
         if not self.fbo:
+            print(f"[ThumbnailGenerator] ERROR: No framebuffer available")
             return None
 
         # Sanitize filename
@@ -153,26 +189,34 @@ class ThumbnailGenerator:
 
         # Skip if already exists
         if thumb_path.exists() and not force_regenerate:
+            print(f"[ThumbnailGenerator] [SKIP] {model_name}: thumbnail already exists at {thumb_path}")
             return thumb_path
 
+        print(f"[ThumbnailGenerator] [GENERATING] {model_name}...")
         try:
             # Import here to avoid circular dependency
             from ..loaders import GltfLoader
 
+            print(f"  Loading model from: {model_path}")
             loader = GltfLoader(self.ctx)
             model = loader.load(model_path)
+            print(f"  Model loaded successfully")
 
             # Render thumbnail
+            print(f"  Rendering thumbnail...")
             self._render_model_thumbnail(model)
 
             # Save to file
+            print(f"  Saving to: {thumb_path}")
             self._save_framebuffer_to_png(thumb_path)
-            print(f"Generated thumbnail: {thumb_path}")
+            print(f"[ThumbnailGenerator] [SUCCESS] {model_name}: {thumb_path}")
 
             return thumb_path
 
         except Exception as e:
-            print(f"Warning: Failed to generate thumbnail for {model_name}: {e}")
+            print(f"[ThumbnailGenerator] [ERROR] {model_name}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def generate_light_preset_thumbnails(self, light_presets: dict) -> dict:
@@ -185,6 +229,7 @@ class ThumbnailGenerator:
         Returns:
             Dict mapping preset names to thumbnail paths
         """
+        print(f"[ThumbnailGenerator] Generating light preset thumbnails for {len(light_presets)} presets")
         results = {}
 
         for preset_name, preset_data in light_presets.items():
@@ -192,27 +237,38 @@ class ThumbnailGenerator:
 
             # Skip if already exists
             if thumb_path.exists():
+                print(f"  [SKIP] {preset_name}: thumbnail already exists at {thumb_path}")
                 results[preset_name] = thumb_path
                 continue
 
+            # Skip generation if framebuffer failed
+            if not self.fbo:
+                print(f"  [SKIP] {preset_name}: framebuffer not available (rendering disabled)")
+                results[preset_name] = None
+                continue
+
             try:
+                print(f"  [GENERATING] {preset_name}...")
                 color = preset_data.get("color", (1.0, 1.0, 1.0))
                 self._render_light_thumbnail(color)
                 self._save_framebuffer_to_png(thumb_path)
                 results[preset_name] = thumb_path
-                print(f"Generated light thumbnail: {thumb_path}")
+                print(f"  [SUCCESS] {preset_name}: saved to {thumb_path}")
             except Exception as e:
-                print(f"Warning: Failed to generate light thumbnail for {preset_name}: {e}")
+                print(f"  [ERROR] {preset_name}: {e}")
+                import traceback
+                traceback.print_exc()
                 results[preset_name] = None
 
+        print(f"[ThumbnailGenerator] Light thumbnail generation complete")
         return results
 
-    def _render_model_thumbnail(self, model: SceneObject) -> None:
+    def _render_model_thumbnail(self, model) -> None:
         """
-        Render model to thumbnail framebuffer.
+        Render model to thumbnail framebuffer by loading and rendering the actual model geometry.
 
         Args:
-            model: SceneObject to render
+            model: Model object with geometry to render
         """
         # Set up viewport and clear
         self.ctx.viewport = (0, 0, self.thumbnail_size, self.thumbnail_size)
@@ -220,32 +276,96 @@ class ThumbnailGenerator:
         self.ctx.clear(0.15, 0.15, 0.18, 1.0)  # Dark background
         self.ctx.enable(moderngl.DEPTH_TEST)
 
-        # Simple orthographic view centered on model
-        view = Matrix44.look_at(
-            (5, 5, 5),  # Camera position
-            (0, 0, 0),  # Look at center
-            (0, 1, 0)   # Up vector
-        )
+        if not self.program:
+            return
 
-        projection = Matrix44.orthogonal_projection(
-            -10, 10,  # left, right
-            -10, 10,  # bottom, top
-            0.1, 100  # near, far
-        )
+        try:
+            # Calculate model bounds to frame it properly
+            bounds = self._calculate_model_bounds(model)
+            if bounds is None:
+                # Fallback if we can't calculate bounds
+                bounds = ((-2, -2, -2), (2, 2, 2))
 
-        # Reset model transform for thumbnail
-        model.position = Vector3([0, 0, 0])
-        model.rotation = Vector3([0.5, 0.5, 0])  # Slight rotation for better view
-        model.scale = Vector3([1.0, 1.0, 1.0])
+            min_pt, max_pt = bounds
+            center = np.array([(min_pt[i] + max_pt[i]) / 2 for i in range(3)], dtype=np.float32)
+            size = np.array([max_pt[i] - min_pt[i] for i in range(3)], dtype=np.float32)
+            max_size = max(size) if max(size) > 0 else 4.0
 
-        # Render
-        if hasattr(model, 'render'):
-            try:
-                model.render(view, projection, [])
-            except Exception as e:
-                # Fallback: just render with basic shader if available
-                if self.program:
-                    self._render_with_basic_shader(model, view, projection)
+            # Position camera to see the entire model
+            distance = max_size * 1.5
+            camera_pos = center + np.array([distance * 0.6, distance * 0.5, distance * 0.8], dtype=np.float32)
+
+            view = Matrix44.look_at(
+                tuple(camera_pos),
+                tuple(center),
+                (0, 1, 0)
+            )
+
+            # Orthographic projection framed around the model
+            half_size = max_size * 0.8
+            projection = Matrix44.orthogonal_projection(
+                -half_size, half_size,
+                -half_size, half_size,
+                0.1, 1000
+            )
+
+            # Identity model matrix (model already at origin)
+            model_matrix = Matrix44.identity()
+
+            # Set up shader uniforms
+            self.program['model'].write(np.array(model_matrix, dtype=np.float32))
+            self.program['view'].write(np.array(view, dtype=np.float32))
+            self.program['projection'].write(np.array(projection, dtype=np.float32))
+            self.program['light_dir'].write(np.array([1.0, 0.8, 0.6], dtype=np.float32))
+            self.program['object_color'].write(np.array([0.7, 0.7, 0.7], dtype=np.float32))
+            self.program['camera_pos'].write(np.array(camera_pos, dtype=np.float32))
+
+            # Render all meshes of the model
+            if hasattr(model, 'meshes'):
+                for mesh in model.meshes:
+                    if hasattr(mesh, 'render'):
+                        # Pass model matrix as parent transform and context
+                        mesh.render(self.program, parent_transform=model_matrix, ctx=self.ctx)
+            elif hasattr(model, 'render'):
+                # Fallback: try to render the model directly
+                model.render(self.program)
+            elif hasattr(model, 'geometry') and hasattr(model.geometry, 'render'):
+                # Another fallback for SceneObjects
+                model.geometry.render(self.program)
+
+        except Exception as e:
+            print(f"[ThumbnailGenerator] Warning: Failed to render model thumbnail: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _calculate_model_bounds(self, model) -> tuple:
+        """
+        Calculate bounding box of a model.
+
+        Returns:
+            Tuple of (min_point, max_point) or None if calculation fails
+        """
+        try:
+            if hasattr(model, 'meshes'):
+                all_vertices = []
+                for mesh in model.meshes:
+                    if hasattr(mesh, 'vertices'):
+                        all_vertices.extend(mesh.vertices)
+                    elif hasattr(mesh, 'vao') and hasattr(mesh.vao, 'vertices'):
+                        # Try to get vertices from VAO
+                        pass
+
+                if all_vertices:
+                    vertices = np.array(all_vertices)
+                    min_pt = tuple(np.min(vertices, axis=0)[:3])
+                    max_pt = tuple(np.max(vertices, axis=0)[:3])
+                    return (min_pt, max_pt)
+
+            # Fallback default bounds
+            return ((-2, -2, -2), (2, 2, 2))
+        except Exception as e:
+            print(f"[ThumbnailGenerator] Warning: Could not calculate model bounds: {e}")
+            return None
 
     def _render_light_thumbnail(self, color: tuple) -> None:
         """
@@ -265,7 +385,7 @@ class ThumbnailGenerator:
 
         # Create a simple sphere geometry
         from moderngl_window import geometry
-        sphere = geometry.sphere(radius=1.0, sectors=16, stacks=8)
+        sphere = geometry.sphere(radius=1.0, sectors=16, rings=8)
 
         # Set up matrices
         model = Matrix44.identity()
@@ -278,12 +398,12 @@ class ThumbnailGenerator:
             -3, 3, -3, 3, 0.1, 100
         )
 
-        # Set up lighting
-        self.program['model'].write(model)
-        self.program['view'].write(view)
-        self.program['projection'].write(projection)
-        self.program['light_dir'].write((1.0, 1.0, 1.0))
-        self.program['object_color'].write(color)
+        # Set up lighting - convert to numpy arrays for ModernGL
+        self.program['model'].write(np.array(model, dtype=np.float32))
+        self.program['view'].write(np.array(view, dtype=np.float32))
+        self.program['projection'].write(np.array(projection, dtype=np.float32))
+        self.program['light_dir'].write(np.array([1.0, 1.0, 1.0], dtype=np.float32))
+        self.program['object_color'].write(np.array(color, dtype=np.float32))
 
         # Render sphere
         try:
@@ -303,11 +423,12 @@ class ThumbnailGenerator:
 
         try:
             model_matrix = self._build_model_matrix(model)
-            self.program['model'].write(model_matrix)
-            self.program['view'].write(view)
-            self.program['projection'].write(projection)
-            self.program['light_dir'].write((1.0, 1.0, 1.0))
-            self.program['object_color'].write(model.color if hasattr(model, 'color') else (0.8, 0.8, 0.8))
+            self.program['model'].write(np.array(model_matrix, dtype=np.float32))
+            self.program['view'].write(np.array(view, dtype=np.float32))
+            self.program['projection'].write(np.array(projection, dtype=np.float32))
+            self.program['light_dir'].write(np.array([1.0, 1.0, 1.0], dtype=np.float32))
+            color_val = model.color if hasattr(model, 'color') else (0.8, 0.8, 0.8)
+            self.program['object_color'].write(np.array(color_val, dtype=np.float32))
 
             if hasattr(model, 'geometry') and hasattr(model.geometry, 'render'):
                 model.geometry.render(self.program)
@@ -331,18 +452,26 @@ class ThumbnailGenerator:
         Args:
             path: Output file path
         """
-        # Read pixel data from texture
-        data = self.texture.read()
+        try:
+            # Read pixel data from texture
+            print(f"  [PNG] Reading texture data ({self.thumbnail_size}x{self.thumbnail_size})...")
+            data = self.texture.read()
 
-        # Convert to numpy array
-        image_data = np.frombuffer(data, dtype=np.uint8)
-        image_data = image_data.reshape((self.thumbnail_size, self.thumbnail_size, 4))
+            # Convert to numpy array
+            image_data = np.frombuffer(data, dtype=np.uint8)
+            image_data = image_data.reshape((self.thumbnail_size, self.thumbnail_size, 4))
 
-        # Flip vertically (OpenGL origin is bottom-left)
-        image_data = np.flipud(image_data)
+            # Flip vertically (OpenGL origin is bottom-left)
+            image_data = np.flipud(image_data)
 
-        # Write simple PNG (uncompressed for now)
-        self._write_png(path, image_data)
+            # Write simple PNG (uncompressed for now)
+            print(f"  [PNG] Writing PNG file ({len(image_data)} bytes)...")
+            self._write_png(path, image_data)
+            print(f"  [PNG] File written successfully to {path}")
+        except Exception as e:
+            print(f"  [PNG] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _write_png(self, path: Path, image_data: np.ndarray) -> None:
         """

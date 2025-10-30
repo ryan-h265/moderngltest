@@ -79,6 +79,22 @@ class Game(mglw.WindowConfig):
         self.ctx.enable(moderngl.CULL_FACE)
         self.ctx.front_face = "ccw"
 
+        # Generate thumbnails immediately (as soon as ModernGL context is available)
+        print("[Game] Initializing thumbnail generator...")
+        self.thumbnail_generator = ThumbnailGenerator(self.ctx, thumbnail_size=THUMBNAIL_SIZE)
+
+        # Discover and generate model thumbnails
+        print("[Game] Discovering available models for thumbnail generation...")
+        model_list = self._discover_available_models()
+        print(f"[Game] Found {len(model_list)} models to generate thumbnails for")
+        for model_name, model_path in model_list.items():
+            print(f"[Game] Generating thumbnail for: {model_name}")
+            self.thumbnail_generator.generate_model_thumbnail(model_path, model_name)
+
+        # Generate light preset thumbnails
+        print("[Game] Generating light preset thumbnails...")
+        self.thumbnail_generator.generate_light_preset_thumbnails(LIGHT_PRESETS)
+
         # Primary camera used by all rigs
         self.camera = Camera(
             position=Vector3([0.0, 5.0, 10.0]),
@@ -195,6 +211,38 @@ class Game(mglw.WindowConfig):
 
         self.input_manager.register_handler(InputCommand.EDITOR_ATTRIBUTE_MODE, self.toggle_attribute_mode)
 
+    def _discover_available_models(self) -> dict:
+        """
+        Discover all available models in the models library.
+
+        Returns:
+            Dictionary mapping model names to their file paths
+        """
+        models_dir = PROJECT_ROOT / "assets" / "models" / "props"
+        available_models = {}
+
+        if not models_dir.exists():
+            print(f"[Game] Models directory not found: {models_dir}")
+            return available_models
+
+        # Look for models in subdirectories (scene.gltf or scene.glb)
+        for model_dir in models_dir.iterdir():
+            if model_dir.is_dir():
+                gltf_path = model_dir / "scene.gltf"
+                glb_path = model_dir / "scene.glb"
+
+                if gltf_path.exists():
+                    available_models[model_dir.name] = str(gltf_path)
+                elif glb_path.exists():
+                    available_models[model_dir.name] = str(glb_path)
+
+        # Also look for standalone .glb files in the props directory
+        for glb_file in models_dir.glob("*.glb"):
+            model_name = glb_file.stem  # filename without extension
+            available_models[model_name] = str(glb_file)
+
+        return available_models
+
     def _on_game_state_changed(self, old_state: GameState, new_state: GameState):
         """Called when game state changes."""
         if new_state == GameState.PLAYING:
@@ -286,13 +334,8 @@ class Game(mglw.WindowConfig):
             if self.tool_manager.inventory.get_hotbar_tool(0):
                 self.tool_manager.equip_hotbar_slot(0)
 
-            # Initialize thumbnail generator for asset previews
-            self.thumbnail_generator = ThumbnailGenerator(self.ctx, thumbnail_size=THUMBNAIL_SIZE)
-
-            # Generate thumbnails for light presets (one-time generation)
-            self.thumbnail_generator.generate_light_preset_thumbnails(LIGHT_PRESETS)
-
             # Initialize attribute mode components
+            print("[Game] Initializing attribute mode components...")
             self.thumbnail_menu = ThumbnailMenu(
                 self.tool_manager,
                 thumbnail_size=THUMBNAIL_SIZE,
@@ -304,19 +347,9 @@ class Game(mglw.WindowConfig):
             self.selection_highlight = SelectionHighlight(self.ctx)
             self.selection_highlight.set_outline_scale(SELECTION_OUTLINE_SCALE)
 
-            # Populate thumbnail menu from scene with generated thumbnails
+            # Populate thumbnail menu from scene
+            print("[Game] Populating thumbnail menu from scene...")
             self.thumbnail_menu.populate_from_scene(self.scene)
-
-            # Generate model thumbnails for assets in scene
-            if hasattr(self.scene, 'objects'):
-                for obj in self.scene.objects:
-                    if hasattr(obj, 'is_model') and obj.is_model:
-                        # Generate thumbnail for this model if it has a path
-                        if hasattr(obj, 'source_path'):
-                            self.thumbnail_generator.generate_model_thumbnail(
-                                obj.source_path,
-                                obj.name
-                            )
 
             # Attribute mode disabled by default
             self.attribute_mode_active = False
