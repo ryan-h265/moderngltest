@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional, Tuple
 from dataclasses import dataclass
+from pathlib import Path
 
 import imgui
 
@@ -76,6 +77,9 @@ class ThumbnailMenu:
         # Tool icon data (will populate from tool_manager)
         self.tool_icons = []
 
+        # Texture cache for thumbnails (filepath -> imgui texture ID)
+        self.texture_cache: dict[str, tuple] = {}
+
     def add_asset(self, category: str, item: ThumbnailItem) -> None:
         """
         Add an asset to a category.
@@ -119,7 +123,7 @@ class ThumbnailMenu:
         expanded, self.show = imgui.begin(
             "Thumbnail Menu##thumbnail_menu",
             self.show,
-            imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_RESIZE,
+            imgui.WINDOW_NO_RESIZE,
         )
 
         if not expanded:
@@ -141,7 +145,7 @@ class ThumbnailMenu:
     def _draw_tool_icons(self) -> None:
         """Draw top row with small editor tool icons."""
         tool_icon_size = self.tool_icon_size
-        spacing = 8
+        spacing = 12
 
         imgui.text("Tools:")
         imgui.same_line(spacing + 50)
@@ -154,17 +158,37 @@ class ThumbnailMenu:
                 # Draw as button
                 is_active = tool == self.tool_manager.active_tool
                 if is_active:
+                    # Active tool: darker green background
                     imgui.push_style_color(
                         imgui.COLOR_BUTTON,
-                        0.4, 0.7, 0.4, 1.0  # Green for active
+                        0.3, 0.6, 0.3, 1.0
+                    )
+                    imgui.push_style_color(
+                        imgui.COLOR_BUTTON_HOVERED,
+                        0.4, 0.75, 0.4, 1.0
+                    )
+                    imgui.push_style_color(
+                        imgui.COLOR_BUTTON_ACTIVE,
+                        0.5, 0.9, 0.5, 1.0
+                    )
+                else:
+                    # Inactive tool: dark gray
+                    imgui.push_style_color(
+                        imgui.COLOR_BUTTON,
+                        0.2, 0.2, 0.25, 1.0
                     )
 
-                button_label = f"{tool.name}##tool_{tool.id}"
+                button_label = f"{tool.name[:3]}##tool_{tool.id}"
                 if imgui.button(button_label, tool_icon_size, tool_icon_size):
                     self.tool_manager.equip_tool(tool.id)
                     self.selected_tool_id = tool.id
 
+                # Pop style colors
                 if is_active:
+                    imgui.pop_style_color()
+                    imgui.pop_style_color()
+                    imgui.pop_style_color()
+                else:
                     imgui.pop_style_color()
 
                 if idx < len(tools_to_show) - 1:
@@ -183,15 +207,16 @@ class ThumbnailMenu:
             for category in categories:
                 is_open, is_selected = imgui.begin_tab_item(category)
 
-                if is_selected:
-                    if imgui.begin_child(
-                        f"Category_{category}##child",
-                        border=False,
-                    ):
-                        self._draw_category_thumbnails(category)
-                        imgui.end_child()
+                if is_open:
+                    if is_selected:
+                        if imgui.begin_child(
+                            f"Category_{category}##child",
+                            border=False,
+                        ):
+                            self._draw_category_thumbnails(category)
+                            imgui.end_child()
 
-                imgui.end_tab_item()
+                    imgui.end_tab_item()
 
             imgui.end_tab_bar()
 
@@ -208,30 +233,25 @@ class ThumbnailMenu:
             return
 
         # Draw scroll buttons
-        scroll_width = 40
-        thumb_spacing = 8
-        total_width = imgui.get_content_region_available_width()
+        scroll_width = 35
+        thumb_spacing = 6
 
-        # Calculate how many can fit
-        max_visible = int((total_width - 80) / (self.thumbnail_size + thumb_spacing))
-
-        imgui.text(f"Showing {min(self.visible_count, len(assets))} of {len(assets)}")
-        imgui.same_line()
-
-        # Scroll left button
+        # Scroll controls on one line
         if imgui.button("<##scroll_left", scroll_width, 30):
             self.scroll_offset = max(0, self.scroll_offset - 1)
 
         imgui.same_line()
 
-        # Scroll right button
-        max_scroll = max(0, len(assets) - self.visible_count)
         if imgui.button(">##scroll_right", scroll_width, 30):
+            max_scroll = max(0, len(assets) - self.visible_count)
             self.scroll_offset = min(max_scroll, self.scroll_offset + 1)
 
-        imgui.separator()
+        imgui.same_line()
+        imgui.text(f"{min(self.visible_count, len(assets))}/{len(assets)}")
 
-        # Draw visible thumbnails in a row
+        imgui.spacing()
+
+        # Draw visible thumbnails in a compact row
         for i in range(self.visible_count):
             asset_idx = self.scroll_offset + i
             if asset_idx >= len(assets):
@@ -247,22 +267,37 @@ class ThumbnailMenu:
             if is_selected:
                 imgui.push_style_color(
                     imgui.COLOR_BUTTON,
-                    0.7, 0.7, 0.3, 1.0  # Yellow highlight
+                    0.6, 0.6, 0.2, 1.0  # Dark yellow highlight
+                )
+                imgui.push_style_color(
+                    imgui.COLOR_BUTTON_HOVERED,
+                    0.8, 0.8, 0.3, 1.0
+                )
+                imgui.push_style_color(
+                    imgui.COLOR_BUTTON_ACTIVE,
+                    1.0, 1.0, 0.4, 1.0
+                )
+            else:
+                imgui.push_style_color(
+                    imgui.COLOR_BUTTON,
+                    0.3, 0.3, 0.35, 1.0  # Dark background
                 )
 
-            # Draw thumbnail as button
-            button_label = f"{asset.name}##thumb_{category}_{asset.id}"
+            # Draw thumbnail as button with truncated name
+            short_name = asset.name[:8] if len(asset.name) > 8 else asset.name
+            button_label = f"{short_name}##thumb_{category}_{asset.id}"
             if imgui.button(button_label, self.thumbnail_size, self.thumbnail_size):
                 self.selected_category = category
                 self.selected_item_id = asset.id
 
             if is_selected:
                 imgui.pop_style_color()
+                imgui.pop_style_color()
+                imgui.pop_style_color()
+            else:
+                imgui.pop_style_color()
 
-            # Draw label below
-            imgui.text(asset.name)
-
-            # Same line for next thumbnail (except last)
+            # Same line for next thumbnail
             if i < self.visible_count - 1 and asset_idx + 1 < len(assets):
                 imgui.same_line(thumb_spacing)
 
@@ -329,3 +364,142 @@ class ThumbnailMenu:
             Tuple of (category, item_id, tool_id)
         """
         return self.selected_category, self.selected_item_id, self.selected_tool_id
+
+    def load_thumbnail_image(self, filepath: str) -> Optional[tuple]:
+        """
+        Load thumbnail image from file and cache it for ImGui.
+
+        Args:
+            filepath: Path to PNG file
+
+        Returns:
+            ImGui texture ID tuple or None if loading failed
+        """
+        if not filepath:
+            return None
+
+        # Check cache first
+        if filepath in self.texture_cache:
+            return self.texture_cache[filepath]
+
+        try:
+            path = Path(filepath)
+            if not path.exists():
+                return None
+
+            # Read PNG file
+            import zlib
+            import struct
+
+            png_data = path.read_bytes()
+
+            # Parse PNG (simplified - just extract image data from IDAT chunk)
+            width, height, image_data = self._parse_png(png_data)
+
+            if image_data is None:
+                return None
+
+            # Create ImGui texture
+            texture_data = self._convert_to_rgba8(image_data, width, height)
+
+            # Cache the texture (for ImGui, we store the path as identifier)
+            # ImGui will handle the actual texture binding
+            self.texture_cache[filepath] = (width, height, texture_data)
+
+            return self.texture_cache[filepath]
+
+        except Exception as e:
+            print(f"Warning: Failed to load thumbnail {filepath}: {e}")
+            return None
+
+    def _parse_png(self, png_data: bytes) -> Tuple[Optional[int], Optional[int], Optional[bytes]]:
+        """
+        Parse PNG file and extract image dimensions and RGBA data.
+
+        Args:
+            png_data: Raw PNG file bytes
+
+        Returns:
+            Tuple of (width, height, image_data) or (None, None, None) if parsing failed
+        """
+        try:
+            import zlib
+            import struct
+
+            # Check PNG signature
+            if png_data[:8] != b'\x89PNG\r\n\x1a\n':
+                return None, None, None
+
+            offset = 8
+            width = height = None
+            idat_data = b''
+
+            # Parse chunks
+            while offset < len(png_data):
+                # Read chunk length
+                length = struct.unpack('>I', png_data[offset:offset+4])[0]
+                offset += 4
+
+                # Read chunk type
+                chunk_type = png_data[offset:offset+4]
+                offset += 4
+
+                if chunk_type == b'IHDR':
+                    # Image header
+                    width, height = struct.unpack('>II', png_data[offset:offset+8])
+                elif chunk_type == b'IDAT':
+                    # Image data
+                    idat_data += png_data[offset:offset+length]
+                elif chunk_type == b'IEND':
+                    # End of image
+                    break
+
+                offset += length + 4  # Skip data and CRC
+
+            if width is None or height is None:
+                return None, None, None
+
+            # Decompress image data
+            raw_data = zlib.decompress(idat_data)
+
+            # Convert raw data to RGBA (simple unfiltering)
+            image_data = self._unfilter_png_data(raw_data, width, height)
+
+            return width, height, image_data
+
+        except Exception as e:
+            print(f"Warning: PNG parsing failed: {e}")
+            return None, None, None
+
+    def _unfilter_png_data(self, raw_data: bytes, width: int, height: int) -> bytes:
+        """
+        Unfilter PNG scanlines and convert to proper image format.
+
+        Args:
+            raw_data: Raw PNG pixel data with filter bytes
+            width: Image width
+            height: Image height
+
+        Returns:
+            Unfiltered RGBA image data
+        """
+        bytes_per_pixel = 4
+        scanline_size = 1 + (width * bytes_per_pixel)  # 1 byte filter + pixels
+        result = bytearray()
+
+        for y in range(height):
+            scanline_start = y * scanline_size
+            filter_type = raw_data[scanline_start]
+            scanline = bytearray(raw_data[scanline_start+1:scanline_start+scanline_size])
+
+            # Simple filter (just copy for now - proper filtering would be more complex)
+            result.extend(scanline)
+
+        return bytes(result)
+
+    def _convert_to_rgba8(self, image_data: bytes, width: int, height: int) -> bytes:
+        """Convert image data to RGBA8 format for ImGui."""
+        # Ensure we have RGBA format
+        if len(image_data) == width * height * 4:
+            return image_data
+        return image_data

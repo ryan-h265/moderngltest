@@ -20,6 +20,7 @@ class Asset:
         name: str,
         category: str,
         path: str,
+        thumbnail_path: Optional[str] = None,
         icon_path: Optional[str] = None,
         metadata: Optional[dict] = None,
     ):
@@ -31,13 +32,15 @@ class Asset:
             name: Display name
             category: Asset category (Models, Lights, Objects, Materials)
             path: Path to asset file
-            icon_path: Path to icon/thumbnail image
+            thumbnail_path: Path to generated thumbnail image
+            icon_path: Path to icon/thumbnail image (deprecated, use thumbnail_path)
             metadata: Additional metadata dict
         """
         self.id = asset_id
         self.name = name
         self.category = category
         self.path = path
+        self.thumbnail_path = thumbnail_path or icon_path
         self.icon_path = icon_path
         self.metadata = metadata or {}
 
@@ -48,6 +51,7 @@ class Asset:
             "name": self.name,
             "category": self.category,
             "path": self.path,
+            "thumbnail_path": self.thumbnail_path,
             "icon_path": self.icon_path,
             **self.metadata,
         }

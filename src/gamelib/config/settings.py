@@ -420,12 +420,59 @@ UI_PAUSE_DIM_ALPHA = 0.6  # Opacity of dim overlay (0.0-1.0)
 # ============================================================================
 
 # Thumbnail menu configuration
-THUMBNAIL_SIZE = 128  # Size of asset thumbnails in pixels
+THUMBNAIL_SIZE = 96  # Size of asset thumbnails in pixels
 THUMBNAIL_VISIBLE_COUNT = 6  # Number of thumbnails visible at once
-BOTTOM_MENU_HEIGHT = 200  # Height of bottom menu bar in pixels
-TOOL_ICON_SIZE = 48  # Size of tool icons in top row
+BOTTOM_MENU_HEIGHT = 220  # Height of bottom menu bar in pixels
+TOOL_ICON_SIZE = 56  # Size of tool icons in top row
 
 # Object selection and highlight
 SELECTION_HIGHLIGHT_COLOR = (1.0, 0.8, 0.0, 1.0)  # Orange RGBA
 SELECTION_OUTLINE_SCALE = 0.01  # Outline thickness (0.005-0.02 recommended)
 OBJECT_RAYCAST_RANGE = 1000.0  # Maximum distance for raycasting
+
+# ============================================================================
+# Light Presets (Editor)
+# ============================================================================
+
+LIGHT_PRESETS = {
+    "White": {
+        "color": (1.0, 1.0, 1.0),
+        "intensity": 1.0,
+        "icon_color": (1.0, 1.0, 1.0),
+    },
+    "Red": {
+        "color": (1.0, 0.2, 0.2),
+        "intensity": 1.0,
+        "icon_color": (1.0, 0.0, 0.0),
+    },
+    "Green": {
+        "color": (0.2, 1.0, 0.2),
+        "intensity": 1.0,
+        "icon_color": (0.0, 1.0, 0.0),
+    },
+    "Blue": {
+        "color": (0.2, 0.2, 1.0),
+        "intensity": 1.0,
+        "icon_color": (0.0, 0.0, 1.0),
+    },
+    "Yellow": {
+        "color": (1.0, 1.0, 0.2),
+        "intensity": 1.0,
+        "icon_color": (1.0, 1.0, 0.0),
+    },
+    "Orange": {
+        "color": (1.0, 0.6, 0.2),
+        "intensity": 1.0,
+        "icon_color": (1.0, 0.6, 0.0),
+    },
+    "Purple": {
+        "color": (0.8, 0.2, 1.0),
+        "intensity": 1.0,
+        "icon_color": (1.0, 0.0, 1.0),
+    },
+    "Cyan": {
+        "color": (0.2, 1.0, 1.0),
+        "intensity": 1.0,
+        "icon_color": (0.0, 1.0, 1.0),
+    },
+}

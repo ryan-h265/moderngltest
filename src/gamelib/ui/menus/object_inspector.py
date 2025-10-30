@@ -38,17 +38,18 @@ class ObjectInspector:
         self.temp_casts_shadow = True
         self.temp_physics_enabled = False
 
-    def draw(self, screen_width: int, screen_height: int) -> None:
+    def draw(self, screen_width: int, screen_height: int, force_show: bool = False) -> None:
         """
         Draw object inspector panel (docked on right side).
 
         Args:
             screen_width: Screen width in pixels
             screen_height: Screen height in pixels
+            force_show: If True, show panel even without selection (for attribute mode)
         """
         # Determine if we should show
         has_selection = self.selected_object is not None or self.preview_item is not None
-        if not self.show or not has_selection:
+        if not self.show or (not has_selection and not force_show):
             return
 
         # Dock on right side
@@ -64,7 +65,6 @@ class ObjectInspector:
         expanded, self.show = imgui.begin(
             "Inspector##inspector",
             self.show,
-            imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_RESIZE,
         )
 
         if not expanded:
@@ -76,6 +76,12 @@ class ObjectInspector:
             self._draw_preview_mode()
         elif self.mode == "edit" and self.selected_object:
             self._draw_edit_mode()
+        else:
+            # No selection - show help text
+            imgui.text("Inspector")
+            imgui.separator()
+            imgui.text_wrapped("Click on an object in the scene to edit it,")
+            imgui.text_wrapped("or select an asset from the thumbnail menu below.")
 
         imgui.end()
 

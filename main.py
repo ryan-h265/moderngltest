@@ -43,10 +43,12 @@ from src.gamelib.tools import ToolManager
 from src.gamelib.tools.editor_history import EditorHistory
 from src.gamelib.tools.grid_overlay import GridOverlay
 from src.gamelib.rendering.selection_highlight import SelectionHighlight
+from src.gamelib.rendering.thumbnail_generator import ThumbnailGenerator
 from src.gamelib.config.settings import (
     PROJECT_ROOT, UI_THEME, UI_PAUSE_DIM_ALPHA,
     THUMBNAIL_SIZE, THUMBNAIL_VISIBLE_COUNT, BOTTOM_MENU_HEIGHT, TOOL_ICON_SIZE,
-    SELECTION_HIGHLIGHT_COLOR, SELECTION_OUTLINE_SCALE, OBJECT_RAYCAST_RANGE
+    SELECTION_HIGHLIGHT_COLOR, SELECTION_OUTLINE_SCALE, OBJECT_RAYCAST_RANGE,
+    LIGHT_PRESETS
 )
 
 # Physics
@@ -284,6 +286,12 @@ class Game(mglw.WindowConfig):
             if self.tool_manager.inventory.get_hotbar_tool(0):
                 self.tool_manager.equip_hotbar_slot(0)
 
+            # Initialize thumbnail generator for asset previews
+            self.thumbnail_generator = ThumbnailGenerator(self.ctx, thumbnail_size=THUMBNAIL_SIZE)
+
+            # Generate thumbnails for light presets (one-time generation)
+            self.thumbnail_generator.generate_light_preset_thumbnails(LIGHT_PRESETS)
+
             # Initialize attribute mode components
             self.thumbnail_menu = ThumbnailMenu(
                 self.tool_manager,
@@ -296,8 +304,19 @@ class Game(mglw.WindowConfig):
             self.selection_highlight = SelectionHighlight(self.ctx)
             self.selection_highlight.set_outline_scale(SELECTION_OUTLINE_SCALE)
 
-            # Populate thumbnail menu from scene
+            # Populate thumbnail menu from scene with generated thumbnails
             self.thumbnail_menu.populate_from_scene(self.scene)
+
+            # Generate model thumbnails for assets in scene
+            if hasattr(self.scene, 'objects'):
+                for obj in self.scene.objects:
+                    if hasattr(obj, 'is_model') and obj.is_model:
+                        # Generate thumbnail for this model if it has a path
+                        if hasattr(obj, 'source_path'):
+                            self.thumbnail_generator.generate_model_thumbnail(
+                                obj.source_path,
+                                obj.name
+                            )
 
             # Attribute mode disabled by default
             self.attribute_mode_active = False
@@ -439,7 +458,7 @@ class Game(mglw.WindowConfig):
     def toggle_attribute_mode(self):
         """Toggle attribute editing mode (Tab key)."""
         # Only allow in editor mode
-        if self.input_manager.current_context != InputContext.LEVEL_EDITOR:
+        if self.input_manager.get_current_context() != InputContext.LEVEL_EDITOR:
             return
 
         self.attribute_mode_active = not self.attribute_mode_active
@@ -651,7 +670,12 @@ class Game(mglw.WindowConfig):
 
         # Draw object inspector (editor mode)
         if self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
-            self.object_inspector.draw(int(self.wnd.width), int(self.wnd.height))
+            # Force show inspector in attribute mode, otherwise only if something selected
+            force_show = self.attribute_mode_active
+            self.object_inspector.draw(
+                int(self.wnd.width), int(self.wnd.height),
+                force_show=force_show
+            )
 
         # End ImGui frame and render
         self.ui_manager.end_frame()
