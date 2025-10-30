@@ -14,6 +14,7 @@ examples.load_fractal_terrain.example_usage: example_usage() | Example of loadin
 examples.load_fractal_terrain.load_heightmap: load_heightmap(npz_path) | Load heightmap and metadata from .npz file.
 examples.load_fractal_terrain.load_scene_json: load_scene_json(scene_path) | Load a fractal terrain scene JSON.
 project_overview_generator.main: main() | Main entry point.
+src.gamelib.config.settings._load_light_presets: _load_light_presets() -> dict | Load light presets from JSON configuration file.
 src.gamelib.core.geometry_utils.cone: cone(radius, height, segments) | Create a cone geometry.
 src.gamelib.core.geometry_utils.donut_terrain: donut_terrain(resolution, outer_radius, inner_radius, height, rim_width, seed) | Create a donut-shaped terrain mesh with procedu...
 src.gamelib.core.geometry_utils.heightmap_terrain: heightmap_terrain(heightmap_path) | Create a terrain mesh from a pre-generated heig...
@@ -100,6 +101,7 @@ examples.simple_scene.SimpleSceneDemo(mglw.WindowConfig) | Simple 3-cube scene
   on_key_event(self, key, action, modifiers)
 main.Game(mglw.WindowConfig) | Main game class
   __init__(self, **kwargs)
+  _discover_available_models(self) -> dict | Discover all available models in the models lib...
   _on_game_state_changed(self, old_state: GameState, new_state: GameState) | Called when game state changes.
   _load_scene_from_menu(self, scene_id: str) -> bool | Load a scene after selection from main menu.
   toggle_pause(self) | Toggle pause state.
@@ -771,7 +773,8 @@ src.gamelib.rendering.thumbnail_generator.ThumbnailGenerator | Generates and cac
   _create_framebuffer(self) -> None | Create framebuffer and texture for thumbnail re...
   generate_model_thumbnail(self, model_path: str, model_name: str, force_regenerate: bool) -> Optional[Path] | Generate thumbnail for a 3D model.
   generate_light_preset_thumbnails(self, light_presets: dict) -> dict | Generate thumbnails for light presets.
-  _render_model_thumbnail(self, model: SceneObject) -> None | Render model to thumbnail framebuffer.
+  _render_model_thumbnail(self, model) -> None | Render model to thumbnail framebuffer by loadin...
+  _calculate_model_bounds(self, model) -> tuple | Calculate bounding box of a model.
   _render_light_thumbnail(self, color: tuple) -> None | Render light preset thumbnail (colored sphere).
   _render_with_basic_shader(self, model: SceneObject, view: Matrix44, projection: Matrix44) -> None | Fallback rendering using basic shader.
   _build_model_matrix(self, obj: SceneObject) -> Matrix44 | Build model matrix from object transform.
@@ -1015,7 +1018,9 @@ src.gamelib.ui.menus.thumbnail_menu.ThumbnailMenu | Bottom menu bar with tool ic
   _draw_tool_icons(self) -> None | Draw top row with small editor tool icons.
   _draw_asset_thumbnails(self) -> None | Draw main section with scrollable asset thumbna...
   _draw_category_thumbnails(self, category: str) -> None | Draw thumbnail grid for a specific category.
-  populate_from_scene(self, scene) -> None | Populate asset list from scene objects.
+  populate_from_scene(self, scene) -> None | Populate asset list from scene objects and gene...
+  _populate_light_presets(self) -> None | Load and add light preset thumbnails from gener...
+  _populate_model_library(self) -> None | Load and add model library thumbnails from gene...
   set_selected(self, category: Optional[str], item_id: Optional[str], tool_id: Optional[str]) -> None | Programmatically set selected item.
   get_selected(self) -> Tuple[Optional[str], Optional[str], Optional[str]] | Get currently selected items.
   load_thumbnail_image(self, filepath: str) -> Optional[tuple] | Load thumbnail image from file and cache it for...
@@ -1075,4 +1080,4 @@ src.gamelib.ui.ui_manager.UIManager | Central UI manager for ImGui integration.
   shutdown(self) -> None | Clean up ImGui resources.
   switch_theme(self, theme_name: str) -> None | Switch to a different theme.
 
-# TOTAL: 134 classes, 860 methods, 77 functions
+# TOTAL: 134 classes, 864 methods, 78 functions

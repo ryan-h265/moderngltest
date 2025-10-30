@@ -72,7 +72,7 @@ Key modules:
 - `src/gamelib/input` implements the command-pattern input stack with controllers for camera, player, rendering switches, tools, and UI.
 - `src/gamelib/tools` contains editor tool logic, undo/redo history, grid overlay renderer, placement previews, and thumbnail menu handling.
 - `src/gamelib/physics` wraps PyBullet APIs, collision mesh resolution, and the kinematic player controller.
-- `src/gamelib/ui` integrates ImGui themes (`assets/config/themes/*.json`), menus, HUD, thumbnail browser, and debug overlay.
+- `src/gamelib/ui` integrates ImGui themes (`assets/config/themes/*.json`), menus, HUD, thumbnail browser, debug overlay, and a **configuration-driven layout system** (`layout_manager.py`, `layout_debug.py`, `config/menu_layouts.json`) for robust, extensible menu design with live debugging (press `F12` in editor to access layout debug tools).
 
 ## Utilities & Content Pipeline
 - `examples/generate_fractal_scene.py` builds heightmaps and scene JSON from fractal noise presets (see `docs/FRACTAL_TERRAIN_GENERATION.md`).
@@ -90,6 +90,7 @@ Requires packages from `requirements-dev.txt`. The suite exercises camera maths,
 ## Documentation
 Primary references:
 - `docs/ARCHITECTURE.md` – high-level structure (core/input/rendering).
+- `docs/MENU_SYSTEM.md` – configuration-driven layout system for editor menus with live debugging.
 - `docs/DEFERRED_RENDERING.md`, `docs/MULTI_LIGHT_IMPLEMENTATION.md`, `docs/ANTIALIASING_IMPLEMENTATION.md`, `docs/SMAA_IMPLEMENTATION.md` – rendering deep dives.
 - `docs/INPUT_SYSTEM.md` and `docs/TOOL_SYSTEM_INTEGRATION.md` – control flow and editor tooling.
 - `docs/FRACTAL_TERRAIN_GENERATION.md`, `docs/ROADMAP.md`, `docs/OPTIMIZATIONS.md`, `docs/LIGHTING.md` – content pipelines and future work.
@@ -103,3 +104,8 @@ The engine is functional but still evolving. Gameplay-specific controllers (`Gam
 - Keep configs in `assets/config` in sync with new tools, lights, or themes.
 
 Roadmaps and known issues live in `TODO.md`, `docs/ROADMAP.md`, and per-feature plans inside `docs/`. Issues, ideas, and regressions are easiest to track there or alongside pull requests.
+
+
+###
+
+https://3dviewer.net/

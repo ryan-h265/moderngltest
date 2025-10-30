@@ -1,0 +1,125 @@
+════════════════════════════════════════════════════════════════════════════════
+                    THUMBNAIL RENDERING - QUICK TEST CHECKLIST
+════════════════════════════════════════════════════════════════════════════════
+
+STEP 1: RUN PNG TEST (OPTIONAL - already passing)
+────────────────────────────────────────────────────
+$ python test_png_parsing.py
+
+Expected: All files parse successfully ✓
+
+
+STEP 2: RUN EDITOR WITH DEBUG OUTPUT
+────────────────────────────────────────────────────
+$ python main.py 2>&1 | tee thumbnail_debug.log
+
+Alternative (to see only [Thumbnail] messages):
+$ python main.py 2>&1 | grep "\[Thumbnail\]"
+
+
+STEP 3: EDITOR SEQUENCE
+────────────────────────────────────────────────────
+1. See main menu
+2. Select any scene
+3. Press [ENTER] → Wait for "Entered LEVEL EDITOR mode"
+4. Press [TAB]   → Wait for "Entered ATTRIBUTE MODE"
+5. Watch console for [Thumbnail] debug messages
+6. After 5 seconds, stop with [CTRL+C]
+
+
+STEP 4: ANALYZE OUTPUT
+────────────────────────────────────────────────────
+Look for these key messages in order:
+
+✓ Phase 1: Population
+  [Thumbnail] Found 8 light presets in ...
+  [Thumbnail] Found 7 models in ...
+  [Thumbnail] Added light preset: ...
+  [Thumbnail] Added model: ...
+
+✓ Phase 2: Draw Called
+  [Thumbnail] draw() called. Total assets: 15
+  [Thumbnail]   ✓ Assets loaded
+
+✓ Phase 3: Categories Listed
+  [Thumbnail] _draw_asset_thumbnails() called
+  [Thumbnail] Categories: ['Models', 'Lights']
+
+✓ Phase 4: Tab Bar Created
+  [Thumbnail] Tab bar created with 2 categories
+  [Thumbnail] Tab 0 'Models': is_open=True, is_selected=True
+  [Thumbnail] Tab 1 'Lights': is_open=True, is_selected=False
+
+✓ Phase 5: Grid Drawing Started
+  [Thumbnail] Drawing grid for selected tab: Models
+  [Thumbnail] _draw_category_grid(Models) called
+
+✓ Phase 6: Texture Loading
+  [Thumbnail] Loading texture from: /path/to/japanese_bar.png
+  [Thumbnail] File exists, reading 837 bytes
+  [Thumbnail] Parsing PNG...
+  [Thumbnail] PNG parsed: 96x96, data size=36960
+  [Thumbnail] Creating ModernGL texture...
+  [Thumbnail] ✓ Successfully loaded texture: japanese_bar.png (ID: 12345)
+
+
+STEP 5: IDENTIFY MISSING PHASE
+────────────────────────────────────────────────────
+Where does output STOP? That's the problem location:
+
+❌ Stops after: "Found 8 light presets..."
+   → draw() method never called
+   → Check main.py line 692 conditions
+
+❌ Stops after: "_draw_asset_thumbnails() called"
+   → Tab bar creation failed (very rare)
+   → Check ImGui state
+
+❌ Stops after: "Tab bar created..."
+   → No tab is selected by default (likely issue)
+   → Need to force first tab selection
+
+❌ Stops after: "_draw_category_grid() called"
+   → Items aren't being drawn
+   → Check _draw_thumbnail_item() implementation
+
+❌ Stops after: "Loading texture from:..."
+   → PNG parsing or texture creation failing
+   → Check error messages in output
+
+
+STEP 6: SHARE OUTPUT
+────────────────────────────────────────────────────
+Copy the complete console output (all [Thumbnail] messages)
+and share in the conversation. We'll identify and fix the issue.
+
+
+QUICK KEYS
+──────────────────────────────────────────────────
+[ENTER]  → Toggle LEVEL EDITOR mode
+[TAB]    → Toggle ATTRIBUTE MODE (after ENTER)
+[CTRL+C] → Stop the program
+[F12]    → Toggle debug banner (in editor mode)
+[P]      → Show panel boundaries (in editor mode)
+
+
+FILES TO CHECK
+──────────────────────────────────────────────────
+✓ test_png_parsing.py ................. PNG validation
+✓ thumbnail_debug.log ................. (created by tee command)
+✓ DEBUGGING_READY.md .................. Full reference guide
+✓ THUMBNAIL_DEBUG_GUIDE.md ............ Detailed instructions
+✓ src/gamelib/ui/menus/thumbnail_menu.py .. Main code (with debug output)
+
+
+EXPECTED TIMING
+──────────────────────────────────────────────────
+Population:         ~1 second after scene loads
+Attribute mode on:  ~1 second after Tab pressed
+Debug messages:     Should see continuous [Thumbnail] output
+                   every frame after that
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            READY TO TEST!
+════════════════════════════════════════════════════════════════════════════════

@@ -23,13 +23,15 @@ from src.gamelib import (
     # Rendering
     RenderPipeline,
     # UI
-    PlayerHUD, UIManager, MainMenu, PauseMenu, SettingsMenu, ObjectInspector, ThumbnailMenu,
+    PlayerHUD, UIManager, MainMenu, PauseMenu, SettingsMenu, ObjectInspector, NativeThumbnailMenu,
     # Gameplay
     PlayerCharacter,
     # Input helpers
     InputContext,
     InputCommand,
 )
+from src.gamelib.ui.layout_manager import LayoutManager
+from src.gamelib.ui.layout_debug import LayoutDebugOverlay
 from src.gamelib.core.skybox import Skybox
 from src.gamelib.core.game_state import GameStateManager, GameState
 
@@ -127,6 +129,10 @@ class Game(mglw.WindowConfig):
         self.ui_manager = UIManager(self.ctx, self.wnd.size, theme_name=UI_THEME)
         self.ui_manager.set_input_manager(self.input_manager)
 
+        # Layout Manager (configuration-driven UI panel positioning)
+        self.layout_manager = LayoutManager()
+        self.layout_debug = LayoutDebugOverlay(self.layout_manager)
+
         # Scene management
         self.scene_manager = SceneManager(
             self.ctx,
@@ -157,7 +163,7 @@ class Game(mglw.WindowConfig):
         self.main_menu = MainMenu(self.scene_manager)
         self.pause_menu = PauseMenu(self.scene_manager)
         self.settings_menu = SettingsMenu(self.render_pipeline, self.input_manager.key_bindings, self.ui_manager)
-        self.object_inspector = ObjectInspector()
+        self.object_inspector = ObjectInspector(layout_manager=self.layout_manager)
         self.pause_menu.settings_menu = self.settings_menu
 
         # Attribute mode menu and selection (initialized after scene loads)
@@ -336,13 +342,22 @@ class Game(mglw.WindowConfig):
 
             # Initialize attribute mode components
             print("[Game] Initializing attribute mode components...")
-            self.thumbnail_menu = ThumbnailMenu(
-                self.tool_manager,
+
+            # Get UI sprite shader from render pipeline
+            ui_sprite_shader = self.render_pipeline.shader_manager.get("ui_sprite")
+
+            # Initialize native thumbnail menu
+            self.thumbnail_menu = NativeThumbnailMenu(
+                self.ctx,
+                ui_sprite_shader,
+                tool_manager=self.tool_manager,
                 thumbnail_size=THUMBNAIL_SIZE,
-                visible_count=THUMBNAIL_VISIBLE_COUNT,
+                grid_cols=4,
+                grid_rows=3,
                 bottom_menu_height=BOTTOM_MENU_HEIGHT,
-                tool_icon_size=TOOL_ICON_SIZE,
+                tool_icon_size=48,
             )
+
             self.object_selector = ObjectSelector(raycast_range=OBJECT_RAYCAST_RANGE)
             self.selection_highlight = SelectionHighlight(self.ctx)
             self.selection_highlight.set_outline_scale(SELECTION_OUTLINE_SCALE)
@@ -531,6 +546,81 @@ class Game(mglw.WindowConfig):
             if self.camera_controller:
                 self.camera_controller.mouse_look_enabled = True
 
+    def _set_active_model(self, model_name: str):
+        """
+        Set the active model in the ModelPlacementTool.
+
+        Args:
+            model_name: Name of the model (folder name without full path)
+        """
+        from src.gamelib.tools.editor.model_placement_tool import ModelPlacementTool
+
+        if not self.tool_manager:
+            return
+
+        active_tool = self.tool_manager.get_active_tool()
+
+        # If not using ModelPlacementTool, equip it
+        if not isinstance(active_tool, ModelPlacementTool):
+            self.tool_manager.equip_tool("model_placer")
+            active_tool = self.tool_manager.get_active_tool()
+
+        # Set the active model by finding its index
+        if isinstance(active_tool, ModelPlacementTool):
+            if model_name in active_tool.available_models:
+                index = active_tool.available_models.index(model_name)
+                active_tool.select_model_by_index(index)
+                print(f"[Game] Switched to model: {model_name}")
+            else:
+                print(f"[Game] Model not found in library: {model_name}")
+
+    def _set_light_preset(self, preset_name: str):
+        """
+        Set the light color from a preset name.
+
+        Args:
+            preset_name: Name of the light preset (e.g., "Purple", "Blue", "Red")
+        """
+        from src.gamelib.tools.editor.light_editor_tool import LightEditorTool
+        from pyrr import Vector3
+
+        if not self.tool_manager:
+            return
+
+        # Color name to RGB mapping
+        COLOR_PRESETS = {
+            "purple": Vector3([0.8, 0.0, 1.0]),
+            "blue": Vector3([0.0, 0.5, 1.0]),
+            "white": Vector3([1.0, 1.0, 1.0]),
+            "yellow": Vector3([1.0, 1.0, 0.0]),
+            "cyan": Vector3([0.0, 1.0, 1.0]),
+            "orange": Vector3([1.0, 0.65, 0.0]),
+            "green": Vector3([0.0, 1.0, 0.0]),
+            "red": Vector3([1.0, 0.0, 0.0]),
+        }
+
+        # Get the color for this preset
+        color_name = preset_name.lower()
+        color = COLOR_PRESETS.get(color_name)
+
+        if not color:
+            print(f"[Game] Unknown light color preset: {preset_name}")
+            return
+
+        active_tool = self.tool_manager.get_active_tool()
+
+        # If not using LightEditorTool, equip it
+        if not isinstance(active_tool, LightEditorTool):
+            self.tool_manager.equip_tool("light_editor")
+            active_tool = self.tool_manager.get_active_tool()
+
+        # Set the light color
+        if isinstance(active_tool, LightEditorTool):
+            active_tool.set_light_color(color)
+            print(f"[Game] Set light color to: {preset_name}")
+        else:
+            print(f"[Game] Light editor tool not available")
+
     def on_update(self, time, frametime):
         """
         Update game logic.
@@ -682,23 +772,33 @@ class Game(mglw.WindowConfig):
         # Draw attribute mode menus (editor mode only)
         if self.attribute_mode_active and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
             if self.thumbnail_menu:
-                # Draw thumbnail menu
-                category, item_id, tool_id = self.thumbnail_menu.draw(
+                # Draw thumbnail menu using native rendering
+                category, asset_id = self.thumbnail_menu.render(
+                    self.render_pipeline.icon_manager,
                     int(self.wnd.width), int(self.wnd.height)
                 )
 
                 # Handle thumbnail menu selections
-                if tool_id:
-                    # Tool was clicked - already handled by ThumbnailMenu
-                    pass
-                elif item_id:
-                    # Asset was clicked
-                    asset = self.thumbnail_menu.assets.get(category, [])
-                    for asset_item in asset:
-                        if asset_item.id == item_id:
+                if asset_id and category:
+                    # Asset was clicked - find it and update inspector
+                    assets = self.thumbnail_menu.assets.get(category, [])
+                    for asset_item in assets:
+                        if asset_item.asset_id == asset_id:
                             # Create preview item dict
-                            preview_item = asset_item.to_dict()
-                            self.object_inspector.set_preview_item(preview_item)
+                            preview_dict = {
+                                "id": asset_item.asset_id,
+                                "name": asset_item.name,
+                                "category": asset_item.category,
+                                "preview_path": str(asset_item.preview_path),
+                            }
+                            self.object_inspector.set_preview_item(preview_dict)
+
+                            # If it's a model, also set it as the active model in the tool
+                            if category == "Models" and self.tool_manager:
+                                self._set_active_model(asset_item.name)
+                            # If it's a light preset, set the color in the light tool
+                            elif category == "Lights" and self.tool_manager:
+                                self._set_light_preset(asset_item.name)
                             break
 
         # Draw object inspector (editor mode)
@@ -709,6 +809,10 @@ class Game(mglw.WindowConfig):
                 int(self.wnd.width), int(self.wnd.height),
                 force_show=force_show
             )
+
+        # Draw layout debug overlay (if enabled)
+        self.layout_manager.check_reload()  # Hot-reload config if file changed
+        self.layout_debug.draw(int(self.wnd.width), int(self.wnd.height))
 
         # End ImGui frame and render
         self.ui_manager.end_frame()
@@ -728,24 +832,26 @@ class Game(mglw.WindowConfig):
         self.input_manager.on_mouse_move(dx, dy)
 
         # Handle mouse drag for tool operations
+        # Only process if UI isn't capturing input (defense in depth)
         if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
-            # If a mouse button is held, this is a drag operation
-            if self.tool_right_held:
-                # Right-click drag: secondary tool action (usually rotate)
-                self.tool_manager.use_active_tool_secondary(
-                    self.camera,
-                    self.scene,
-                    mouse_held=True,
-                    mouse_delta_x=dx,
-                    mouse_delta_y=dy
-                )
-            elif self.tool_left_held:
-                # Left-click drag: primary tool action (usually move)
-                self.tool_manager.use_active_tool(
-                    self.camera,
-                    self.scene,
-                    mouse_held=True
-                )
+            if not self.ui_manager.is_input_captured_by_imgui():
+                # If a mouse button is held, this is a drag operation
+                if self.tool_right_held:
+                    # Right-click drag: secondary tool action (usually rotate)
+                    self.tool_manager.use_active_tool_secondary(
+                        self.camera,
+                        self.scene,
+                        mouse_held=True,
+                        mouse_delta_x=dx,
+                        mouse_delta_y=dy
+                    )
+                elif self.tool_left_held:
+                    # Left-click drag: primary tool action (usually move)
+                    self.tool_manager.use_active_tool(
+                        self.camera,
+                        self.scene,
+                        mouse_held=True
+                    )
 
     def on_mouse_press_event(self, x: int, y: int, button: int):
         """
@@ -759,7 +865,17 @@ class Game(mglw.WindowConfig):
         imgui_button = button - 1 if button > 0 else 0
         self.ui_manager.handle_mouse_button(imgui_button, True)
 
-        self.input_manager.on_mouse_button_press(button)
+        # Handle thumbnail menu clicks (in attribute mode)
+        if (self.attribute_mode_active and
+            self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR and
+            button == 1 and  # Left click only
+            self.thumbnail_menu):
+            if self.thumbnail_menu.handle_click(float(x), float(y)):
+                return  # Click was handled by menu, don't process further
+
+        # Only dispatch tool commands if UI isn't capturing input
+        if not self.ui_manager.is_input_captured_by_imgui():
+            self.input_manager.on_mouse_button_press(button)
 
         # Handle object selection in attribute mode
         if (self.attribute_mode_active and
@@ -789,11 +905,13 @@ class Game(mglw.WindowConfig):
                     self.selection_highlight.set_selected_object(None)
 
         # Track mouse button state for tool drag operations
+        # Only if UI hasn't captured the mouse input
         if self.tool_manager and self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR:
-            if button == 1:  # Left button
-                self.tool_left_held = True
-            elif button == 2:  # Right button
-                self.tool_right_held = True
+            if not self.ui_manager.is_input_captured_by_imgui():
+                if button == 1:  # Left button
+                    self.tool_left_held = True
+                elif button == 2:  # Right button
+                    self.tool_right_held = True
 
     def on_mouse_release_event(self, x: int, y: int, button: int):
         """
@@ -825,6 +943,23 @@ class Game(mglw.WindowConfig):
                 if active_tool and hasattr(active_tool, 'finish_rotate'):
                     active_tool.finish_rotate()
 
+    def on_mouse_scroll_event(self, x_offset: float, y_offset: float):
+        """
+        Handle mouse wheel scroll.
+
+        Args:
+            x_offset: Horizontal scroll delta
+            y_offset: Vertical scroll delta (positive = up, negative = down)
+        """
+        # Pass to ImGui first
+        self.ui_manager.handle_mouse_scroll(x_offset, y_offset)
+
+        # Handle thumbnail menu scrolling in attribute mode
+        if (self.attribute_mode_active and
+            self.input_manager.get_current_context() == InputContext.LEVEL_EDITOR and
+            self.thumbnail_menu):
+            self.thumbnail_menu.handle_scroll(y_offset)
+
     def resize(self, width: int, height: int):
         """Handle window resize events by updating render targets."""
         super().resize(width, height)
@@ -841,6 +976,11 @@ class Game(mglw.WindowConfig):
             modifiers: Modifier keys (shift, ctrl, etc.)
         """
         keys = self.wnd.keys
+
+        # Handle layout debug keyboard shortcuts
+        if action == keys.ACTION_PRESS:
+            if self.layout_debug.handle_keyboard(key, modifiers):
+                return  # Debug shortcut was handled
 
         # Handle key press/release
         if action == keys.ACTION_PRESS:

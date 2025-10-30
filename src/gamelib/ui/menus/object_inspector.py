@@ -17,13 +17,20 @@ if TYPE_CHECKING:
     from ...core.scene import SceneObject
     from ...core.light import Light
     from ...tools.editor_history import EditorHistory
+    from ..layout_manager import LayoutManager
 
 
 class ObjectInspector:
     """Inspector panel for editing selected object properties."""
 
-    def __init__(self):
-        """Initialize object inspector."""
+    def __init__(self, layout_manager: Optional[LayoutManager] = None):
+        """
+        Initialize object inspector.
+
+        Args:
+            layout_manager: LayoutManager for panel positioning (optional)
+        """
+        self.layout_manager = layout_manager
         self.selected_object: Optional[SceneObject] = None
         self.preview_item: Optional[dict] = None  # Preview item from thumbnail menu
         self.editor_history: Optional[EditorHistory] = None
@@ -52,12 +59,29 @@ class ObjectInspector:
         if not self.show or (not has_selection and not force_show):
             return
 
-        # Dock on right side
-        inspector_width = 350
-        inspector_height = screen_height
+        # Use layout manager for positioning if available
+        if self.layout_manager:
+            rect = self.layout_manager.get_panel_rect(
+                "object_inspector", screen_width, screen_height
+            )
+            if rect:
+                inspector_x, inspector_y, inspector_width, inspector_height = rect
+            else:
+                # Fallback positioning
+                inspector_width = 350
+                inspector_height = screen_height
+                inspector_x = screen_width - inspector_width
+                inspector_y = 0
+        else:
+            # Original fallback positioning
+            inspector_width = 350
+            inspector_height = screen_height
+            inspector_x = screen_width - inspector_width
+            inspector_y = 0
+
         imgui.set_next_window_position(
-            screen_width - inspector_width,
-            0,
+            inspector_x,
+            inspector_y,
             imgui.ALWAYS,
         )
         imgui.set_next_window_size(inspector_width, inspector_height, imgui.ALWAYS)
