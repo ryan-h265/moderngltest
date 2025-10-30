@@ -458,7 +458,17 @@ class NativeThumbnailMenu:
         # print(f"[NativeThumbnailMenu] Rendering {len(assets)} assets in {category}")
         # print(f"[NativeThumbnailMenu] Grid position: ({grid_x}, {grid_y}), scroll: {scroll_offset}")
 
-        # Render each visible thumbnail
+        # Clear bounds for this frame
+        self.thumbnail_bounds.clear()
+
+        # First pass: hide all loaded icons by moving them off-screen
+        for asset in assets:
+            icon_id = self.icon_ids.get(asset.asset_id)
+            if icon_id is not None:
+                # Move off-screen (far below the menu)
+                icon_manager.update_position(icon_id, (-10000.0, -10000.0))
+
+        # Second pass: position visible thumbnails
         visible_index = 0
         for asset_idx, asset in enumerate(assets):
             if asset_idx < scroll_offset:
@@ -477,7 +487,7 @@ class NativeThumbnailMenu:
             # Load and render thumbnail
             icon_id = self._load_thumbnail(icon_manager, asset)
             if icon_id is not None:
-                # Update position
+                # Update position to visible location
                 icon_manager.update_position(icon_id, (x, y))
 
                 # Update color for selection highlight
