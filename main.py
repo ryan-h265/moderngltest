@@ -351,6 +351,7 @@ class Game(mglw.WindowConfig):
                 self.ctx,
                 ui_sprite_shader,
                 tool_manager=self.tool_manager,
+                text_manager=self.render_pipeline.text_manager,
                 thumbnail_size=THUMBNAIL_SIZE,
                 grid_cols=4,
                 grid_rows=3,

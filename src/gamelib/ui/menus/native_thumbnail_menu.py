@@ -33,6 +33,7 @@ class NativeThumbnailMenu:
         ctx: moderngl.Context,
         ui_shader: moderngl.Program,
         tool_manager=None,
+        text_manager=None,
         thumbnail_size: int = 96,
         grid_cols: int = 4,
         grid_rows: int = 3,
@@ -46,6 +47,8 @@ class NativeThumbnailMenu:
         Args:
             ctx: ModernGL context
             ui_shader: Shader program for rendering UI sprites
+            tool_manager: Tool manager for tool operations
+            text_manager: Text manager for rendering text labels
             thumbnail_size: Size of each thumbnail in pixels
             grid_cols: Number of columns in grid
             grid_rows: Number of rows in grid
@@ -55,6 +58,7 @@ class NativeThumbnailMenu:
         self.ctx = ctx
         self.ui_shader = ui_shader
         self.tool_manager = tool_manager
+        self.text_manager = text_manager
         self.thumbnail_size = thumbnail_size
         self.grid_cols = grid_cols
         self.grid_rows = grid_rows
@@ -75,6 +79,7 @@ class NativeThumbnailMenu:
         self.icon_ids: Dict[str, int] = {}  # asset_id -> icon_id mapping
         self.texture_cache: Dict[str, int] = {}  # preview_path -> icon_id
         self.loaded_textures: set = set()  # Track which assets have been rendered
+        self.tool_label_text_ids: Dict[str, int] = {}  # tool_id -> text_id mapping
 
         # UI state
         self.show = True
@@ -250,14 +255,13 @@ class NativeThumbnailMenu:
         # Tool button positioning
         button_x = self.menu_x + self.padding
         button_y = self.menu_y + self.padding
-        button_spacing = self.tool_icon_size + self.padding
 
-        # Tool definitions: (tool_id, label, color_override)
+        # Tool definitions: (tool_id, label)
         tools = [
-            ("model_placer", "Model", None),
-            ("light_editor", "Light", None),
-            ("object_editor", "Object", None),
-            ("delete_tool", "Delete", None),
+            ("model_placer", "Model"),
+            ("light_editor", "Light"),
+            ("object_editor", "Object"),
+            ("delete_tool", "Delete"),
         ]
 
         # Clear previous bounds
@@ -268,26 +272,86 @@ class NativeThumbnailMenu:
         active_tool_id = active_tool.definition.id if active_tool else None
 
         # Render each tool button
-        for idx, (tool_id, label, color_override) in enumerate(tools):
-            x = button_x + idx * button_spacing
-            y = button_y
-
+        current_x = button_x
+        for tool_id, label in tools:
             # Check if this is the active tool
             is_active = tool_id == active_tool_id
 
-            # Determine color based on active state
-            if is_active:
-                # Bright color for active tool
-                color = (0.3, 0.8, 0.3, 1.0)  # Green
+            # Render text label with button background (background acts as button)
+            if self.text_manager:
+                bounds = self._render_tool_label_with_button(current_x, button_y, tool_id, label, is_active)
+                # bounds is (x, y, width, height)
+                x, y, width, height = bounds
+                self.tool_button_bounds[tool_id] = (x, y, width, height)
+                current_x = x + width + self.padding
             else:
-                # Dimmer color for inactive tools
-                color = (0.6, 0.6, 0.6, 1.0)  # Gray
+                # Fallback: render colored quad if text manager not available
+                self._render_tool_button_quad(current_x, button_y, (0.6, 0.6, 0.6, 1.0))
+                self.tool_button_bounds[tool_id] = (current_x, button_y, self.tool_icon_size, self.tool_icon_size)
+                current_x += self.tool_icon_size + self.padding
 
-            # Render tool button as a colored quad
-            self._render_tool_button_quad(x, y, color)
+    def _render_tool_label_with_button(self, x: float, y: float, tool_id: str, label: str, is_active: bool) -> Tuple[float, float, float, float]:
+        """
+        Render text label with a button background.
 
-            # Store bounds for click detection
-            self.tool_button_bounds[tool_id] = (x, y, self.tool_icon_size, self.tool_icon_size)
+        The button background is rendered using the TextManager's background_color feature,
+        so the button width automatically scales based on the text length.
+
+        Args:
+            x: Button X position
+            y: Button Y position
+            tool_id: Tool identifier
+            label: Text label to display
+            is_active: Whether this tool is currently active
+
+        Returns:
+            Tuple of (x, y, width, height) representing the button bounds
+        """
+        if not self.text_manager:
+            return (x, y, self.tool_icon_size, self.tool_icon_size)
+
+        # Text color: white
+        text_color = (1.0, 1.0, 1.0, 1.0)
+
+        # Button background color based on active state
+        if is_active:
+            # Bright green for active tool
+            button_color = (0.3, 0.8, 0.3, 1.0)
+        else:
+            # Gray for inactive tools
+            button_color = (0.6, 0.6, 0.6, 1.0)
+
+        # Button padding
+        button_padding = 6.0
+
+        # Check if text already exists for this tool
+        if tool_id in self.tool_label_text_ids:
+            # Update existing text
+            text_id = self.tool_label_text_ids[tool_id]
+            self.text_manager.update_text(text_id, label)
+            self.text_manager.update_position(text_id, (x, y))
+            self.text_manager.update_color(text_id, text_color)
+            self.text_manager.update_background(text_id, background_color=button_color)
+        else:
+            # Create new text label with button background
+            text_id = self.text_manager.add_text(
+                text=label,
+                position=(x, y),
+                color=text_color,
+                scale=0.7,  # Scaled font
+                layer="tool_labels",
+                background_color=button_color,
+                background_padding=button_padding,
+            )
+            self.tool_label_text_ids[tool_id] = text_id
+
+        # Estimate button bounds based on text length
+        # Rough estimate: each character is about 12 pixels wide at scale 0.7
+        char_width = 12.0
+        estimated_width = len(label) * char_width + (button_padding * 2)
+        estimated_height = 28.0 + (button_padding * 2)
+
+        return (x, y, estimated_width, estimated_height)
 
     def _render_tool_button_quad(self, x: float, y: float, color: Tuple[float, float, float, float]) -> None:
         """
@@ -570,6 +634,12 @@ class NativeThumbnailMenu:
 
     def release(self) -> None:
         """Clean up resources."""
+        # Remove text labels
+        if self.text_manager:
+            for text_id in self.tool_label_text_ids.values():
+                self.text_manager.remove_text(text_id)
+            self.tool_label_text_ids.clear()
+
         self.icon_ids.clear()
         self.texture_cache.clear()
         self.loaded_textures.clear()
