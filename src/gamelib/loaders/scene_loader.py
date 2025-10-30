@@ -15,8 +15,11 @@ from ..config.settings import PROJECT_ROOT
 from ..core import geometry_utils
 from ..core.light import Light
 from ..core.scene import Scene, SceneDefinition, SceneNodeDefinition
+from ..core.skybox import Skybox
+from ..core.skybox_config import SkyboxConfig
 from ..physics import PhysicsBodyConfig, PhysicsBodyHandle, PhysicsWorld
 from .gltf_loader import GltfLoader
+from .skybox_loader import SkyboxLoader
 
 
 @dataclass
@@ -30,6 +33,7 @@ class SceneLoadResult:
     player_spawn_position: Optional[Vector3] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     physics_bodies: List[PhysicsBodyHandle] = field(default_factory=list)
+    skybox: Optional[Skybox] = None
 
 
 class SceneLoader:
@@ -38,6 +42,7 @@ class SceneLoader:
     def __init__(self, ctx, physics_world: Optional[PhysicsWorld] = None):
         self.ctx = ctx
         self._gltf_loader: Optional[GltfLoader] = GltfLoader(ctx) if ctx is not None else None
+        self._skybox_loader: Optional[SkyboxLoader] = SkyboxLoader(ctx) if ctx is not None else None
         self._physics_world: Optional[PhysicsWorld] = physics_world
 
     def load_scene(self, path: Path | str) -> SceneLoadResult:
@@ -80,6 +85,12 @@ class SceneLoader:
         camera_target = Vector3(definition.camera_target) if definition.camera_target else None
         player_spawn_position = Vector3(definition.player_spawn_position) if definition.player_spawn_position else None
 
+        # Load skybox if defined
+        skybox = None
+        skybox_config_data = payload.get("skybox")
+        if skybox_config_data is not None:
+            skybox = self._load_skybox(skybox_config_data, base_path)
+
         return SceneLoadResult(
             scene=scene,
             lights=lights,
@@ -88,6 +99,7 @@ class SceneLoader:
             player_spawn_position=player_spawn_position,
             metadata=definition.metadata,
             physics_bodies=physics_handles,
+            skybox=skybox,
         )
 
     def _attach_physics(
@@ -275,4 +287,45 @@ class SceneLoader:
             model.play_animation(first, loop=bool(node.extras.get("animation_loop", True)))
 
         return model
+
+    def _load_skybox(self, skybox_data: Dict[str, Any], base_path: Path) -> Optional[Skybox]:
+        """
+        Load skybox from configuration.
+
+        Args:
+            skybox_data: Skybox configuration dictionary from JSON
+            base_path: Base directory for relative paths
+
+        Returns:
+            Skybox instance or None if loading fails
+        """
+        if self._skybox_loader is None or self.ctx is None:
+            return None
+
+        try:
+            # Parse skybox configuration
+            config = SkyboxConfig.from_dict(skybox_data)
+            if config is None:
+                return None
+
+            # Load cubemap texture if asset path is provided
+            texture = None
+            if config.asset is not None:
+                asset_path = config.resolve_asset_path(base_path)
+                if asset_path is not None and asset_path.exists():
+                    # Load cubemap from directory
+                    texture = self._skybox_loader.load(str(asset_path))
+
+            # Create skybox from configuration
+            skybox = Skybox.from_config(
+                ctx=self.ctx,
+                config=config,
+                texture=texture,
+            )
+
+            return skybox
+
+        except Exception as e:
+            print(f"Warning: Failed to load skybox: {e}")
+            return None
 

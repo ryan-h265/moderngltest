@@ -76,6 +76,18 @@ src/gamelib/
 - Models: GLTF/GLB loaded models with PBR materials and textures
 - Scene.create_default_scene() creates mixed scene (primitives + GLTF models)
 - Automatic shader switching based on object type (textured vs flat-color)
+- Each scene can have its own skybox defined in scene JSON
+
+**Industry-Standard Skybox System** (`src/gamelib/core/skybox.py`, `skybox_config.py`, `time_of_day.py`)
+- **Multiple skybox types**: cubemap, atmospheric, procedural, hybrid
+- **Atmospheric scattering**: Physically-based Preetham model for realistic skies
+- **Dynamic time-of-day**: Automated day/night cycles with sun/moon positioning
+- **Weather effects**: Procedural clouds, fog, precipitation
+- **Star field**: Rotating stars with configurable density and twinkling
+- **JSON-based configuration**: Define skybox per-scene in scene JSON files
+- Scene-specific: Different scenes can have completely different skyboxes
+- Shader variants: `skybox_cubemap.frag`, `skybox_atmospheric.frag`, `skybox_hybrid.frag`
+- See `docs/SKYBOX_SYSTEM.md` for complete guide
 
 ### Important Implementation Details
 
@@ -161,6 +173,61 @@ self.add_object(model)
 - `assets/models/props/japanese_bar/scene.gltf` - Large building with hierarchy
 
 **See [docs/MODEL_LOADING.md](docs/MODEL_LOADING.md) for complete GLTF loading guide.**
+
+### Configuring Scene Skybox
+
+Skyboxes are defined in scene JSON files. Each scene can have its own unique skybox configuration:
+
+```json
+{
+  "skybox": {
+    "type": "hybrid",
+    "intensity": 1.0,
+    "rotation": [0.0, 0.0, 0.0],
+    "time_of_day": {
+      "enabled": true,
+      "current_time": 0.5,
+      "auto_progress": false,
+      "sun_intensity": 1.0,
+      "moon_intensity": 0.3
+    },
+    "weather": {
+      "type": "clear",
+      "cloud_coverage": 0.3,
+      "cloud_speed": 1.0
+    },
+    "atmospheric": {
+      "enabled": true,
+      "turbidity": 2.0
+    },
+    "stars": {
+      "enabled": true,
+      "density": 1000,
+      "brightness": 1.0
+    }
+  }
+}
+```
+
+**Skybox Types:**
+- `"cubemap"` - Static cubemap texture (requires `asset` path)
+- `"atmospheric"` - Physically-based atmospheric scattering
+- `"procedural"` - Procedural effects (aurora/northern lights)
+- `"hybrid"` - Combined atmospheric + clouds + weather + stars
+
+**Time-of-Day Values:**
+- `0.0` - Midnight
+- `0.25` - Sunrise (6 AM)
+- `0.5` - Noon
+- `0.75` - Sunset (6 PM)
+- `1.0` - Midnight
+
+**Example Scenes:**
+- `assets/scenes/default_scene.json` - Hybrid sky with clouds
+- `assets/scenes/atmospheric_sky_scene.json` - Pure atmospheric scattering
+- `assets/scenes/stormy_sky_scene.json` - Stormy weather with thick clouds
+
+**See [docs/SKYBOX_SYSTEM.md](docs/SKYBOX_SYSTEM.md) for complete skybox documentation.**
 
 ### Adding a New Input Command
 1. Add command to `InputCommand` enum in `input_commands.py`
