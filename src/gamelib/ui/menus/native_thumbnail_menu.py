@@ -34,10 +34,10 @@ class NativeThumbnailMenu:
         ui_shader: moderngl.Program,
         tool_manager=None,
         text_manager=None,
-        thumbnail_size: int = 96,
+        thumbnail_size: int = 192,
         grid_cols: int = 4,
-        grid_rows: int = 3,
-        bottom_menu_height: int = 200,
+        grid_rows: int = 1,
+        bottom_menu_height: int = 300,
         padding: int = 8,
         tool_icon_size: int = 48,
     ):

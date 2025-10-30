@@ -421,9 +421,9 @@ UI_PAUSE_DIM_ALPHA = 0.6  # Opacity of dim overlay (0.0-1.0)
 # ============================================================================
 
 # Thumbnail menu configuration
-THUMBNAIL_SIZE = 96  # Size of asset thumbnails in pixels
+THUMBNAIL_SIZE = 192  # Size of asset thumbnails in pixels
 THUMBNAIL_VISIBLE_COUNT = 6  # Number of thumbnails visible at once
-BOTTOM_MENU_HEIGHT = 220  # Height of bottom menu bar in pixels
+BOTTOM_MENU_HEIGHT = 300  # Height of bottom menu bar in pixels
 TOOL_ICON_SIZE = 56  # Size of tool icons in top row
 
 # Object selection and highlight
