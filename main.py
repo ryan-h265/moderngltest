@@ -356,7 +356,7 @@ class Game(mglw.WindowConfig):
                 tool_manager=self.tool_manager,
                 text_manager=self.render_pipeline.text_manager,
                 thumbnail_size=THUMBNAIL_SIZE,
-                grid_cols=6,
+                grid_cols=8,
                 grid_rows=1,
                 bottom_menu_height=BOTTOM_MENU_HEIGHT,
                 tool_icon_size=48,

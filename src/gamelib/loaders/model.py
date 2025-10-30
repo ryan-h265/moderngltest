@@ -339,6 +339,103 @@ class Model:
         if self.animation_controller:
             self.animation_controller.stop()
 
+    def clone(self) -> 'Model':
+        """
+        Create a new instance of this model sharing GPU resources.
+
+        This is the standard way to create instances of a model without reloading
+        all textures and geometry. Cloned models share:
+        - VAOs (vertex geometry)
+        - Materials and textures
+        - Animation data
+
+        But each clone has independent:
+        - Position, rotation, scale
+        - Animation playback state
+        - Animation controller (if applicable)
+
+        Returns:
+            New Model instance with shared GPU resources but independent transforms
+
+        Example:
+            ```python
+            # Load once
+            original = loader.load("model.glb")
+
+            # Create 100 instances instantly (no reloading)
+            for i in range(100):
+                instance = original.clone()
+                instance.position = Vector3([i, 0, 0])
+                scene.add_object(instance)
+            ```
+        """
+        # Clone meshes with shared VAOs/materials but new transforms
+        cloned_meshes = [self._clone_mesh(mesh) for mesh in self.meshes]
+
+        # Create new Model with cloned meshes
+        new_model = Model(
+            meshes=cloned_meshes,
+            position=Vector3([0.0, 0.0, 0.0]),  # Reset to origin
+            rotation=Vector3([0.0, 0.0, 0.0]),
+            scale=Vector3([1.0, 1.0, 1.0]),
+            name=f"{self.name}_clone"
+        )
+
+        # Copy metadata
+        new_model.bounding_radius = self.bounding_radius
+        new_model.is_model = True
+
+        # Share animation data (immutable after loading)
+        new_model.skeleton = self.skeleton  # Shared
+        new_model.skins = self.skins  # Shared
+        new_model.animations = self.animations  # Shared dict
+
+        # Create new animation controller if skeleton exists
+        if self.skeleton:
+            from ..animation import AnimationController
+            new_model.animation_controller = AnimationController(self.skeleton)
+
+        # Reset animation playback state (fresh for new instance)
+        new_model.current_node_animation = None
+        new_model.node_animation_time = 0.0
+        new_model.node_animation_playing = False
+        new_model.node_animation_loop = True
+
+        return new_model
+
+    def _clone_mesh(self, mesh: Mesh) -> Mesh:
+        """
+        Clone a mesh with shared VAO/material but independent transforms.
+
+        Args:
+            mesh: Mesh to clone
+
+        Returns:
+            New Mesh with shared GPU resources but independent local transform
+        """
+        cloned_mesh = Mesh(
+            vao=mesh.vao,  # SHARED - same GPU vertex data
+            material=mesh.material,  # SHARED - same textures and properties
+            local_transform=Matrix44(mesh.base_local_transform),  # Copy of base local transform
+            node_name=mesh.node_name,  # Shared - same node reference
+            parent_transform=Matrix44.identity()  # Reset parent (will be calculated at render time)
+        )
+
+        # Copy animation-related state
+        cloned_mesh.base_translation = Vector3(mesh.base_translation)
+        cloned_mesh.base_rotation = mesh.base_rotation.copy()
+        cloned_mesh.base_scale = Vector3(mesh.base_scale)
+
+        # Copy skinning data
+        cloned_mesh.is_skinned = mesh.is_skinned
+        cloned_mesh.skin = mesh.skin  # Shared - same joint data
+
+        # Copy indices (immutable, set by loader for animations)
+        cloned_mesh.mesh_index = mesh.mesh_index
+        cloned_mesh.node_index = mesh.node_index
+
+        return cloned_mesh
+
     def release(self):
         """Release GPU resources"""
         for mesh in self.meshes:

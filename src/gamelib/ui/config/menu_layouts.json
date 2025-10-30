@@ -38,7 +38,7 @@
       "enabled": true,
       "anchor": "top_right",
       "position": {
-        "x": -350,
+        "x": 0,
         "y": 0,
         "reference": "screen"
       },
