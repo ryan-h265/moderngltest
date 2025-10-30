@@ -406,7 +406,7 @@ class NativeThumbnailMenu:
             button_color = (0.6, 0.6, 0.6, 1.0)
 
         # Button padding
-        button_padding = 6.0
+        button_padding = 12.0
 
         # Check if text already exists for this tool
         if tool_id in self.tool_label_text_ids:
@@ -422,7 +422,7 @@ class NativeThumbnailMenu:
                 text=label,
                 position=(x, y),
                 color=text_color,
-                scale=0.7,  # Scaled font
+                scale=1.4,  # Doubled from 0.7 for larger buttons
                 layer="tool_labels",
                 background_color=button_color,
                 background_padding=button_padding,
@@ -430,10 +430,10 @@ class NativeThumbnailMenu:
             self.tool_label_text_ids[tool_id] = text_id
 
         # Estimate button bounds based on text length
-        # Rough estimate: each character is about 12 pixels wide at scale 0.7
-        char_width = 12.0
+        # Rough estimate: each character is about 24 pixels wide at scale 1.4
+        char_width = 24.0
         estimated_width = len(label) * char_width + (button_padding * 2)
-        estimated_height = 28.0 + (button_padding * 2)
+        estimated_height = 56.0 + (button_padding * 2)
 
         return (x, y, estimated_width, estimated_height)
 
@@ -683,7 +683,7 @@ class NativeThumbnailMenu:
                         # print(f"[NativeThumbnailMenu] Selected: {asset.name}")
                         return True
 
-        return False
+        return True
 
     def handle_scroll(self, delta: float) -> bool:
         """

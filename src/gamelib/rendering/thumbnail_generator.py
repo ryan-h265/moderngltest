@@ -189,7 +189,7 @@ class ThumbnailGenerator:
 
         # Skip if already exists
         if thumb_path.exists() and not force_regenerate:
-            print(f"[ThumbnailGenerator] [SKIP] {model_name}: thumbnail already exists at {thumb_path}")
+            # print(f"[ThumbnailGenerator] [SKIP] {model_name}: thumbnail already exists at {thumb_path}")
             return thumb_path
 
         print(f"[ThumbnailGenerator] [GENERATING] {model_name}...")
@@ -237,13 +237,13 @@ class ThumbnailGenerator:
 
             # Skip if already exists
             if thumb_path.exists():
-                print(f"  [SKIP] {preset_name}: thumbnail already exists at {thumb_path}")
+                # print(f"  [SKIP] {preset_name}: thumbnail already exists at {thumb_path}")
                 results[preset_name] = thumb_path
                 continue
 
             # Skip generation if framebuffer failed
             if not self.fbo:
-                print(f"  [SKIP] {preset_name}: framebuffer not available (rendering disabled)")
+                # print(f"  [SKIP] {preset_name}: framebuffer not available (rendering disabled)")
                 results[preset_name] = None
                 continue
 
