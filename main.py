@@ -359,6 +359,9 @@ class Game(mglw.WindowConfig):
                 tool_icon_size=48,
             )
 
+            # Pass native menu reference to UIManager for scroll event delegation
+            self.ui_manager.set_native_thumbnail_menu(self.thumbnail_menu)
+
             self.object_selector = ObjectSelector(raycast_range=OBJECT_RAYCAST_RANGE)
             self.selection_highlight = SelectionHighlight(self.ctx)
             self.selection_highlight.set_outline_scale(SELECTION_OUTLINE_SCALE)
@@ -952,7 +955,6 @@ class Game(mglw.WindowConfig):
             x_offset: Horizontal scroll delta
             y_offset: Vertical scroll delta (positive = up, negative = down)
         """
-        # Pass to ImGui first
         self.ui_manager.handle_mouse_scroll(x_offset, y_offset)
 
         # Handle thumbnail menu scrolling in attribute mode

@@ -82,14 +82,27 @@ class UIManager:
         # Input manager reference (set later)
         self.input_manager: Optional[InputManager] = None
 
+        # Native menu reference (for non-ImGui scroll handling)
+        self.native_thumbnail_menu = None
+
+        # Track last mouse position for native menu scroll detection
+        self.last_mouse_x = 0.0
+        self.last_mouse_y = 0.0
+
     def set_input_manager(self, input_manager: InputManager) -> None:
         """Set reference to input manager for context switching."""
         self.input_manager = input_manager
+
+    def set_native_thumbnail_menu(self, menu) -> None:
+        """Set reference to native thumbnail menu for scroll event delegation."""
+        self.native_thumbnail_menu = menu
 
     def handle_mouse_position(self, x: float, y: float) -> None:
         """Update ImGui mouse position."""
         io = imgui.get_io()
         io.mouse_pos = (x, y)
+        self.last_mouse_x = x
+        self.last_mouse_y = y
 
     def handle_mouse_button(self, button: int, pressed: bool) -> None:
         """
@@ -104,9 +117,27 @@ class UIManager:
             io.mouse_down[button] = pressed
 
     def handle_mouse_scroll(self, x_offset: float, y_offset: float) -> None:
-        """Handle mouse scroll."""
+        """
+        Handle mouse scroll.
+
+        Delegates to native thumbnail menu if visible and mouse is over it,
+        otherwise routes to ImGui.
+        """
+        # Try to delegate to native thumbnail menu first
+        if self.native_thumbnail_menu:
+            # Check if mouse is over native menu bounds
+            if (self.last_mouse_y >= self.native_thumbnail_menu.menu_y and
+                self.last_mouse_x >= self.native_thumbnail_menu.menu_x and
+                self.last_mouse_x <= self.native_thumbnail_menu.menu_x + self.native_thumbnail_menu.menu_width):
+                # Mouse is over native menu, delegate scroll
+                self.native_thumbnail_menu.handle_scroll(y_offset)
+                return
+
+        # Otherwise, route to ImGui
         io = imgui.get_io()
-        io.mouse_wheel_h = x_offset
+        # Only set mouse_wheel_h if it exists (some ImGui versions don't have it)
+        if hasattr(io, 'mouse_wheel_h'):
+            io.mouse_wheel_h = x_offset
         io.mouse_wheel = y_offset
 
     def handle_keyboard_event(self, key: int, pressed: bool) -> None:
