@@ -643,10 +643,6 @@ class NativeThumbnailMenu:
         if not self.show or self.selected_category is None:
             return False
 
-        # Check if cursor is in menu area
-        # TODO: Check actual mouse position from ImGui
-        # For now, just handle scroll when menu is visible
-
         assets = self.assets.get(self.selected_category, [])
         if not assets:
             return False
