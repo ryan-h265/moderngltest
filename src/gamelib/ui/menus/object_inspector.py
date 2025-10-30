@@ -84,7 +84,7 @@ class ObjectInspector:
         imgui.set_next_window_position(
             inspector_x,
             inspector_y,
-            imgui.ALWAYS,
+            imgui.ONCE,
         )
         imgui.set_next_window_size(inspector_width, inspector_height, imgui.ALWAYS)
 
