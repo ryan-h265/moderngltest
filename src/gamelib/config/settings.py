@@ -5,6 +5,7 @@ All configuration constants for the game engine.
 Modify these values to change engine behavior.
 """
 
+import json
 from pathlib import Path
 
 # ============================================================================
@@ -401,3 +402,70 @@ HUD_SECTION_ORDER = (
     "health",
     "compass",  # Furthest from anchor
 )
+
+# ============================================================================
+# UI Settings (ImGui)
+# ============================================================================
+
+# ImGui theme to use
+UI_THEME = "sage_green"  # Options: "sage_green", "dark", "light", "cyberpunk"
+
+# UI scaling (auto-scales with resolution)
+UI_SCALE_FACTOR = 1.0
+
+# Menu background dimming when paused
+UI_PAUSE_DIM_ALPHA = 0.6  # Opacity of dim overlay (0.0-1.0)
+
+# ============================================================================
+# Attribute Mode Settings (Editor)
+# ============================================================================
+
+# Thumbnail menu configuration
+THUMBNAIL_SIZE = 192  # Size of asset thumbnails in pixels
+THUMBNAIL_VISIBLE_COUNT = 6  # Number of thumbnails visible at once
+BOTTOM_MENU_HEIGHT = 300  # Height of bottom menu bar in pixels
+TOOL_ICON_SIZE = 56  # Size of tool icons in top row
+
+# Object selection and highlight
+SELECTION_HIGHLIGHT_COLOR = (1.0, 0.8, 0.0, 1.0)  # Orange RGBA
+SELECTION_OUTLINE_SCALE = 0.01  # Outline thickness (0.005-0.02 recommended)
+OBJECT_RAYCAST_RANGE = 1000.0  # Maximum distance for raycasting
+
+# ============================================================================
+# Light Presets (Editor) - Loaded from JSON Config
+# ============================================================================
+
+def _load_light_presets() -> dict:
+    """
+    Load light presets from JSON configuration file.
+
+    Returns:
+        Dictionary mapping preset names to preset data
+    """
+    config_path = PROJECT_ROOT / "assets" / "config" / "lights" / "light_presets.json"
+
+    if not config_path.exists():
+        print(f"Warning: Light presets config not found at {config_path}")
+        return {}
+
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        presets = {}
+        for preset in config.get("presets", []):
+            name = preset.get("name", preset.get("id", "Unknown"))
+            presets[name] = {
+                "color": tuple(preset.get("color", [1.0, 1.0, 1.0])),
+                "intensity": preset.get("intensity", 1.0),
+                "cast_shadows": preset.get("cast_shadows", True),
+                "icon_color": tuple(preset.get("icon_color", [1.0, 1.0, 1.0])),
+            }
+
+        return presets
+    except Exception as e:
+        print(f"Error loading light presets: {e}")
+        return {}
+
+# Load light presets from JSON configuration
+LIGHT_PRESETS = _load_light_presets()

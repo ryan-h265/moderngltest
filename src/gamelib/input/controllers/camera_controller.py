@@ -21,6 +21,9 @@ class CameraController:
         self.speed_multiplier = 1.0
         self.base_speed = camera.speed
 
+        # Mouse look control (can be disabled for UI editing)
+        self.mouse_look_enabled = True
+
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -89,7 +92,8 @@ class CameraController:
         self.camera.position.y -= movement
 
     def rotate(self, dx: float, dy: float) -> None:
-        self.rig.apply_look_input(dx, dy)
+        if self.mouse_look_enabled:
+            self.rig.apply_look_input(dx, dy)
 
     def set_speed_boost(self, delta_time: float) -> None:
         """

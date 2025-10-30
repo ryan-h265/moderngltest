@@ -1,0 +1,107 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                THUMBNAIL RENDERING - TEST THE FIX                            ║
+║                                                                              ║
+║             Fixed: ImGui Tab Selection + Fallback Rendering                  ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+
+WHAT WAS FIXED
+───────────────────────────────────────────────────────────────────────────────
+
+Previous issue:  No tabs were being selected by ImGui by default
+New fix:        First tab now renders as fallback on first frame
+Code fix:       Added `should_render` logic (line 294 in thumbnail_menu.py)
+
+
+HOW TO TEST
+───────────────────────────────────────────────────────────────────────────────
+
+Run:  python main.py
+
+Steps:
+  1. Click on any scene
+  2. Press ENTER (to enter editor mode)
+  3. Press TAB (to toggle attribute mode)
+  4. LOOK AT THE BOTTOM OF THE SCREEN
+
+
+EXPECTED RESULT
+───────────────────────────────────────────────────────────────────────────────
+
+You should see:
+  ✓ A bottom menu bar with tabs: Models | Lights | Objects | Materials
+  ✓ Below "Models" tab: a 4×3 grid showing thumbnail images
+  ✓ Images should be colorful PNG previews (96×96 pixels each)
+  ✓ First image should have a yellow border (selected)
+  ✓ You should see at least 4 images visible before scrolling
+
+
+OPTIONAL TESTS
+───────────────────────────────────────────────────────────────────────────────
+
+Try these to confirm it's working:
+
+  1. Scroll with mouse wheel
+     → The grid should scroll showing more items
+
+  2. Click on "Lights" tab
+     → Should show 8 light color thumbnails instead of models
+
+  3. Click on "Objects" tab
+     → Should show scene objects (may have no preview images)
+
+  4. Click an image in the grid
+     → Yellow border should move to the clicked item
+     → Right panel should update to show selected item details
+
+
+WHAT THE DEBUG OUTPUT SHOULD SHOW
+───────────────────────────────────────────────────────────────────────────────
+
+If you want to see debug output, run:
+
+  python main.py 2>&1 | grep "\[Thumbnail\]" | grep -E "Fallback|Loading|Successfully"
+
+Should see something like:
+  [Thumbnail] Fallback rendering first tab (ImGui not selecting any)
+  [Thumbnail] Loading texture from: /path/to/EmissiveStrengthTest.png
+  [Thumbnail] ✓ Successfully loaded texture: EmissiveStrengthTest.png (ID: 12345)
+  ... (more loading messages)
+
+
+IF IT WORKS ✓
+───────────────────────────────────────────────────────────────────────────────
+
+Perfect! The thumbnail system is working. Next steps:
+  1. Remove debug print statements (optional, for cleaner code)
+  2. Test edge cases (scrolling, switching tabs, clicking items)
+  3. Commit changes to git
+
+
+IF IT STILL DOESN'T WORK ✗
+───────────────────────────────────────────────────────────────────────────────
+
+Share the debug output:
+
+  python main.py 2>&1 | grep "\[Thumbnail\]" > /tmp/thumb_debug.txt
+  cat /tmp/thumb_debug.txt
+
+And share the complete output so we can diagnose what's happening.
+
+
+KEYBOARD SHORTCUTS IN EDITOR
+───────────────────────────────────────────────────────────────────────────────
+
+  ENTER ..................... Toggle gameplay ↔ editor
+  TAB ....................... Toggle attribute menu (when in editor)
+  F12 ....................... Toggle debug overlay
+  P ......................... Show panel boundaries (in debug mode)
+  Mouse wheel ............... Scroll thumbnails
+  Click image ............... Select item
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+              Go ahead and test! Does it show the thumbnails now?
+
+═══════════════════════════════════════════════════════════════════════════════

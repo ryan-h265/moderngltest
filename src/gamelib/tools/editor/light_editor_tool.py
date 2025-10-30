@@ -63,6 +63,7 @@ class LightEditorTool(EditorTool):
         self.light_color: Vector3 = Vector3(self.get_property("default_color", [1.0, 1.0, 1.0]))
         self.light_intensity: float = self.get_property("default_intensity", 1.0)
         self.light_height: float = self.get_property("default_height", 5.0)
+        self.cast_shadows: bool = self.get_property("default_cast_shadows", True)
 
         # Move operation
         self.is_moving: bool = False
@@ -106,7 +107,8 @@ class LightEditorTool(EditorTool):
             target=light_target,
             color=self.light_color,
             intensity=self.light_intensity,
-            light_type=self.light_type
+            light_type=self.light_type,
+            cast_shadows=self.cast_shadows
         )
 
         # Record in history
@@ -251,6 +253,16 @@ class LightEditorTool(EditorTool):
         """
         self.light_intensity = intensity
         print(f"Light intensity: {self.light_intensity}")
+
+    def set_cast_shadows(self, cast_shadows: bool):
+        """
+        Set whether lights cast shadows.
+
+        Args:
+            cast_shadows: True to enable shadows, False to disable
+        """
+        self.cast_shadows = cast_shadows
+        print(f"Cast shadows: {self.cast_shadows}")
 
     def on_equipped(self):
         """Called when tool is equipped."""

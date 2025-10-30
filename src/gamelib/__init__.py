@@ -17,7 +17,12 @@ from .core.scene_manager import SceneManager
 
 # Rendering
 from .rendering.render_pipeline import RenderPipeline
+
+# UI
 from .ui.player_hud import PlayerHUD
+from .ui.ui_manager import UIManager
+from .ui.theme import ThemeManager, ThemeConfig, ColorPalette
+from .ui.menus import MainMenu, PauseMenu, SettingsMenu, ObjectInspector, NativeThumbnailMenu
 
 # Loaders
 from .loaders import SceneLoader, SceneLoadResult
@@ -65,6 +70,16 @@ __all__ = [
     "PhysicsBodyHandle",
     # Rendering
     "RenderPipeline",
+    # UI
+    "UIManager",
+    "ThemeManager",
+    "ThemeConfig",
+    "ColorPalette",
+    "MainMenu",
+    "PauseMenu",
+    "SettingsMenu",
+    "ObjectInspector",
+    "NativeThumbnailMenu",
     "PlayerHUD",
     # Input
     "InputManager",
