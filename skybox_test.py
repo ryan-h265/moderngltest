@@ -55,11 +55,10 @@ class SkyboxTestWindow(mglw.WindowConfig):
         self.imgui_renderer = ModernglWindowRenderer(self.wnd)
 
         # Camera setup (simple free look)
-        self.camera = Camera(
-            position=Vector3([0.0, 0.0, 0.0]),
-            yaw=-90.0,
-            pitch=0.0,
-        )
+        self.camera = Camera(position=Vector3([0.0, 0.0, 0.0]))
+        self.camera.yaw = -90.0
+        self.camera.pitch = 0.0
+        self.camera.update_vectors()
         self.mouse_sensitivity = 0.1
         self.last_mouse_pos = None
         self.mouse_captured = False
