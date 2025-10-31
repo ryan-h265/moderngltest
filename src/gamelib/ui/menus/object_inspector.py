@@ -371,7 +371,7 @@ class ObjectInspector:
 
     def _draw_preview_light_section(self) -> None:
         """Draw light-specific controls for light presets."""
-        from ..tools.editor.light_editor_tool import LightEditorTool
+        from ...tools.editor.light_editor_tool import LightEditorTool
 
         item = self.preview_item
         if not item:

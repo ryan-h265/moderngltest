@@ -208,9 +208,23 @@ class Light:
         """Return a look-at view matrix for the light."""
         if up is None:
             up = Vector3([0.0, 1.0, 0.0])
+
+        # Ensure position and target are different to avoid zero-length forward vector
+        # which causes issues in pyrr's look_at function
+        target = self.target.copy()
+        position = self.position.copy()
+
+        direction = target - position
+        dir_length = np.linalg.norm(direction)
+
+        if dir_length < 1e-5:
+            # Position and target are too close or identical
+            # Offset target slightly to create a valid view matrix
+            target = position + Vector3([0.0, -1.0, 0.0])
+
         return Matrix44.look_at(
-            self.position,
-            self.target,
+            position,
+            target,
             up
         )
 
