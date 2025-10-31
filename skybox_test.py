@@ -472,6 +472,10 @@ class SkyboxTestWindow(mglw.WindowConfig):
         imgui.render()
         self.imgui_renderer.render(imgui.get_draw_data())
 
+    def on_render(self, time: float, frametime: float):
+        """Render callback - called every frame."""
+        self.render(time, frametime)
+
     def render(self, time: float, frametime: float):
         """Render the skybox."""
         self.ctx.clear(0.0, 0.0, 0.0)
