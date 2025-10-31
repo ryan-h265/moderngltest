@@ -498,11 +498,11 @@ class SkyboxTestWindow(mglw.WindowConfig):
         # Render ImGui
         self.render_imgui()
 
-    def resize(self, width: int, height: int):
+    def on_resize(self, width: int, height: int):
         """Handle window resize."""
         self.imgui_renderer.resize(width, height)
 
-    def key_event(self, key, action, modifiers):
+    def on_key_event(self, key, action, modifiers):
         """Handle keyboard events."""
         self.imgui_renderer.key_event(key, action, modifiers)
 
@@ -525,7 +525,7 @@ class SkyboxTestWindow(mglw.WindowConfig):
             elif key == self.wnd.keys.NUMBER_5:
                 self._preset_stormy()
 
-    def mouse_position_event(self, x, y, dx, dy):
+    def on_mouse_position_event(self, x, y, dx, dy):
         """Handle mouse movement."""
         self.imgui_renderer.mouse_position_event(x, y, dx, dy)
 
@@ -539,23 +539,23 @@ class SkyboxTestWindow(mglw.WindowConfig):
 
             self.camera.update_vectors()
 
-    def mouse_drag_event(self, x, y, dx, dy):
+    def on_mouse_drag_event(self, x, y, dx, dy):
         """Handle mouse drag."""
         self.imgui_renderer.mouse_drag_event(x, y, dx, dy)
 
-    def mouse_scroll_event(self, x_offset, y_offset):
+    def on_mouse_scroll_event(self, x_offset, y_offset):
         """Handle mouse scroll."""
         self.imgui_renderer.mouse_scroll_event(x_offset, y_offset)
 
-    def mouse_press_event(self, x, y, button):
+    def on_mouse_press_event(self, x, y, button):
         """Handle mouse press."""
         self.imgui_renderer.mouse_press_event(x, y, button)
 
-    def mouse_release_event(self, x: int, y: int, button: int):
+    def on_mouse_release_event(self, x: int, y: int, button: int):
         """Handle mouse release."""
         self.imgui_renderer.mouse_release_event(x, y, button)
 
-    def unicode_char_entered(self, char):
+    def on_unicode_char_entered(self, char):
         """Handle unicode character input."""
         self.imgui_renderer.unicode_char_entered(char)
 
