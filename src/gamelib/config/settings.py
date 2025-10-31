@@ -38,7 +38,8 @@ RENDERING_MODE = "deferred"  # "forward" or "deferred"
 # Shadow mapping
 SHADOW_MAP_SIZE = 2048  # Resolution of shadow maps (2048x2048) - default/high quality
 MAX_LIGHTS = 3          # Number of shadow-casting lights (only for forward rendering)
-SHADOW_BIAS = 0.005     # Bias to prevent shadow acne
+SHADOW_BIAS = 0.005     # Bias to prevent shadow acne on 2D shadow maps
+POINT_SHADOW_BIAS = 0.05  # Bias for point light cube shadows (units in world space)
 
 # Shadow map optimizations
 SHADOW_MAP_MIN_INTENSITY = 0.01  # Skip shadow rendering for lights dimmer than this

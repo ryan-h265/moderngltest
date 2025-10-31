@@ -6,6 +6,7 @@ Objects are depth-sorted back-to-front to ensure correct transparency.
 """
 
 from typing import List, Optional, Tuple
+
 import numpy as np
 import moderngl
 from pyrr import Vector3
@@ -13,6 +14,7 @@ from pyrr import Vector3
 from ..core.camera import Camera
 from ..core.scene import Scene
 from ..core.light import Light
+from ..config.settings import SHADOW_BIAS, POINT_SHADOW_BIAS
 
 
 class TransparentRenderer:
@@ -37,6 +39,16 @@ class TransparentRenderer:
         self.ctx = ctx
         self.transparent_program = transparent_program
         self._last_viewport_size: Optional[Tuple[int, int]] = None
+
+        self._dummy_shadow_map = self.ctx.depth_texture((1, 1))
+        self._dummy_shadow_map.compare_func = ''
+        self._dummy_shadow_map.repeat_x = False
+        self._dummy_shadow_map.repeat_y = False
+
+        self._dummy_shadow_cube = self.ctx.depth_texture_cube((1, 1))
+        self._dummy_shadow_cube.compare_func = ''
+        self._dummy_shadow_cube.repeat_x = False
+        self._dummy_shadow_cube.repeat_y = False
 
     def render(
         self,
@@ -138,14 +150,32 @@ class TransparentRenderer:
         light_positions = np.zeros((4, 3), dtype='f4')
         light_colors = np.zeros((4, 3), dtype='f4')
         light_intensities = np.zeros(4, dtype='f4')
-        light_matrices = []
+        light_matrices = np.zeros((4, 4, 4), dtype='f4')
+        light_types = np.zeros(4, dtype='i4')
+        light_directions = np.zeros((4, 3), dtype='f4')
+        light_ranges = np.zeros(4, dtype='f4')
+        spot_inner = np.zeros(4, dtype='f4')
+        spot_outer = np.zeros(4, dtype='f4')
+        shadow_clips = np.zeros((4, 2), dtype='f4')
 
         for i in range(num_lights):
             light = lights[i]
             light_positions[i] = light.position
             light_colors[i] = light.color
             light_intensities[i] = light.intensity
-            light_matrices.append(light.get_light_matrix())
+            light_types[i] = light.get_light_type_id()
+            light_directions[i] = light.get_direction()
+            light_ranges[i] = light.range
+            inner_cos, outer_cos = light.get_spot_cosines()
+            spot_inner[i] = inner_cos
+            spot_outer[i] = outer_cos
+            clip_near, clip_far = light.get_shadow_clip_planes()
+            shadow_clips[i] = (clip_near, clip_far)
+
+            if light.light_type == 'point':
+                light_matrices[i] = np.eye(4, dtype='f4')
+            else:
+                light_matrices[i] = light.get_shadow_matrices()[0]
 
         # Upload arrays as uniforms (check if uniform exists first)
         if 'lightPositions' in self.transparent_program:
@@ -154,6 +184,18 @@ class TransparentRenderer:
             self.transparent_program['lightColors'].write(light_colors.tobytes())
         if 'lightIntensities' in self.transparent_program:
             self.transparent_program['lightIntensities'].write(light_intensities.tobytes())
+        if 'lightTypes' in self.transparent_program:
+            self.transparent_program['lightTypes'].write(light_types.tobytes())
+        if 'lightDirections' in self.transparent_program:
+            self.transparent_program['lightDirections'].write(light_directions.tobytes())
+        if 'lightRanges' in self.transparent_program:
+            self.transparent_program['lightRanges'].write(light_ranges.tobytes())
+        if 'spotInnerCos' in self.transparent_program:
+            self.transparent_program['spotInnerCos'].write(spot_inner.tobytes())
+        if 'spotOuterCos' in self.transparent_program:
+            self.transparent_program['spotOuterCos'].write(spot_outer.tobytes())
+        if 'shadowClip' in self.transparent_program:
+            self.transparent_program['shadowClip'].write(shadow_clips.tobytes())
 
         # Upload light matrices and shadow maps individually
         for i in range(num_lights):
@@ -161,16 +203,43 @@ class TransparentRenderer:
             if uniform_name in self.transparent_program:
                 self.transparent_program[uniform_name].write(light_matrices[i].astype('f4').tobytes())
 
-            # Bind shadow map
-            if i < len(shadow_maps) and shadow_maps[i] is not None:
-                shadow_maps[i].use(location=10 + i)  # shadowMap0-3 at locations 10-13
+            texture = shadow_maps[i] if i < len(shadow_maps) else None
+            unit_2d = 10 + i
+            unit_cube = 20 + i
+
+            if light.cast_shadows and texture is not None:
+                if light.light_type == 'point' and light.shadow_map_type == 'cube':
+                    texture.use(location=unit_cube)
+                    cube_uniform = f'shadowCubeMap{i}'
+                    if cube_uniform in self.transparent_program:
+                        self.transparent_program[cube_uniform].value = unit_cube
+                    self._dummy_shadow_map.use(location=unit_2d)
+                    shadow_uniform = f'shadowMap{i}'
+                    if shadow_uniform in self.transparent_program:
+                        self.transparent_program[shadow_uniform].value = unit_2d
+                else:
+                    texture.use(location=unit_2d)
+                    shadow_uniform = f'shadowMap{i}'
+                    if shadow_uniform in self.transparent_program:
+                        self.transparent_program[shadow_uniform].value = unit_2d
+                    self._dummy_shadow_cube.use(location=unit_cube)
+                    cube_uniform = f'shadowCubeMap{i}'
+                    if cube_uniform in self.transparent_program:
+                        self.transparent_program[cube_uniform].value = unit_cube
+            else:
+                self._dummy_shadow_map.use(location=unit_2d)
                 shadow_uniform = f'shadowMap{i}'
                 if shadow_uniform in self.transparent_program:
-                    self.transparent_program[shadow_uniform].value = 10 + i
+                    self.transparent_program[shadow_uniform].value = unit_2d
+                self._dummy_shadow_cube.use(location=unit_cube)
+                cube_uniform = f'shadowCubeMap{i}'
+                if cube_uniform in self.transparent_program:
+                    self.transparent_program[cube_uniform].value = unit_cube
 
         # Shadow parameters
-        from ..config.settings import SHADOW_BIAS
         self.transparent_program['shadowBias'].value = SHADOW_BIAS
+        if 'pointShadowBias' in self.transparent_program:
+            self.transparent_program['pointShadowBias'].value = POINT_SHADOW_BIAS
 
         # Ambient lighting
         from ..config.settings import AMBIENT_STRENGTH

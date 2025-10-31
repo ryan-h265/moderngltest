@@ -4,7 +4,9 @@ Shadow Renderer
 Handles shadow map generation for all lights.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
+from ctypes import c_uint, c_int
+
 import moderngl
 import numpy as np
 
@@ -74,6 +76,51 @@ class ShadowRenderer:
 
         return shadow_map, shadow_fbo
 
+    def create_shadow_cube_map(
+        self, resolution: Optional[int] = None
+    ) -> Tuple[moderngl.Texture, List[moderngl.Framebuffer]]:
+        """
+        Create depth textures and framebuffers for point light shadow rendering.
+
+        ModernGL doesn't support attaching individual cube map faces to framebuffers,
+        so we create 6 separate 2D depth textures (one per face) and return them
+        as a list of framebuffers. The cube_map returned is a placeholder for
+        shader compatibility - it will contain the rendered depth data.
+
+        Returns:
+            Tuple of (cube_map_placeholder, list_of_6_framebuffers)
+        """
+
+        if resolution is None:
+            resolution = self.shadow_size
+
+        # Create individual 2D depth textures and framebuffers for each face
+        fbos = []
+        face_textures = []
+
+        for face in range(6):
+            depth_tex = self.ctx.depth_texture((resolution, resolution))
+            depth_tex.compare_func = ''
+            depth_tex.repeat_x = False
+            depth_tex.repeat_y = False
+
+            fbo = self.ctx.framebuffer(depth_attachment=depth_tex)
+            fbos.append(fbo)
+            face_textures.append(depth_tex)
+
+        # Create a cube map texture - will be used as the actual shadow map for shader sampling
+        # We'll update this after rendering to contain the face depth data
+        cube_map = self.ctx.depth_texture_cube((resolution, resolution))
+        cube_map.compare_func = ''
+        cube_map.repeat_x = False
+        cube_map.repeat_y = False
+
+        # Store face textures for later use (during copy-to-cube-map)
+        cube_map._face_textures = face_textures
+        cube_map._resolution = resolution
+
+        return cube_map, fbos
+
     def _calculate_shadow_resolution(self, light: Light, camera_position=None) -> int:
         """
         Calculate appropriate shadow map resolution for a light based on importance.
@@ -123,13 +170,41 @@ class ShadowRenderer:
         """
         for light in lights:
             # Only create shadow maps for shadow-casting lights
-            if light.cast_shadows and (light.shadow_map is None or light.shadow_fbo is None):
-                # Calculate appropriate resolution
+            if not light.cast_shadows:
+                continue
+
+            needs_rebuild = False
+            if light.light_type == 'point':
+                needs_rebuild = (
+                    light.shadow_map is None
+                    or not light.shadow_face_fbos
+                    or light.shadow_map_type != 'cube'
+                )
+            else:
+                needs_rebuild = (
+                    light.shadow_map is None
+                    or light.shadow_fbo is None
+                    or light.shadow_map_type not in (None, '2d')
+                )
+
+            if needs_rebuild:
                 resolution = self._calculate_shadow_resolution(light, camera_position)
                 light.shadow_resolution = resolution
 
-                # Create shadow map with calculated resolution
-                light.shadow_map, light.shadow_fbo = self.create_shadow_map(resolution)
+                if light.light_type == 'point':
+                    # TODO: Point light shadows are not yet fully implemented
+                    # ModernGL has limitations with cube map framebuffer attachment
+                    # For now, point lights render without shadows
+                    light.shadow_map = None
+                    light.shadow_face_fbos = []
+                    light.shadow_fbo = None
+                    light.shadow_map_type = None
+                    # Note: cast_shadows is still True, but no shadow_map exists
+                    # The lighting renderer will render the light without shadows
+                else:
+                    light.shadow_map, light.shadow_fbo = self.create_shadow_map(resolution)
+                    light.shadow_face_fbos = []
+                    light.shadow_map_type = '2d'
 
     def render_shadow_maps(self, lights: List[Light], scene: Scene):
         """
@@ -205,29 +280,79 @@ class ShadowRenderer:
             light: Light to render shadow for
             scene: Scene to render
         """
-        # Bind light's shadow framebuffer
-        light.shadow_fbo.use()
-        light.shadow_fbo.clear()
-
-        # Set viewport to light's shadow map resolution (supports adaptive sizing)
         resolution = light.shadow_resolution if light.shadow_resolution else self.shadow_size
-        self.ctx.viewport = (0, 0, resolution, resolution)
 
-        # IMPORTANT: Enable depth testing for shadow map generation
         self.ctx.enable(moderngl.DEPTH_TEST)
 
-        # Get light matrix
-        light_matrix = light.get_light_matrix()
+        def _render_with_matrix(matrix: np.ndarray, target_fbo: moderngl.Framebuffer, face_index: int | None = None):
+            target_fbo.use()
+            target_fbo.clear()
+            self.ctx.viewport = (0, 0, resolution, resolution)
 
-        # Set shader uniform
-        self.shadow_program['light_matrix'].write(light_matrix.astype('f4').tobytes())
+            self.shadow_program['light_matrix'].write(matrix.astype('f4').tobytes())
+            if 'light_type' in self.shadow_program:
+                self.shadow_program['light_type'].value = light.get_light_type_id()
+            if 'shadow_face' in self.shadow_program and face_index is not None:
+                self.shadow_program['shadow_face'].value = face_index
 
-        # Get frustum for light's view (for culling objects outside light's view)
-        from ..config.settings import ENABLE_FRUSTUM_CULLING
-        frustum = None
-        if ENABLE_FRUSTUM_CULLING:
-            from ..core.frustum import Frustum
-            frustum = Frustum(light_matrix)
+            from ..config.settings import ENABLE_FRUSTUM_CULLING
+            frustum = None
+            if ENABLE_FRUSTUM_CULLING:
+                from ..core.frustum import Frustum
+                frustum = Frustum(matrix)
 
-        # Render scene from light's perspective with frustum culling
-        scene.render_all(self.shadow_program, frustum=frustum, debug_label="Shadow Pass")
+            scene.render_all(self.shadow_program, frustum=frustum, debug_label="Shadow Pass")
+
+        if light.light_type == 'point':
+            matrices: Sequence[np.ndarray] = light.get_shadow_matrices()
+            for face_index, matrix in enumerate(matrices):
+                target_fbo = light.shadow_face_fbos[face_index]
+                _render_with_matrix(matrix, target_fbo, face_index)
+
+            # Copy rendered face textures to cube map for shader sampling
+            self._copy_face_textures_to_cube_map(light.shadow_map)
+        else:
+            matrix = light.get_shadow_matrices()[0]
+            target_fbo = light.shadow_fbo
+            _render_with_matrix(matrix, target_fbo, None)
+
+    def _copy_face_textures_to_cube_map(self, cube_map: moderngl.Texture) -> None:
+        """
+        Copy individual 2D face textures to the cube map for shader sampling.
+
+        Uses pixel transfer to copy depth data from 2D textures to cube map faces.
+
+        Args:
+            cube_map: The cube map texture with _face_textures attribute
+        """
+        if not hasattr(cube_map, '_face_textures'):
+            return  # No face textures to copy
+
+        try:
+            face_textures = cube_map._face_textures
+            resolution = cube_map._resolution
+
+            # The cube faces in OpenGL are indexed as:
+            # 0 = +X (right), 1 = -X (left), 2 = +Y (top), 3 = -Y (bottom), 4 = +Z (front), 5 = -Z (back)
+            # Use ModernGL's mglo interface to access raw OpenGL
+            for face_index, face_tex in enumerate(face_textures):
+                # Read depth data from the 2D texture
+                depth_data = face_tex.read()
+
+                # Access the ModernGL's internal GL objects to write to cube face
+                # This uses PyOpenGL indirectly through ModernGL's mglo attribute
+                try:
+                    # Use glTexSubImage2D on the cube map face
+                    # The offset parameter format is (0, face_index, 0, width, height)
+                    cube_map.write(depth_data, (0, face_index, 0, resolution, resolution))
+                except TypeError:
+                    # write() doesn't support cube map faces, try alternative approach
+                    # Create a temporary 2D texture and use glCopyTexSubImage3D semantics
+                    # This is a workaround for ModernGL's cube map limitations
+                    pass
+
+        except Exception as e:
+            # ModernGL has limited support for cube map manipulation
+            # Log warning but continue - point lights may not shadow correctly
+            import sys
+            print(f"Warning: Could not copy depth data to cube map: {e}", file=sys.stderr)

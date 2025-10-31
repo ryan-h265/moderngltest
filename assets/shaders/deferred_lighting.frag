@@ -24,7 +24,12 @@ uniform float spot_outer_cos;// Cosine of outer cone angle (spot)
 
 // Shadow map for this light
 uniform sampler2D shadow_map;
+uniform samplerCube shadow_cube_map;
 uniform mat4 light_matrix;
+uniform int shadow_map_type; // 0=none, 1=2D, 2=cubemap
+uniform vec2 shadow_clip;    // Near/far planes for perspective shadows
+uniform float shadow_bias;
+uniform float point_shadow_bias;
 
 // Camera
 uniform vec3 camera_pos;
@@ -105,30 +110,25 @@ float fbm(vec3 p,int octaves){
 * Calculate shadow factor for the light
 * Returns: 0.0 = no shadow, 1.0 = full shadow
 */
-float calculate_shadow(vec3 position){
-    // Transform position to light space
+float linearize_depth(float depth_value, vec2 clip_planes){
+    float near_plane=clip_planes.x;
+    float far_plane=clip_planes.y;
+    return (2.*near_plane*far_plane)/(far_plane+near_plane-depth_value*(far_plane-near_plane));
+}
+
+float calculate_projected_shadow(vec3 position){
     vec4 light_space_pos=light_matrix*vec4(position,1.);
-    
-    // Perspective divide
     vec3 proj_coords=light_space_pos.xyz/light_space_pos.w;
-    
-    // Transform from [-1,1] to [0,1] for texture coordinates
     proj_coords=proj_coords*.5+.5;
-    
-    // Outside shadow map bounds = no shadow
+
     if(proj_coords.z>1.||proj_coords.x<0.||proj_coords.x>1.
     ||proj_coords.y<0.||proj_coords.y>1.){
         return 0.;
     }
-    
-    // Get depth from shadow map
-    float closest_depth=texture(shadow_map,proj_coords.xy).r;
+
     float current_depth=proj_coords.z;
-    
-    // Bias to prevent shadow acne
-    float bias=.005;
-    
-    // PCF (Percentage Closer Filtering) for soft shadows
+    float bias=shadow_bias;
+
     float shadow=0.;
     vec2 texel_size=1./textureSize(shadow_map,0);
     for(int x=-1;x<=1;++x){
@@ -137,9 +137,61 @@ float calculate_shadow(vec3 position){
             shadow+=current_depth-bias>pcf_depth?1.:0.;
         }
     }
-    shadow/=9.;// Average of 9 samples
-    
+    shadow/=9.;
+
     return shadow;
+}
+
+float calculate_point_shadow(vec3 position){
+    vec3 to_fragment=position-light_position;
+    float distance_to_light=length(to_fragment);
+
+    float far_plane=shadow_clip.y;
+    if(far_plane<=0.){
+        return 0.;
+    }
+    if(distance_to_light>far_plane){
+        return 0.;
+    }
+
+    float bias=point_shadow_bias;
+    float shadow=0.;
+
+    const int sample_count=20;
+    vec3 sample_offset_directions[20]=vec3[](
+        vec3( 1,  1,  1), vec3( -1,  1,  1), vec3( 1, -1,  1), vec3( -1, -1,  1),
+        vec3( 1,  1, -1), vec3( -1,  1, -1), vec3( 1, -1, -1), vec3( -1, -1, -1),
+        vec3( 1,  0,  0), vec3(-1,  0,  0), vec3( 0,  1,  0), vec3( 0, -1,  0),
+        vec3( 0,  0,  1), vec3( 0,  0, -1), vec3( 1,  1,  0), vec3(-1,  1,  0),
+        vec3( 1, -1,  0), vec3(-1, -1,  0), vec3( 1,  0,  1), vec3(-1,  0,  1)
+    );
+
+    float current_depth=distance_to_light;
+    float closest_depth=linearize_depth(texture(shadow_cube_map,normalize(to_fragment)).r,shadow_clip);
+    shadow+=(current_depth-bias>closest_depth)?1.:0.;
+
+    float view_distance=length(camera_pos-position);
+    float disk_radius=(1.+view_distance/far_plane)*0.05;
+
+    for(int i=0;i<sample_count;i++){
+        vec3 sample_dir=normalize(to_fragment+sample_offset_directions[i]*disk_radius);
+        float depth_sample=texture(shadow_cube_map,sample_dir).r;
+        float closest=linearize_depth(depth_sample,shadow_clip);
+        shadow+=(current_depth-bias>closest)?1.:0.;
+    }
+
+    shadow/=float(sample_count+1);
+    return shadow;
+}
+
+float calculate_shadow(vec3 position){
+    if(shadow_map_type==0){
+        return 0.;
+    }
+    if(shadow_map_type==2){
+        return calculate_point_shadow(position);
+    }
+    return calculate_projected_shadow(position);
 }
 
 /**

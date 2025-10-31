@@ -5,6 +5,8 @@
 
 uniform mat4 light_matrix;  // Light projection * view matrix
 uniform mat4 model;          // Object model matrix
+uniform int light_type;      // 0=directional, 1=point, 2=spot (for debugging/consistency)
+uniform int shadow_face;     // Active cubemap face when rendering point light shadows
 
 in vec3 in_position;         // Vertex position
 

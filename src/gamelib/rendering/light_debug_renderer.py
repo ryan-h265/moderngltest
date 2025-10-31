@@ -9,6 +9,7 @@ Renders simple debug gizmos for lights consisting of:
 from __future__ import annotations
 
 from typing import Iterable, Tuple
+import math
 import numpy as np
 import moderngl
 from pyrr import Matrix44
@@ -45,6 +46,13 @@ class LightDebugRenderer:
 
         self._identity_matrix = Matrix44.identity()
         self._identity_bytes = self._identity_matrix.astype("f4").tobytes()
+
+    def _draw_line(self, start: np.ndarray, end: np.ndarray) -> None:
+        """Render a single line segment using the reusable VAO."""
+        line_vertices = np.concatenate((start, end)).astype("f4")
+        self._line_buffer.write(line_vertices.tobytes())
+        self.program["model"].write(self._identity_bytes)
+        self._line_vao.render(mode=moderngl.LINES, vertices=2)
 
     def render(self, camera: Camera, lights: Iterable[Light], viewport: Tuple[int, int, int, int]):
         """Render gizmos for all provided lights."""
@@ -92,18 +100,79 @@ class LightDebugRenderer:
                 self.program["model"].write(model.astype("f4").tobytes())
                 self._sphere_geometry.render(self.program)
 
+                position_vec = np.array(
+                    [light.position.x, light.position.y, light.position.z], dtype="f4"
+                )
+
+                # Optional volume visualization for point lights (shadow radius)
+                if light.light_type == "point":
+                    _, far_plane = light.get_shadow_clip_planes()
+                    if far_plane > 1e-3:
+                        volume_scale = Matrix44.from_scale((far_plane, far_plane, far_plane))
+                        volume_model = translation * volume_scale
+                        self.program["alpha"].value = alpha * 0.35
+                        previous_wireframe = getattr(self.ctx, "wireframe", False)
+                        self.ctx.wireframe = True
+                        self.program["model"].write(volume_model.astype("f4").tobytes())
+                        self._sphere_geometry.render(self.program)
+                        self.ctx.wireframe = previous_wireframe
+                        self.program["alpha"].value = alpha
+
                 # Direction line – start at light, extend along direction
                 if line_length > 0.0:
                     direction = light.get_direction()
-                    start = np.array(
-                        [light.position.x, light.position.y, light.position.z],
-                        dtype="f4",
-                    )
-                    end = start + np.array([direction.x, direction.y, direction.z], dtype="f4") * line_length
-                    line_vertices = np.concatenate((start, end)).astype("f4")
-                    self._line_buffer.write(line_vertices.tobytes())
-                    self.program["model"].write(self._identity_bytes)
-                    self._line_vao.render(mode=moderngl.LINES, vertices=2)
+                    end = position_vec + np.array([
+                        direction.x,
+                        direction.y,
+                        direction.z,
+                    ], dtype="f4") * line_length
+                    self._draw_line(position_vec, end)
+
+                # Cone preview for spot lights
+                if light.light_type == "spot":
+                    _, far_plane = light.get_shadow_clip_planes()
+                    if far_plane > 1e-3:
+                        direction = light.get_direction()
+                        dir_vec = np.array([direction.x, direction.y, direction.z], dtype="f4")
+                        base_center = position_vec + dir_vec * far_plane
+                        up_hint = np.array([0.0, 1.0, 0.0], dtype="f4")
+                        if abs(float(np.dot(dir_vec, up_hint))) > 0.95:
+                            up_hint = np.array([0.0, 0.0, 1.0], dtype="f4")
+                        right_vec = np.cross(dir_vec, up_hint)
+                        norm = np.linalg.norm(right_vec)
+                        if norm < 1e-4:
+                            right_vec = np.array([1.0, 0.0, 0.0], dtype="f4")
+                        else:
+                            right_vec /= norm
+                        up_vec = np.cross(right_vec, dir_vec)
+                        up_norm = np.linalg.norm(up_vec)
+                        if up_norm < 1e-4:
+                            up_vec = np.array([0.0, 0.0, 1.0], dtype="f4")
+                        else:
+                            up_vec /= up_norm
+
+                        radius = far_plane * math.tan(math.radians(max(light.outer_cone_angle, 1e-3)))
+                        right_vec *= radius
+                        up_vec *= radius
+
+                        offsets = [
+                            right_vec + up_vec,
+                            -right_vec + up_vec,
+                            -right_vec - up_vec,
+                            right_vec - up_vec,
+                        ]
+
+                        self.program["alpha"].value = alpha * 0.6
+                        for offset in offsets:
+                            base_point = base_center + offset
+                            self._draw_line(position_vec, base_point)
+
+                        for idx in range(len(offsets)):
+                            start_point = base_center + offsets[idx]
+                            end_point = base_center + offsets[(idx + 1) % len(offsets)]
+                            self._draw_line(start_point, end_point)
+
+                        self.program["alpha"].value = alpha
         finally:
             # Restore default depth/blend state for subsequent passes
             self.ctx.depth_mask = True

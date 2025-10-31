@@ -15,6 +15,10 @@ uniform sampler2D shadowMap0;
 uniform sampler2D shadowMap1;
 uniform sampler2D shadowMap2;
 uniform sampler2D shadowMap3;
+uniform samplerCube shadowCubeMap0;
+uniform samplerCube shadowCubeMap1;
+uniform samplerCube shadowCubeMap2;
+uniform samplerCube shadowCubeMap3;
 
 // Texture flags
 uniform bool hasBaseColorTexture;
@@ -47,9 +51,16 @@ uniform vec3 lightPositions[4];// World space
 uniform vec3 lightColors[4];
 uniform float lightIntensities[4];
 uniform mat4 lightMatrices[4];// Light view-projection matrices for shadow mapping
+uniform int lightTypes[4];// 0=directional,1=point,2=spot
+uniform vec3 lightDirections[4];
+uniform float lightRanges[4];
+uniform float spotInnerCos[4];
+uniform float spotOuterCos[4];
+uniform vec2 shadowClip[4];
 
 // Shadow parameters
 uniform float shadowBias;
+uniform float pointShadowBias;
 
 // Ambient lighting
 uniform float ambientStrength;
@@ -154,31 +165,89 @@ float computeFogFactor(vec3 world_pos){
     return clamp(fog_amount*distance_factor,0.,1.);
 }
 
-// PCF Shadow calculation (same as deferred lighting)
-float calculateShadow(sampler2D shadowMap,vec4 fragPosLightSpace,float bias){
-    // Perspective divide
+float linearizeDepth(float depthValue, vec2 clipPlanes){
+    float nearPlane=clipPlanes.x;
+    float farPlane=clipPlanes.y;
+    return (2.*nearPlane*farPlane)/(farPlane+nearPlane-depthValue*(farPlane-nearPlane));
+}
+
+vec2 getShadowTexelSize(int index){
+    if(index==0)return 1./vec2(textureSize(shadowMap0,0));
+    if(index==1)return 1./vec2(textureSize(shadowMap1,0));
+    if(index==2)return 1./vec2(textureSize(shadowMap2,0));
+    return 1./vec2(textureSize(shadowMap3,0));
+}
+
+float sampleShadowMap(int index, vec2 uv){
+    if(index==0)return texture(shadowMap0,uv).r;
+    if(index==1)return texture(shadowMap1,uv).r;
+    if(index==2)return texture(shadowMap2,uv).r;
+    return texture(shadowMap3,uv).r;
+}
+
+float calculateProjectedShadow(int index, vec4 fragPosLightSpace, float bias){
     vec3 projCoords=fragPosLightSpace.xyz/fragPosLightSpace.w;
-    
-    // Transform to [0,1] range
     projCoords=projCoords*.5+.5;
-    
-    // Outside shadow map bounds = no shadow
+
     if(projCoords.z>1.||projCoords.x<0.||projCoords.x>1.||
     projCoords.y<0.||projCoords.y>1.){
         return 0.;
     }
-    
-    // PCF (Percentage Closer Filtering) for soft shadows
+
+    vec2 texelSize=getShadowTexelSize(index);
     float shadow=0.;
-    vec2 texelSize=1./textureSize(shadowMap,0);
     for(int x=-1;x<=1;++x){
         for(int y=-1;y<=1;++y){
-            float pcfDepth=texture(shadowMap,projCoords.xy+vec2(x,y)*texelSize).r;
+            vec2 offset=vec2(x,y)*texelSize;
+            float pcfDepth=sampleShadowMap(index,projCoords.xy+offset);
             shadow+=(projCoords.z-bias)>pcfDepth?1.:0.;
         }
     }
     shadow/=9.;
-    
+    return shadow;
+}
+
+float sampleShadowCube(int index, vec3 direction){
+    if(index==0)return texture(shadowCubeMap0,direction).r;
+    if(index==1)return texture(shadowCubeMap1,direction).r;
+    if(index==2)return texture(shadowCubeMap2,direction).r;
+    return texture(shadowCubeMap3,direction).r;
+}
+
+float calculatePointShadow(int index, vec3 worldPos, vec3 lightPos, vec2 clipPlanes, float bias){
+    vec3 toFragment=worldPos-lightPos;
+    float distanceToLight=length(toFragment);
+    float farPlane=clipPlanes.y;
+    if(farPlane<=0.){
+        return 0.;
+    }
+    if(distanceToLight>farPlane){
+        return 0.;
+    }
+
+    float shadow=0.;
+    const int sampleCount=20;
+    vec3 sampleOffsetDirections[20]=vec3[](
+        vec3( 1,  1,  1), vec3( -1,  1,  1), vec3( 1, -1,  1), vec3( -1, -1,  1),
+        vec3( 1,  1, -1), vec3( -1,  1, -1), vec3( 1, -1, -1), vec3( -1, -1, -1),
+        vec3( 1,  0,  0), vec3(-1,  0,  0), vec3( 0,  1,  0), vec3( 0, -1,  0),
+        vec3( 0,  0,  1), vec3( 0,  0, -1), vec3( 1,  1,  0), vec3(-1,  1,  0),
+        vec3( 1, -1,  0), vec3(-1, -1,  0), vec3( 1,  0,  1), vec3(-1,  0,  1)
+    );
+
+    float currentDepth=distanceToLight;
+    float closestDepth=linearizeDepth(sampleShadowCube(index,normalize(toFragment)),clipPlanes);
+    shadow+=(currentDepth-bias>closestDepth)?1.:0.;
+
+    float diskRadius=(1.+length(cameraPos-worldPos)/farPlane)*0.05;
+    for(int i=0;i<sampleCount;i++){
+        vec3 sampleDir=normalize(toFragment+sampleOffsetDirections[i]*diskRadius);
+        float depthSample=sampleShadowCube(index,sampleDir);
+        float closest=linearizeDepth(depthSample,clipPlanes);
+        shadow+=(currentDepth-bias>closest)?1.:0.;
+    }
+
+    shadow/=float(sampleCount+1);
     return shadow;
 }
 
@@ -250,13 +319,49 @@ void main(){
     vec3 Lo=vec3(0.);
     
     for(int i=0;i<numLights&&i<4;++i){
-        // Light direction and distance
-        vec3 L=normalize(lightPositions[i]-v_world_position);
+        int type=lightTypes[i];
+        vec3 L;
+        float attenuation=1.;
+        float distance=0.;
+
+        if(type==0){
+            vec3 dir=normalize(lightDirections[i]);
+            L=-dir;
+        }else{
+            vec3 toLight=lightPositions[i]-v_world_position;
+            distance=length(toLight);
+            if(distance<1e-4){
+                continue;
+            }
+            L=toLight/distance;
+            attenuation=1./max(distance*distance,1e-4);
+
+            float range=lightRanges[i];
+            if(range>0.){
+                float normalized=clamp(distance/range,0.,1.);
+                float smoothFactor=1.-normalized*normalized;
+                attenuation*=smoothFactor*smoothFactor;
+                if(normalized>=1.){
+                    continue;
+                }
+            }
+
+            if(type==2){
+                vec3 spotDir=normalize(lightDirections[i]);
+                float cosAngle=dot(-L,spotDir);
+                float inner=spotInnerCos[i];
+                float outer=spotOuterCos[i];
+                float spotFactor=clamp((cosAngle-outer)/max(inner-outer,1e-4),0.,1.);
+                attenuation*=spotFactor;
+                if(attenuation<=0.){
+                    continue;
+                }
+            }
+        }
+
         vec3 H=normalize(V+L);
-        float distance=length(lightPositions[i]-v_world_position);
-        float attenuation=1./(distance*distance);
         vec3 radiance=lightColors[i]*lightIntensities[i]*attenuation;
-        
+
         // Cook-Torrance BRDF
         float NDF=DistributionGGX(N,H,roughness);
         float G=GeometrySmith(N,V,L,roughness);
@@ -272,15 +377,14 @@ void main(){
         
         float NdotL=max(dot(N,L),0.);
         
-        // Shadow calculation
         float shadow=0.;
-        vec4 fragPosLightSpace=lightMatrices[i]*vec4(v_world_position,1.);
-        
-        if(i==0)shadow=calculateShadow(shadowMap0,fragPosLightSpace,shadowBias);
-        else if(i==1)shadow=calculateShadow(shadowMap1,fragPosLightSpace,shadowBias);
-        else if(i==2)shadow=calculateShadow(shadowMap2,fragPosLightSpace,shadowBias);
-        else if(i==3)shadow=calculateShadow(shadowMap3,fragPosLightSpace,shadowBias);
-        
+        if(type==1){
+            shadow=calculatePointShadow(i,v_world_position,lightPositions[i],shadowClip[i],pointShadowBias);
+        }else{
+            vec4 fragPosLightSpace=lightMatrices[i]*vec4(v_world_position,1.);
+            shadow=calculateProjectedShadow(i,fragPosLightSpace,shadowBias);
+        }
+
         // Add to outgoing radiance
         Lo+=(kD*albedo.rgb/PI+specular)*radiance*NdotL*(1.-shadow)*occlusion;
     }

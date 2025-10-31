@@ -6,9 +6,9 @@ Includes lightweight descriptors for data-driven scene loading.
 """
 
 import math
-import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Iterable, List, Tuple
+
 import numpy as np
 from pyrr import Matrix44, Vector3
 import moderngl
@@ -45,13 +45,30 @@ class LightDefinition:
     intensity: float = DEFAULT_LIGHT_INTENSITY
     light_type: str = "directional"
     cast_shadows: bool = True
+    range: float = 10.0
+    inner_cone_angle: float = 20.0
+    outer_cone_angle: float = 30.0
+    shadow_near: float = 0.1
+    shadow_far: float = 50.0
     extras: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LightDefinition":
         """Create a light definition from JSON data."""
 
-        known = {"position", "target", "color", "intensity", "type", "cast_shadows"}
+        known = {
+            "position",
+            "target",
+            "color",
+            "intensity",
+            "type",
+            "cast_shadows",
+            "range",
+            "inner_cone_angle",
+            "outer_cone_angle",
+            "shadow_near",
+            "shadow_far",
+        }
         extras = {k: v for k, v in data.items() if k not in known}
 
         return cls(
@@ -61,6 +78,11 @@ class LightDefinition:
             intensity=float(data.get("intensity", DEFAULT_LIGHT_INTENSITY)),
             light_type=data.get("type", "directional"),
             cast_shadows=bool(data.get("cast_shadows", True)),
+            range=float(data.get("range", 10.0)),
+            inner_cone_angle=float(data.get("inner_cone_angle", 20.0)),
+            outer_cone_angle=float(data.get("outer_cone_angle", 30.0)),
+            shadow_near=float(data.get("shadow_near", 0.1)),
+            shadow_far=float(data.get("shadow_far", 50.0)),
             extras=extras,
         )
 
@@ -74,6 +96,11 @@ class LightDefinition:
             intensity=self.intensity,
             light_type=self.light_type,
             cast_shadows=self.cast_shadows,
+            range=self.range,
+            inner_cone_angle=self.inner_cone_angle,
+            outer_cone_angle=self.outer_cone_angle,
+            shadow_near=self.shadow_near,
+            shadow_far=self.shadow_far,
         )
 
 
@@ -99,11 +126,15 @@ class Light:
     range: float = 10.0  # Effective radius for point/spot lights (0 = infinite)
     inner_cone_angle: float = 20.0  # Degrees (spot lights)
     outer_cone_angle: float = 30.0  # Degrees (spot lights - must be >= inner angle)
+    shadow_near: float = 0.1  # Near clip plane for perspective shadow maps
+    shadow_far: float = 50.0  # Far clip plane for perspective shadow maps
 
     # Shadow map resources (set by ShadowRenderer)
     shadow_map: moderngl.Texture = None
     shadow_fbo: moderngl.Framebuffer = None
     shadow_resolution: int = None  # Actual resolution of this light's shadow map
+    shadow_face_fbos: List[moderngl.Framebuffer] = field(default_factory=list, init=False, repr=False)
+    shadow_map_type: str = field(default=None, init=False, repr=False)
 
     # Shadow map caching (optimization)
     _shadow_dirty: bool = field(default=True, init=False, repr=False)
@@ -124,6 +155,12 @@ class Light:
         # Directional lights have infinite range
         if self.light_type == 'directional':
             self.range = 0.0
+
+        # Ensure perspective clip planes remain valid
+        if self.shadow_near < 1e-4:
+            self.shadow_near = 1e-4
+        if self.shadow_far <= self.shadow_near + 1e-4:
+            self.shadow_far = self.shadow_near + 1.0
 
     def get_light_type_id(self) -> int:
         """Return integer identifier for shaders."""
@@ -155,6 +192,42 @@ class Light:
         outer_cos = math.cos(math.radians(self.outer_cone_angle))
         return inner_cos, outer_cos
 
+    def get_shadow_clip_planes(self) -> Tuple[float, float]:
+        """Return near/far clip planes used for this light's shadow map."""
+        if self.light_type == 'directional':
+            return LIGHT_ORTHO_NEAR, LIGHT_ORTHO_FAR
+
+        near = max(self.shadow_near, 1e-4)
+        if self.range > 0.0:
+            far = max(min(self.range, self.shadow_far), near + 1e-3)
+        else:
+            far = max(self.shadow_far, near + 1e-3)
+        return near, far
+
+    def _get_view_matrix(self, up: Vector3 | None = None) -> Matrix44:
+        """Return a look-at view matrix for the light."""
+        if up is None:
+            up = Vector3([0.0, 1.0, 0.0])
+
+        # Ensure position and target are different to avoid zero-length forward vector
+        # which causes issues in pyrr's look_at function
+        target = self.target.copy()
+        position = self.position.copy()
+
+        direction = target - position
+        dir_length = np.linalg.norm(direction)
+
+        if dir_length < 1e-5:
+            # Position and target are too close or identical
+            # Offset target slightly to create a valid view matrix
+            target = position + Vector3([0.0, -1.0, 0.0])
+
+        return Matrix44.look_at(
+            position,
+            target,
+            up
+        )
+
     def get_light_matrix(
         self,
         left: float = LIGHT_ORTHO_LEFT,
@@ -178,27 +251,126 @@ class Light:
             Combined projection * view matrix
         """
         if self.light_type == 'directional':
-            # Orthographic projection for directional light
             light_projection = Matrix44.orthogonal_projection(
                 left, right, bottom, top, near, far
             )
-        elif self.light_type == 'point':
-            # Point lights need cube map shadows (6 perspectives)
-            raise NotImplementedError("Point light shadow maps not yet implemented")
-        elif self.light_type == 'spot':
-            # Spotlight uses perspective projection
-            raise NotImplementedError("Spot light shadow maps not yet implemented")
-        else:
-            raise ValueError(f"Unknown light type: {self.light_type}")
+            light_view = self._get_view_matrix()
+            return light_projection * light_view
 
-        # Light view matrix
-        light_view = Matrix44.look_at(
-            self.position,
-            self.target,
-            Vector3([0.0, 1.0, 0.0])  # Up vector
-        )
+        if self.light_type == 'spot':
+            near_plane, far_plane = self.get_shadow_clip_planes()
+            fov = max(self.outer_cone_angle * 2.0, 1.0)
+            light_projection = Matrix44.perspective_projection(
+                fov,
+                1.0,
+                near_plane,
+                far_plane,
+            )
+            light_view = self._get_view_matrix()
+            return light_projection * light_view
 
-        return light_projection * light_view
+        if self.light_type == 'point':
+            # Return first face transform for compatibility.
+            return self.get_point_shadow_face_transforms()[0]
+
+        raise ValueError(f"Unknown light type: {self.light_type}")
+
+    def get_point_shadow_face_transforms(self) -> List[Matrix44]:
+        """Return view-projection matrices for each cubemap face."""
+        if self.light_type != 'point':
+            raise ValueError("Point light face transforms requested for non-point light")
+
+        near_plane, far_plane = self.get_shadow_clip_planes()
+        projection = Matrix44.perspective_projection(90.0, 1.0, near_plane, far_plane)
+
+        directions = [
+            Vector3([1.0, 0.0, 0.0]),
+            Vector3([-1.0, 0.0, 0.0]),
+            Vector3([0.0, 1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+        ]
+        ups = [
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+        ]
+
+        matrices: List[Matrix44] = []
+        for direction, up in zip(directions, ups):
+            view = Matrix44.look_at(
+                self.position,
+                self.position + direction,
+                up,
+            )
+            matrices.append(projection * view)
+        return matrices
+
+    def iter_point_shadow_faces(self) -> Iterable[Tuple[int, Matrix44, Vector3, Vector3]]:
+        """Yield (index, matrix, direction, up) tuples for cubemap faces."""
+        if self.light_type != 'point':
+            return []
+
+        near_plane, far_plane = self.get_shadow_clip_planes()
+        projection = Matrix44.perspective_projection(90.0, 1.0, near_plane, far_plane)
+
+        directions = [
+            Vector3([1.0, 0.0, 0.0]),
+            Vector3([-1.0, 0.0, 0.0]),
+            Vector3([0.0, 1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+        ]
+        ups = [
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, 0.0, 1.0]),
+            Vector3([0.0, 0.0, -1.0]),
+            Vector3([0.0, -1.0, 0.0]),
+            Vector3([0.0, -1.0, 0.0]),
+        ]
+
+        for idx, (direction, up) in enumerate(zip(directions, ups)):
+            view = Matrix44.look_at(
+                self.position,
+                self.position + direction,
+                up,
+            )
+            yield idx, projection * view, direction, up
+
+    def get_shadow_matrices(self) -> List[Matrix44]:
+        """Return a list of shadow matrices for the light type."""
+        if self.light_type == 'directional':
+            light_projection = Matrix44.orthogonal_projection(
+                LIGHT_ORTHO_LEFT,
+                LIGHT_ORTHO_RIGHT,
+                LIGHT_ORTHO_BOTTOM,
+                LIGHT_ORTHO_TOP,
+                LIGHT_ORTHO_NEAR,
+                LIGHT_ORTHO_FAR,
+            )
+            return [light_projection * self._get_view_matrix()]
+
+        if self.light_type == 'spot':
+            near_plane, far_plane = self.get_shadow_clip_planes()
+            fov = max(self.outer_cone_angle * 2.0, 1.0)
+            projection = Matrix44.perspective_projection(
+                fov,
+                1.0,
+                near_plane,
+                far_plane,
+            )
+            return [projection * self._get_view_matrix()]
+
+        if self.light_type == 'point':
+            return self.get_point_shadow_face_transforms()
+
+        raise ValueError(f"Unknown light type: {self.light_type}")
 
     def should_render_shadow(self, intensity_threshold: float = 0.01, throttle_frames: int = 0) -> bool:
         """

@@ -64,6 +64,11 @@ class LightEditorTool(EditorTool):
         self.light_intensity: float = self.get_property("default_intensity", 1.0)
         self.light_height: float = self.get_property("default_height", 5.0)
         self.cast_shadows: bool = self.get_property("default_cast_shadows", True)
+        self.light_range: float = float(self.get_property("default_range", 15.0))
+        self.shadow_near: float = float(self.get_property("default_shadow_near", 0.1))
+        self.shadow_far: float = float(self.get_property("default_shadow_far", 30.0))
+        self.inner_cone_angle: float = float(self.get_property("default_inner_angle", 20.0))
+        self.outer_cone_angle: float = float(self.get_property("default_outer_angle", 30.0))
 
         # Move operation
         self.is_moving: bool = False
@@ -108,7 +113,12 @@ class LightEditorTool(EditorTool):
             color=self.light_color,
             intensity=self.light_intensity,
             light_type=self.light_type,
-            cast_shadows=self.cast_shadows
+            cast_shadows=self.cast_shadows,
+            range=self.light_range,
+            inner_cone_angle=self.inner_cone_angle,
+            outer_cone_angle=self.outer_cone_angle,
+            shadow_near=self.shadow_near,
+            shadow_far=self.shadow_far,
         )
 
         # Record in history
@@ -263,6 +273,27 @@ class LightEditorTool(EditorTool):
         """
         self.cast_shadows = cast_shadows
         print(f"Cast shadows: {self.cast_shadows}")
+
+    def set_light_range(self, light_range: float):
+        """Set effective light range for point and spot lights."""
+        self.light_range = max(0.0, float(light_range))
+        print(f"Light range: {self.light_range}")
+
+    def set_shadow_planes(self, near_plane: float, far_plane: float):
+        """Configure perspective shadow clip planes."""
+        near_plane = max(1e-3, float(near_plane))
+        far_plane = max(float(far_plane), near_plane + 0.1)
+        self.shadow_near = near_plane
+        self.shadow_far = far_plane
+        print(f"Shadow clip: near={self.shadow_near:.2f}, far={self.shadow_far:.2f}")
+
+    def set_spot_angles(self, inner_angle: float, outer_angle: float):
+        """Set spot light cone angles."""
+        inner_angle = max(0.0, float(inner_angle))
+        outer_angle = max(float(outer_angle), inner_angle)
+        self.inner_cone_angle = inner_angle
+        self.outer_cone_angle = outer_angle
+        print(f"Spot cone: inner={self.inner_cone_angle:.1f}, outer={self.outer_cone_angle:.1f}")
 
     def on_equipped(self):
         """Called when tool is equipped."""
