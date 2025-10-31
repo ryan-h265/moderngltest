@@ -170,6 +170,10 @@ class SceneManager:
 
         self.render_pipeline.initialize_lights(result.lights, camera)
 
+        # Set skybox on the scene if loaded
+        if result.skybox is not None:
+            result.scene.set_skybox(result.skybox)
+
         return result
 
     def _apply_camera_defaults(self, camera):

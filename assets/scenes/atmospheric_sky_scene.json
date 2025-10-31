@@ -1,0 +1,65 @@
+{
+  "name": "atmospheric_sky_scene",
+  "metadata": {
+    "description": "Example scene with atmospheric scattering skybox",
+    "physics": {
+      "gravity": [0.0, -9.81, 0.0],
+      "fixed_time_step": 0.016666667,
+      "max_substeps": 2
+    }
+  },
+  "camera": {
+    "position": [0.0, 5.0, 10.0],
+    "target": [0.0, 0.0, 0.0]
+  },
+  "player_spawn_position": [0.0, 3.1, 0.0],
+  "objects": [
+    {
+      "name": "Ground",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [40.0, 0.5, 40.0],
+      "position": [0.0, -0.25, 0.0],
+      "color": [0.3, 0.6, 0.3],
+      "bounding_radius": 14.15
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [10.0, 20.0, 10.0],
+      "target": [0.0, 0.0, 0.0],
+      "color": [1.0, 1.0, 0.95],
+      "intensity": 5.0,
+      "cast_shadows": true
+    }
+  ],
+  "skybox": {
+    "type": "atmospheric",
+    "intensity": 1.2,
+    "rotation": [0.0, 0.0, 0.0],
+    "time_of_day": {
+      "enabled": true,
+      "current_time": 0.6,
+      "auto_progress": true,
+      "speed": 0.1,
+      "latitude": 35.0,
+      "sun_intensity": 1.2,
+      "moon_intensity": 0.4
+    },
+    "atmospheric": {
+      "enabled": true,
+      "rayleigh_coefficient": [5.8e-6, 13.5e-6, 33.1e-6],
+      "mie_coefficient": 2.1e-5,
+      "sun_brightness": 22.0,
+      "turbidity": 2.5
+    },
+    "stars": {
+      "enabled": true,
+      "density": 1500,
+      "brightness": 1.2,
+      "size": 1.0,
+      "rotation_speed": 0.05
+    }
+  }
+}

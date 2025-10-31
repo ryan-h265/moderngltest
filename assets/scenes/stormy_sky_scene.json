@@ -1,0 +1,80 @@
+{
+  "name": "stormy_sky_scene",
+  "metadata": {
+    "description": "Example scene with stormy weather and dynamic clouds",
+    "physics": {
+      "gravity": [0.0, -9.81, 0.0],
+      "fixed_time_step": 0.016666667,
+      "max_substeps": 2
+    }
+  },
+  "camera": {
+    "position": [0.0, 5.0, 10.0],
+    "target": [0.0, 0.0, 0.0]
+  },
+  "player_spawn_position": [0.0, 3.1, 0.0],
+  "objects": [
+    {
+      "name": "Ground",
+      "type": "primitive",
+      "primitive": "cube",
+      "size": [40.0, 0.5, 40.0],
+      "position": [0.0, -0.25, 0.0],
+      "color": [0.2, 0.25, 0.3],
+      "bounding_radius": 14.15
+    }
+  ],
+  "lights": [
+    {
+      "type": "directional",
+      "position": [5.0, 15.0, 10.0],
+      "target": [0.0, 0.0, 0.0],
+      "color": [0.7, 0.7, 0.8],
+      "intensity": 3.0,
+      "cast_shadows": true
+    }
+  ],
+  "skybox": {
+    "type": "hybrid",
+    "intensity": 0.8,
+    "rotation": [0.0, 0.0, 0.0],
+    "time_of_day": {
+      "enabled": true,
+      "current_time": 0.4,
+      "auto_progress": false,
+      "speed": 1.0,
+      "latitude": 50.0,
+      "sun_intensity": 0.6,
+      "moon_intensity": 0.2
+    },
+    "weather": {
+      "type": "stormy",
+      "cloud_coverage": 0.85,
+      "cloud_speed": 2.5,
+      "cloud_density": 0.8,
+      "precipitation": 0.7,
+      "wind_speed": 3.0,
+      "wind_direction": [0.7, 0.3]
+    },
+    "atmospheric": {
+      "enabled": true,
+      "rayleigh_coefficient": [5.8e-6, 13.5e-6, 33.1e-6],
+      "mie_coefficient": 3.5e-5,
+      "sun_brightness": 15.0,
+      "turbidity": 6.0
+    },
+    "stars": {
+      "enabled": true,
+      "density": 800,
+      "brightness": 0.5,
+      "size": 0.8
+    },
+    "fog": {
+      "enabled": true,
+      "color": [0.3, 0.35, 0.4],
+      "density": 0.05,
+      "start": 0.0,
+      "end": 80.0
+    }
+  }
+}

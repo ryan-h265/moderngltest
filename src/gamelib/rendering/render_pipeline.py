@@ -73,7 +73,12 @@ class RenderPipeline:
 
         # Forward rendering shaders
         self.shader_manager.load_program("main", "main_lighting.vert", "main_lighting.frag")
-        self.shader_manager.load_program("skybox", "skybox.vert", "aurora_skybox.frag")
+
+        # Skybox shader variants
+        self.shader_manager.load_program("skybox_cubemap", "skybox.vert", "skybox_cubemap.frag")
+        self.shader_manager.load_program("skybox_atmospheric", "skybox.vert", "skybox_atmospheric.frag")
+        self.shader_manager.load_program("skybox_hybrid", "skybox.vert", "skybox_hybrid.frag")
+        self.shader_manager.load_program("skybox_aurora", "skybox.vert", "aurora_skybox.frag")  # Legacy support
 
         # Deferred rendering shaders
         self.shader_manager.load_program("geometry", "deferred_geometry.vert", "deferred_geometry.frag")
@@ -115,11 +120,15 @@ class RenderPipeline:
         )
         self.shadow_renderer.set_screen_viewport((0, 0, WINDOW_SIZE[0], WINDOW_SIZE[1]))
 
-        # Create forward rendering pipeline
-        self.skybox_renderer = SkyboxRenderer(
-            ctx,
-            self.shader_manager.get("skybox")
-        )
+        # Create forward rendering pipeline with multiple skybox shaders
+        skybox_programs = {
+            "cubemap": self.shader_manager.get("skybox_cubemap"),
+            "atmospheric": self.shader_manager.get("skybox_atmospheric"),
+            "hybrid": self.shader_manager.get("skybox_hybrid"),
+            "aurora": self.shader_manager.get("skybox_aurora"),
+            "procedural": self.shader_manager.get("skybox_aurora"),  # Alias for backward compatibility
+        }
+        self.skybox_renderer = SkyboxRenderer(ctx, skybox_programs)
         self.main_renderer = MainRenderer(
             ctx,
             self.shader_manager.get("main"),
