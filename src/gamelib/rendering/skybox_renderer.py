@@ -97,21 +97,30 @@ class SkyboxRenderer:
         elif "skybox" in program:
             program["skybox"].value = 0
 
-        # Set render state
-        prev_depth_mask = self.ctx.depth_mask
-        prev_depth_func = self.ctx.depth_func
-
+        # Set render state for skybox
+        # Skybox renders at maximum depth (always behind everything)
         self.ctx.enable(moderngl.DEPTH_TEST)
-        self.ctx.depth_mask = False
         self.ctx.depth_func = "<="
+
+        # Disable depth writes so skybox doesn't write to depth buffer
+        # Note: depth_mask may be write-only in some ModernGL versions
+        try:
+            self.ctx.depth_mask = False
+        except AttributeError:
+            pass  # Some ModernGL versions don't support this attribute
+
         self.ctx.disable(moderngl.CULL_FACE)
 
+        # Render skybox cube
+        self.cube.render(program)
+
+        # Restore render state to defaults
         try:
-            self.cube.render(program)
-        finally:
-            self.ctx.depth_mask = prev_depth_mask
-            self.ctx.depth_func = prev_depth_func
-            self.ctx.enable(moderngl.CULL_FACE)
+            self.ctx.depth_mask = True
+        except AttributeError:
+            pass
+        self.ctx.depth_func = "<"
+        self.ctx.enable(moderngl.CULL_FACE)
 
     def _set_uniform(
         self,
